@@ -1,0 +1,94 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ========= Helper Functions =========
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    function uid() {
+      return request.auth.uid;
+    }
+
+    function getUserData(role, userId) {
+      return get(/databases/$(database)/documents/colleges/commerce/$(role)/$(userId)).data;
+    }
+
+    function isSuperAdmin() {
+      return exists(/databases/$(database)/documents/colleges/commerce/super_admins/$(uid()));
+    }
+
+    function isManager() {
+      return exists(/databases/$(database)/documents/colleges/commerce/managers/$(uid()));
+    }
+
+    function isDoctor() {
+      return exists(/databases/$(database)/documents/colleges/commerce/doctors/$(uid()));
+    }
+
+    function isManagerOfLevel(levelId) {
+      return isManager() && levelId in getUserData('managers', uid()).managedLevels;
+    }
+
+    // ========= Main Rules =========
+    match /colleges/commerce {
+
+      // Super Admins: Unrestricted access within the college
+      allow read, write: if isSuperAdmin();
+
+      // Managers: Can read their own data.
+      match /managers/{managerId} {
+        allow read: if isAuth() && uid() == managerId;
+        allow write: if false; // Only super admins can write (covered above)
+      }
+
+      // Doctors: Can read their own data.
+      match /doctors/{doctorId} {
+        allow read: if isAuth() && uid() == doctorId;
+        allow write: if false; // Only super admins can write
+      }
+
+      // Semesters: Can be read by any authenticated user.
+      match /semesters/{semId} {
+        allow read: if isAuth();
+        allow write: if false; // Only super admins can write
+      }
+
+      // Levels Collection
+      match /levels/{levelId} {
+        // A manager can read a level document if they manage it.
+        allow read: if isAuth() && isManagerOfLevel(levelId);
+        allow write: if false; // Only super admins can write
+
+        // --- Students --- //
+        match /students/{studentUid} {
+          // 1. A student can read/write to their own document.
+          // 2. A manager of that level can read/write.
+          // 3. A doctor can READ student data.
+          allow read: if (isAuth() && uid() == studentUid) || isManagerOfLevel(levelId) || isDoctor();
+          allow write: if (isAuth() && uid() == studentUid) || isManagerOfLevel(levelId);
+
+          // Students can manage their own schedule
+          match /my_schedule/{scheduleId} {
+             allow read, write: if isAuth() && uid() == studentUid;
+          }
+        }
+
+        // --- Courses & Sections --- //
+        match /(courses|sections)/{docId} {
+          // Any authenticated user can read courses/sections.
+          allow read: if isAuth();
+          // Only the manager of that level can write.
+          allow write: if isManagerOfLevel(levelId);
+        }
+      }
+
+      // Explicitly DENY access to legacy collections
+      match /(students|doctors|admins|attendance|submissions|grades|curriculum|exam_results)/{docId} {
+        allow read, write: if false;
+      }
+    }
+  }
+}

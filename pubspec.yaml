@@ -1,0 +1,63 @@
+name: smart_university
+description: "A professional Smart University System."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.8.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  google_fonts: ^6.2.1
+  shared_preferences: ^2.3.5
+  file_picker: ^8.1.7
+  open_filex: ^4.5.0
+  mobile_scanner: ^5.1.0
+  qr_flutter: ^4.1.0
+  dio: ^5.7.0
+  path_provider: ^2.1.5
+  flutter_local_notifications: ^17.2.2
+  timezone: ^0.9.4
+  intl: ^0.19.0
+  url_launcher: ^6.3.1
+  audioplayers: ^6.1.0
+  local_auth: ^2.2.0
+  excel: ^4.0.3
+  share_plus: ^10.1.4
+  permission_handler: ^11.3.1
+  crypto: ^3.0.3
+  universal_html: ^2.2.4
+  geolocator: ^10.1.0
+
+  firebase_core: ^3.12.0
+  firebase_auth: ^5.5.1
+  cloud_firestore: ^5.6.3
+  firebase_storage: ^12.4.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.13.1
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  web:
+    generate: true
+    image_path: "assets/icon/app_icon.png"
+    background_color: "#673AB7"
+    theme_color: "#673AB7"
+  image_path: "assets/icon/app_icon.png"
+  adaptive_icon_background: "#673AB7"
+  adaptive_icon_foreground: "assets/icon/app_icon.png"
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/sounds/
+    - assets/icon/
