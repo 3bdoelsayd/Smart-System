@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:universal_html/html.dart' as html;
 import '../services/data_service.dart';
 
 class ResearchSubmissionsScreen extends StatefulWidget {
@@ -32,15 +34,34 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
   }
 
   Future<void> _launchURL(String url) async {
-    final Uri uri = Uri.parse(url);
+    if (url.trim().isEmpty) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("رابط الملف غير متاح")));
+      return;
+    }
+
     try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("لا يمكن فتح الرابط حالياً")));
+      if (kIsWeb) {
+        html.window.open(url, '_blank');
+        return;
+      }
+
+      final Uri uri = Uri.parse(url);
+      bool launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!launched) {
+        launched = await launchUrl(uri, mode: LaunchMode.platformDefault);
+      }
+
+      if (!launched && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تعذر فتح ملف البحث")));
       }
     } catch (e) {
       debugPrint("Launch Error: $e");
+      try {
+        final Uri uri = Uri.parse(url);
+        await launchUrl(uri, mode: LaunchMode.platformDefault);
+      } catch (e2) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("خطأ في فتح الملف: $e")));
+      }
     }
   }
 
