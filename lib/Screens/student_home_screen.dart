@@ -486,10 +486,84 @@ class _StudentResearchsPage extends StatelessWidget {
                                 subtitle: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const SizedBox(height: 4),
-                                    Text(r['fileName'] ?? '', style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.grey.shade600), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                    Text(isSeen ? (isAr ? "تمت المشاهدة" : "Seen") : (isAr ? "في انتظار المراجعة" : "Pending"),
-                                        style: TextStyle(fontSize: 10, color: isSeen ? Colors.blue : (isDark ? Colors.white38 : Colors.grey), fontWeight: FontWeight.bold)),
+                                    const SizedBox(height: 10),
+                                    if (r['grade'] != null || (r['comment'] != null && r['comment'].toString().isNotEmpty))
+                                      Container(
+                                        padding: const EdgeInsets.all(12),
+                                        decoration: BoxDecoration(
+                                          color: isDark ? Colors.white.withOpacity(0.03) : Colors.grey.shade50,
+                                          borderRadius: BorderRadius.circular(15),
+                                          border: Border.all(color: isDark ? Colors.white10 : Colors.grey.shade200),
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            if (r['grade'] != null)
+                                              Row(
+                                                children: [
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.green.withOpacity(0.15),
+                                                      borderRadius: BorderRadius.circular(10),
+                                                    ),
+                                                    child: Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        const Icon(Icons.stars_rounded, color: Colors.green, size: 16),
+                                                        const SizedBox(width: 6),
+                                                        Text(
+                                                          "${isAr ? 'الدرجة:' : 'Grade:'} ${r['grade']}",
+                                                          style: GoogleFonts.cairo(fontSize: 13, color: Colors.green, fontWeight: FontWeight.w900),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            if (r['grade'] != null && r['comment'] != null && r['comment'].toString().isNotEmpty)
+                                              const SizedBox(height: 10),
+                                            if (r['comment'] != null && r['comment'].toString().isNotEmpty)
+                                              Row(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  const Icon(Icons.chat_bubble_outline_rounded, color: Colors.orange, size: 14),
+                                                  const SizedBox(width: 8),
+                                                  Expanded(
+                                                    child: Text(
+                                                      r['comment'].toString(),
+                                                      style: GoogleFonts.cairo(
+                                                        fontSize: 12, 
+                                                        color: isDark ? Colors.white70 : Colors.black87,
+                                                        fontWeight: FontWeight.w600,
+                                                        fontStyle: FontStyle.italic,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                    const SizedBox(height: 10),
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          isSeen ? Icons.check_circle_rounded : Icons.access_time_rounded,
+                                          size: 14,
+                                          color: isSeen ? Colors.blue : Colors.grey,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          isSeen ? (isAr ? "تمت المشاهدة" : "Seen") : (isAr ? "في انتظار المراجعة" : "Pending"),
+                                          style: GoogleFonts.cairo(
+                                            fontSize: 10, 
+                                            color: isSeen ? Colors.blue : Colors.grey, 
+                                            fontWeight: FontWeight.bold
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ],
                                 ),
                                 trailing: Icon(isSeen ? Icons.check_circle_rounded : Icons.access_time_rounded,

@@ -10,7 +10,6 @@ class DoctorHomeScreen extends StatelessWidget {
   const DoctorHomeScreen({super.key});
 
   void _showSubjectPicker(BuildContext context, String doctorId, List<String> teachingLevels, DataService ds) {
-    bool isAr = ds.isArabic;
     bool isDark = ds.isDarkMode;
 
     showModalBottomSheet(

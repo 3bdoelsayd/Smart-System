@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/data_service.dart';
 
@@ -174,12 +175,9 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
 
   Widget _buildSubmissionsList(String subject, Color color, bool isDark) {
     bool isAr = _ds.isArabic;
-    final doctorId = _ds.currentDoctor?['uid'] ?? '';
-
     return StreamBuilder<QuerySnapshot>(
       stream: _ds.submissionsColl
           .where('subject', isEqualTo: subject)
-          .where('doctorId', isEqualTo: doctorId)
           .snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
@@ -264,6 +262,11 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   IconButton(
+                                    icon: const Icon(Icons.star_rate_rounded, color: Colors.orange, size: 22),
+                                    onPressed: () => _showEvaluationDialog(docId, r),
+                                    tooltip: isAr ? "تقييم" : "Evaluate",
+                                  ),
+                                  IconButton(
                                     icon: const Icon(Icons.open_in_new_rounded, color: Colors.blue, size: 22),
                                     onPressed: () => _launchURL(fileUrl),
                                   ),
@@ -285,6 +288,60 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
           ],
         );
       },
+    );
+  }
+
+  void _showEvaluationDialog(String docId, Map<String, dynamic> data) {
+    final gradeController = TextEditingController(text: data['grade']?.toString() ?? '');
+    final commentController = TextEditingController(text: data['comment']?.toString() ?? '');
+    bool isAr = _ds.isArabic;
+    bool isDark = _ds.isDarkMode;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(isAr ? "تقييم البحث" : "Evaluate Research", style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: gradeController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: isAr ? "الدرجة" : "Grade",
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+            const SizedBox(height: 15),
+            TextField(
+              controller: commentController,
+              maxLines: 3,
+              decoration: InputDecoration(
+                labelText: isAr ? "تعليقك" : "Comment",
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(isAr ? "إلغاء" : "Cancel")),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF673AB7)),
+            onPressed: () async {
+              await _ds.updateResearchStatus(
+                docId, 
+                'Graded', 
+                grade: gradeController.text, 
+                comment: commentController.text
+              );
+              if (mounted) Navigator.pop(ctx);
+            },
+            child: Text(isAr ? "حفظ" : "Save", style: const TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
     );
   }
 

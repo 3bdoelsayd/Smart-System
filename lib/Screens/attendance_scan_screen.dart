@@ -13,6 +13,9 @@ class AttendanceScanScreen extends StatefulWidget {
 }
 
 class _AttendanceScanScreenState extends State<AttendanceScanScreen> {
+  // 💡 مفتاح التحكم بفحص الموقع والمسافة (موقوف مؤقتاً للتجربة، أرجعه true لإعادة التفعيل)
+  static const bool enableLocationCheck = false;
+
   final DataService _ds = DataService();
   late MobileScannerController _scannerController;
   bool _isProcessing = false;
@@ -105,12 +108,26 @@ class _AttendanceScanScreenState extends State<AttendanceScanScreen> {
               pos = _currentPosition;
             }
 
-            if (pos == null) {
+            if (pos == null && enableLocationCheck) {
               throw _ds.isArabic ? "فشل تحديد موقعك الحالي. تأكد من تشغيل الـ GPS." : "Could not determine location.";
             }
 
+            // موقع افتراضي في حالة إيقاف الفحص للتجربة
+            pos ??= Position(
+              latitude: 0.0,
+              longitude: 0.0,
+              timestamp: DateTime.now(),
+              accuracy: 0.0,
+              altitude: 0.0,
+              heading: 0.0,
+              speed: 0.0,
+              speedAccuracy: 0.0,
+              altitudeAccuracy: 0.0,
+              headingAccuracy: 0.0,
+            );
+
             // 3. حماية Fake GPS (مهمة جداً للتحقق من الغش)
-            if (!kIsWeb) {
+            if (!kIsWeb && enableLocationCheck) {
               if (pos.isMocked) {
                 throw _ds.isArabic 
                   ? "لا يمكن تسجيل الحضور: مصدر الموقع غير موثوق (Fake GPS detected)." 
@@ -118,8 +135,8 @@ class _AttendanceScanScreenState extends State<AttendanceScanScreen> {
               }
             }
             
-            // 4. فحص المسافة (30 متر لضمان التواجد داخل القاعة)
-            if (hallLocStr != "0,0") {
+            // 4. فحص المسافة (30 متر) - موقوف مؤقتاً للتجربة
+            if (enableLocationCheck && hallLocStr != "0,0") {
               List<String> latLng = hallLocStr.split(',');
               if (latLng.length == 2) {
                 double hallLat = double.tryParse(latLng[0]) ?? 0.0;

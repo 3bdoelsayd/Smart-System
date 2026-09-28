@@ -9,7 +9,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:timezone/data/latest.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:io' as io;
 
@@ -47,6 +49,10 @@ class DataService extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
+  
+  // نغير دي عشان متبدأش غير لما نحتاجها فعلاً
+  SupabaseClient get supabase => Supabase.instance.client;
+
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
   List<String> studentSubjects = [];
@@ -58,8 +64,8 @@ class DataService extends ChangeNotifier {
   String translate(String key) {
     final Map<String, Map<String, String>> localizedValues = {
       'ar': {
-        'app_name': 'University Smart System',
-        'app_title': instituteData?['nameAr'] ?? 'المعهد العالي للعلوم الادارية ببلقاس',
+        'app_name': 'نظام الجامعة الذكي',
+        'app_title': instituteData?['nameAr'] ?? 'نظام الجامعة الذكي',
         'home': 'الرئيسية', 'attendance': 'تسجيل الحضور',
         'upload_research': 'رفع بحث', 'research_history': 'سجل الأبحاث', 'results': 'النتائج الدراسية',
         'my_researches': 'أبحاثي', 'schedule': 'جدولي', 'profile': 'الملف الشخصي',
@@ -176,9 +182,34 @@ class DataService extends ChangeNotifier {
       );
 
       String uid = userCredential.user!.uid;
+      
+      // --- نظام الأمان: التحقق من الجهاز (Fingerprinting) ---
+      final prefs = await SharedPreferences.getInstance();
+      String? localDeviceId = prefs.getString('device_unique_id');
+      if (localDeviceId == null) {
+        localDeviceId = "DEV-${DateTime.now().millisecondsSinceEpoch}-${uid.hashCode}";
+        await prefs.setString('device_unique_id', localDeviceId);
+      }
+      // ----------------------------------------------------
+
       String? role = await _findAndLoadUser(uid);
 
       if (role != null) {
+        // التحقق من ربط الجهاز للطلاب فقط لزيادة الأمان ومنع تبادل الحسابات
+        if (role == 'student' && currentStudent != null) {
+          String? storedDeviceId = currentStudent!['deviceId'];
+          if (storedDeviceId == null || storedDeviceId.isEmpty) {
+            // ربط الجهاز لأول مرة
+            await studentsColl.doc(uid).update({'deviceId': localDeviceId});
+            currentStudent!['deviceId'] = localDeviceId;
+          } else if (storedDeviceId != localDeviceId) {
+            await _auth.signOut();
+            throw isArabic 
+              ? "عذراً، هذا الحساب مرتبط بجهاز آخر. يرجى مراجعة شؤون الطلاب لإعادة ضبط الجهاز." 
+              : "Account bound to another device. Contact Student Affairs.";
+          }
+        }
+
         await saveSession(uid, role);
         notifyListeners();
         return role;
@@ -359,9 +390,42 @@ class DataService extends ChangeNotifier {
 
   Future<void> addLectureToCourse(String levelId, String courseId, String title, int number) async { String lecId = _firestore.collection('tmp').doc().id; await getCommerceLecturesColl(levelId, courseId).doc(lecId).set({'id': lecId, 'title': title, 'number': number, 'createdAt': FieldValue.serverTimestamp()}); notifyListeners(); }
 
-  Future<void> deleteStudent(String uid, String level) async { await studentsColl.doc(uid).delete(); await getCommerceStudentsColl('level_$level').doc(uid).delete(); notifyListeners(); }
+  Future<void> deleteStudent(String uid, String level) async {
+    try {
+      final studentDoc = await studentsColl.doc(uid).get();
+      final data = studentDoc.data() as Map<String, dynamic>?;
+      final String? studentId = data?['id']?.toString();
+
+      await studentsColl.doc(uid).delete();
+      await getCommerceStudentsColl('level_$level').doc(uid).delete();
+
+      if (studentId != null) {
+        final attDocs = await attendanceColl.where('studentId', isEqualTo: studentId).get();
+        for (var d in attDocs.docs) { await d.reference.delete(); }
+        final subDocs = await submissionsColl.where('studentId', isEqualTo: studentId).get();
+        for (var d in subDocs.docs) { await d.reference.delete(); }
+        final resDocs = await examResultsColl.where('studentId', isEqualTo: studentId).get();
+        for (var d in resDocs.docs) { await d.reference.delete(); }
+      }
+      notifyListeners();
+    } catch (e) {
+      debugPrint("Comprehensive delete error: $e");
+    }
+  }
+
+  Future<void> resetStudentDevice(String uid) async {
+    await studentsColl.doc(uid).update({'deviceId': FieldValue.delete()});
+    notifyListeners();
+  }
+
   Future<void> deleteDoctor(String uid) async { await commerceDoctorsColl.doc(uid).delete(); notifyListeners(); }
   Future<void> deleteManager(String uid) async { await commerceManagersColl.doc(uid).delete(); notifyListeners(); }
+
+  Future<void> clearAllNotifications(String type) async {
+    var snap = await notificationsColl.where('targetType', isEqualTo: type).get();
+    for (var d in snap.docs) { await d.reference.delete(); }
+    notifyListeners();
+  }
 
   Future<void> addSemester(String id, String name, int order) async { await commerceSemestersColl.doc(id).set({'id': id, 'name': name, 'order': order, 'isActive': false, 'createdAt': FieldValue.serverTimestamp()}); notifyListeners(); }
   Future<void> toggleSemesterStatus(String id, bool isActive) async { if (isActive) { var query = await commerceSemestersColl.get(); for (var doc in query.docs) { if (doc.id != id) { await doc.reference.update({'isActive': false}); } } } await commerceSemestersColl.doc(id).update({'isActive': isActive}); notifyListeners(); }
@@ -425,14 +489,82 @@ class DataService extends ChangeNotifier {
   Future<void> uploadResearchToRemote({required String subject, required PlatformFile file, String title = ''}) async {
     if (currentStudent == null) throw "Action not allowed";
     String studentId = currentStudent!['id'].toString();
-    final Reference storageRef = _storage.ref().child('submissions/$selectedInstituteId/$studentId/${DateTime.now().millisecondsSinceEpoch}_${file.name}');
-    UploadTask uploadTask = kIsWeb ? storageRef.putData(file.bytes!) : storageRef.putFile(io.File(file.path!));
-    final TaskSnapshot snapshot = await uploadTask;
-    String url = await snapshot.ref.getDownloadURL();
-    await submissionsColl.add({'studentId': studentId, 'studentName': currentStudent!['name'], 'subject': subject, 'fileName': file.name, 'fileUrl': url, 'title': title, 'date': FieldValue.serverTimestamp(), 'status': 'Submitted', 'isSeen': false, 'instituteId': selectedInstituteId});
+    String studentName = currentStudent!['name'] ?? '';
+    
+    try {
+      String fileName = 'research_${studentId}_${DateTime.now().millisecondsSinceEpoch}.pdf';
+      
+      if (kIsWeb) {
+        await supabase.storage.from('research-pdfs').uploadBinary(fileName, file.bytes!);
+      } else {
+        await supabase.storage.from('research-pdfs').upload(fileName, io.File(file.path!));
+      }
+
+      final String publicUrl = supabase.storage.from('research-pdfs').getPublicUrl(fileName);
+
+      await submissionsColl.add({
+        'studentId': studentId, 
+        'studentName': studentName, 
+        'subject': subject, 
+        'fileName': file.name, 
+        'fileUrl': publicUrl, 
+        'title': title, 
+        'date': FieldValue.serverTimestamp(), 
+        'status': 'Submitted', 
+        'isSeen': false, 
+        'instituteId': selectedInstituteId,
+        'level': currentStudent?['level']?.toString() ?? '1',
+      });
+
+      // إضافة إشعار للدكتور
+      await notificationsColl.add({
+        'title': isArabic ? 'بحث جديد مرفوع' : 'New Research Uploaded',
+        'body': isArabic ? 'قام الطالب $studentName برفع بحث في مادة $subject' : 'Student $studentName uploaded a research in $subject',
+        'targetType': 'doctor',
+        'subject': subject,
+        'timestamp': FieldValue.serverTimestamp(),
+        'instituteId': selectedInstituteId,
+        'isRead': false,
+      });
+      
+      debugPrint("✅ Research uploaded & Doctor notified");
+    } catch (e) {
+      debugPrint("❌ Error uploading research: $e");
+      rethrow;
+    }
   }
 
-  Future<void> updateResearchStatus(String id, String stat, {bool markAsSeen = false}) async { Map<String, dynamic> data = {'status': stat}; if (markAsSeen) data['isSeen'] = true; await submissionsColl.doc(id).update(data); notifyListeners(); }
+  Future<void> updateResearchStatus(String id, String stat, {bool markAsSeen = false, String? grade, String? comment}) async {
+    Map<String, dynamic> data = {'status': stat};
+    if (markAsSeen) data['isSeen'] = true;
+    if (grade != null) data['grade'] = grade;
+    if (comment != null) data['comment'] = comment;
+    
+    if (grade != null || comment != null) {
+      data['evaluatedAt'] = FieldValue.serverTimestamp();
+      data['evaluatedBy'] = currentDoctor?['name'] ?? 'Doctor';
+
+      // جلب بيانات البحث لإرسال إشعار للطالب
+      var doc = await submissionsColl.doc(id).get();
+      var subData = doc.data() as Map<String, dynamic>?;
+
+      if (subData != null) {
+        await notificationsColl.add({
+          'title': isArabic ? 'تم تقييم بحثك' : 'Research Evaluated',
+          'body': isArabic 
+              ? 'قام الدكتور بتقييم بحثك في مادة ${subData['subject']}. الدرجة: $grade' 
+              : 'Doctor evaluated your research in ${subData['subject']}. Grade: $grade',
+          'targetType': 'student',
+          'targetId': subData['studentId'],
+          'timestamp': FieldValue.serverTimestamp(),
+          'instituteId': selectedInstituteId,
+          'isRead': false,
+        });
+      }
+    }
+    await submissionsColl.doc(id).update(data);
+    notifyListeners();
+  }
   Future<bool> deleteResearch(String id) async { await submissionsColl.doc(id).delete(); notifyListeners(); return true; }
 
   Future<void> saveExamResult(String sId, String sub, double cw, double fin) async { double tot = cw + fin; await examResultsColl.doc('${sId}_$sub').set({'studentId': sId, 'subject': sub, 'coursework': cw, 'final': fin, 'total': tot, 'grade': calculateGrade(tot), 'doctorName': currentDoctor?['name'] ?? 'System', 'date': FieldValue.serverTimestamp(), 'instituteId': selectedInstituteId}); }
@@ -444,10 +576,176 @@ class DataService extends ChangeNotifier {
   Stream<QuerySnapshot> getStudentExamResultsStream(String sId) => examResultsColl.where('studentId', isEqualTo: sId).snapshots();
   Stream<QuerySnapshot> getStudentGradesStream(String sId) => gradesColl.where('studentId', isEqualTo: sId).snapshots();
 
-  Future<void> saveScheduleItem(Map<String, dynamic> item) async { if (currentStudent == null) return; await studentsColl.doc(currentStudent!['uid']).collection('my_schedule').add({...item, 'instituteId': selectedInstituteId}); }
-  Future<void> deleteScheduleItem(String id) async { if (currentStudent == null) return; await studentsColl.doc(currentStudent!['uid']).collection('my_schedule').doc(id).delete(); }
-  Stream<QuerySnapshot> getStudentScheduleStream() { if (currentStudent == null) return const Stream.empty(); return studentsColl.doc(currentStudent!['uid']).collection('my_schedule').snapshots(); }
-  Future<void> clearAllNotifications(String type) async { var snap = await notificationsColl.where('targetType', isEqualTo: type).get(); for (var d in snap.docs) { await d.reference.delete(); } }
+  Future<void> initNotifications() async {
+    if (kIsWeb) return;
+    tz.initializeTimeZones();
+    // ضبط المنطقة الزمنية الافتراضية للقاهرة كمثال لو فشل التعرف التلقائي
+    try {
+      tz.setLocalLocation(tz.getLocation('Africa/Cairo'));
+    } catch (e) {
+      debugPrint("Timezone error: $e");
+    }
+
+    const AndroidInitializationSettings initializationSettingsAndroid =
+        AndroidInitializationSettings('@mipmap/launcher_icon');
+
+    const DarwinInitializationSettings initializationSettingsDarwin =
+        DarwinInitializationSettings(
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: true,
+    );
+
+    const InitializationSettings initializationSettings = InitializationSettings(
+      android: initializationSettingsAndroid,
+      iOS: initializationSettingsDarwin,
+    );
+
+    await flutterLocalNotificationsPlugin.initialize(
+      initializationSettings,
+    );
+
+    // Request permissions for Android 13+
+    await flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.requestNotificationsPermission();
+
+    // Check for exact alarm permission on Android 13+
+    if (io.Platform.isAndroid) {
+      final androidImplementation = flutterLocalNotificationsPlugin
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
+      if (androidImplementation != null) {
+        await androidImplementation.requestExactAlarmsPermission();
+      }
+    }
+  }
+
+  Future<void> scheduleLectureNotification({
+    required String docId,
+    required String subject,
+    required String dayName,
+    required String timeStr,
+    required String type,
+  }) async {
+    try {
+      // 1. حساب الوقت القادم للمحاضرة
+      final now = DateTime.now();
+      
+      // تحويل الوقت من String (مثلاً "10:00 AM") إلى DateTime
+      // ملاحظة: فورمات الوقت في المشروع هو d['time']
+      final timeParts = _parseTime(timeStr);
+      if (timeParts == null) return;
+
+      int dayOfWeek = _getDayOfWeek(dayName);
+      if (dayOfWeek == -1) return;
+
+      DateTime scheduledDate = DateTime(
+        now.year,
+        now.month,
+        now.day,
+        timeParts.hour,
+        timeParts.minute,
+      );
+
+      // ضبط اليوم
+      while (scheduledDate.weekday != dayOfWeek) {
+        scheduledDate = scheduledDate.add(const Duration(days: 1));
+      }
+
+      // لو الوقت فات النهاردة، نخليها الأسبوع الجاي
+      if (scheduledDate.isBefore(now)) {
+        scheduledDate = scheduledDate.add(const Duration(days: 7));
+      }
+
+      // 2. جدولة الإشعار
+      int notificationId = docId.hashCode.abs();
+      
+      await flutterLocalNotificationsPlugin.zonedSchedule(
+        notificationId,
+        isArabic ? "حان موعد $type" : "Time for $type",
+        isArabic ? "تبدأ الآن محاضرة: $subject" : "$type starts now: $subject",
+        tz.TZDateTime.from(scheduledDate, tz.local),
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'lecture_reminders',
+            'Lectures Reminders',
+            channelDescription: 'Notifications for your university schedule',
+            importance: Importance.max,
+            priority: Priority.high,
+            playSound: true,
+          ),
+          iOS: DarwinNotificationDetails(),
+        ),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime, // تكرار أسبوعي
+      );
+      debugPrint("📅 Scheduled $type: $subject at $scheduledDate");
+    } catch (e) {
+      debugPrint("❌ Error scheduling notification: $e");
+    }
+  }
+
+  TimeOfDay? _parseTime(String timeStr) {
+    try {
+      // "10:00 AM" or "22:00"
+      final parts = timeStr.split(' ');
+      final time = parts[0].split(':');
+      int hour = int.parse(time[0]);
+      int minute = int.parse(time[1]);
+
+      if (parts.length > 1) {
+        final ampm = parts[1].toUpperCase();
+        if (ampm == "PM" && hour < 12) hour += 12;
+        if (ampm == "AM" && hour == 12) hour = 0;
+      }
+      return TimeOfDay(hour: hour, minute: minute);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  int _getDayOfWeek(String dayName) {
+    final Map<String, int> days = {
+      'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4,
+      'Friday': 5, 'Saturday': 6, 'Sunday': 7,
+      'الاثنين': 1, 'الثلاثاء': 2, 'الأربعاء': 3, 'الخميس': 4,
+      'الجمعة': 5, 'السبت': 6, 'الأحد': 7,
+    };
+    return days[dayName] ?? -1;
+  }
+
+  Future<void> saveScheduleItem(Map<String, dynamic> item) async {
+    if (currentStudent == null) return;
+    var docRef = await studentsColl.doc(currentStudent!['uid']).collection('my_schedule').add({
+      ...item,
+      'instituteId': selectedInstituteId
+    });
+    
+    // جدولة الإشعار فور الإضافة
+    await scheduleLectureNotification(
+      docId: docRef.id,
+      subject: item['subject'],
+      dayName: item['dayName'],
+      timeStr: item['time'],
+      type: item['type'],
+    );
+  }
+
+  Future<void> deleteScheduleItem(String id) async {
+    if (currentStudent == null) return;
+    await studentsColl.doc(currentStudent!['uid']).collection('my_schedule').doc(id).delete();
+    // إلغاء الإشعار
+    await flutterLocalNotificationsPlugin.cancel(id.hashCode.abs());
+  }
+
+  Stream<QuerySnapshot> getStudentScheduleStream() {
+    if (currentStudent == null) return const Stream.empty();
+    return studentsColl.doc(currentStudent!['uid']).collection('my_schedule').snapshots();
+  }
 
   Future<void> changeUserPassword(String id, String newPass, bool isStud) async {
     if (isStud) {
@@ -465,12 +763,41 @@ class DataService extends ChangeNotifier {
 
   Future<bool> updatePassword(String newPass) async { try { await _auth.currentUser?.updatePassword(newPass); return true; } catch (_) { return false; } }
 
+  Future<void> syncScheduleNotifications() async {
+    if (kIsWeb || currentStudent == null) return;
+    try {
+      // إلغاء كل الإشعارات القديمة لتجنب التكرار
+      await flutterLocalNotificationsPlugin.cancelAll();
+      
+      var snap = await studentsColl.doc(currentStudent!['uid']).collection('my_schedule').get();
+      for (var doc in snap.docs) {
+        final item = doc.data();
+        await scheduleLectureNotification(
+          docId: doc.id,
+          subject: item['subject'] ?? '',
+          dayName: item['dayName'] ?? '',
+          timeStr: item['time'] ?? '',
+          type: item['type'] ?? '',
+        );
+      }
+      debugPrint("🔄 Synced ${snap.docs.length} schedule notifications");
+    } catch (e) {
+      debugPrint("❌ Sync notifications error: $e");
+    }
+  }
+
   Future<void> loadUserData(String uid, String role) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       selectedInstituteId = prefs.getString('selected_institute_id');
       userRole = role;
       await _findAndLoadUser(uid);
+      
+      // مزامنة الإشعارات بعد تحميل البيانات
+      if (!kIsWeb) {
+        syncScheduleNotifications();
+      }
+
       notifyListeners();
     } catch (e) { debugPrint("Load error: $e"); }
   }
@@ -596,8 +923,6 @@ class DataService extends ChangeNotifier {
     // التنسيق المطلوب بناءً على طلبك هو: [كود].college@smart.com
     return "$trimmed.college$_domain";
   }
-
-  Future<void> initNotifications() async { if (kIsWeb) return; tz.initializeTimeZones(); }
 
   Future<String> _secureCreateUser(String email, String password) async {
     String name = 'Creator_${DateTime.now().millisecondsSinceEpoch}';

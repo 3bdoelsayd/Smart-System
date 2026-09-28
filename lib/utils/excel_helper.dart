@@ -145,6 +145,45 @@ class ExcelHelper {
     await _saveAndShareExcel(excel, fileName);
   }
 
+  static Future<void> downloadStudentTemplate(bool isArabic) async {
+    var excel = Excel.createExcel();
+    Sheet sheet = excel['Sheet1'];
+    sheet.appendRow([
+      TextCellValue(isArabic ? 'الكود (رقم)' : 'ID (Number)'),
+      TextCellValue(isArabic ? 'الاسم الرباعي' : 'Full Name'),
+      TextCellValue(isArabic ? 'الفرقة (1 أو 2 أو 3 أو 4)' : 'Level (1, 2, 3, or 4)'),
+      TextCellValue(isArabic ? 'الشعبة' : 'Division'),
+      TextCellValue(isArabic ? 'كلمة المرور (اختياري)' : 'Password (Optional)'),
+    ]);
+    sheet.appendRow([
+      TextCellValue('2024001'),
+      TextCellValue('احمد محمد علي حسن'),
+      TextCellValue('1'),
+      TextCellValue('نظم معلومات الاعمال'),
+      TextCellValue('123456'),
+    ]);
+    await _saveAndShareExcel(excel, "Students_Template");
+  }
+
+  static Future<void> downloadDoctorTemplate(bool isArabic) async {
+    var excel = Excel.createExcel();
+    Sheet sheet = excel['Sheet1'];
+    sheet.appendRow([
+      TextCellValue(isArabic ? 'الكود' : 'ID'),
+      TextCellValue(isArabic ? 'اسم الدكتور' : 'Doctor Name'),
+      TextCellValue(isArabic ? 'كلمة المرور' : 'Password'),
+      TextCellValue(isArabic ? 'الفرق (مثال: الفرقة الأولى, الفرقة الثانية)' : 'Levels (e.g. Level 1, Level 2)'),
+    ]);
+    sheet.appendRow([
+      TextCellValue('101'),
+      TextCellValue('د. محمود ابراهيم'),
+      TextCellValue('doc123'),
+      TextCellValue('الفرقة الأولى'),
+      TextCellValue('الفرقة الثانية'),
+    ]);
+    await _saveAndShareExcel(excel, "Doctors_Template");
+  }
+
   static Future<void> _saveAndShareExcel(Excel excel, String fileName) async {
     final fileBytes = excel.save();
     if (fileBytes != null) {

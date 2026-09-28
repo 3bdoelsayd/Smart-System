@@ -402,12 +402,71 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
               if (docs.isEmpty) return _buildEmptyState(Icons.group_off, 'لا يوجد طلاب');
               return ListView.builder(padding: const EdgeInsets.all(15), itemCount: docs.length, itemBuilder: (ctx, i) {
                 var d = docs[i].data() as Map<String, dynamic>;
-                return _buildListItem(title: d['name'] ?? '', subtitle: 'ID: ${d['id']} | ${d['division']}', icon: Icons.school, color: Colors.green, onDelete: () => _ds.deleteStudent(docs[i].id, _selectedLevel!.replaceAll('level_', '')));
+                return _buildListItem(
+                  title: d['name'] ?? '', 
+                  subtitle: 'ID: ${d['id']} | ${d['division']}', 
+                  icon: Icons.school, 
+                  color: Colors.green, 
+                  onResetDevice: () => _confirmResetDevice(context, docs[i].id, d['name']),
+                  onDelete: () => _ds.deleteStudent(docs[i].id, _selectedLevel!.replaceAll('level_', ''))
+                );
               });
             },
           ),
         ),
       ],
+    );
+  }
+
+  void _confirmResetDevice(BuildContext context, String uid, String? name) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+        title: Column(
+          children: [
+            const Icon(Icons.phonelink_erase_rounded, color: Colors.orange, size: 50),
+            const SizedBox(height: 10),
+            Text("إعادة ضبط الجهاز", style: GoogleFonts.cairo(fontWeight: FontWeight.w900, color: Colors.orange.shade900)),
+          ],
+        ),
+        content: Text(
+          "هل أنت متأكد من فك ربط حساب الطالب ($name) من جهازه الحالي؟",
+          textAlign: TextAlign.center,
+          style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 14),
+        ),
+        actions: [
+          Row(
+            children: [
+              Expanded(
+                child: TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text('إلغاء', style: GoogleFonts.cairo(color: Colors.grey, fontWeight: FontWeight.bold)),
+                ),
+              ),
+              Expanded(
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                    elevation: 0,
+                  ),
+                  onPressed: () async {
+                    await _ds.resetStudentDevice(uid);
+                    if (context.mounted) {
+                      Navigator.pop(ctx);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('تمت إعادة ضبط الجهاز بنجاح'), backgroundColor: Colors.orangeAccent),
+                      );
+                    }
+                  },
+                  child: Text('تأكيد', style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          )
+        ],
+      ),
     );
   }
 
@@ -597,20 +656,92 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
     );
   }
 
-  Widget _buildListItem({required String title, required String subtitle, required IconData icon, required Color color, required VoidCallback onDelete, VoidCallback? onEdit}) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
-        leading: CircleAvatar(backgroundColor: color.withOpacity(0.1), child: Icon(icon, color: color, size: 22)),
-        title: Text(title, style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 15)),
-        subtitle: Text(subtitle, style: GoogleFonts.cairo(fontSize: 12, color: Colors.grey)),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (onEdit != null) IconButton(icon: const Icon(Icons.edit_note_rounded, color: Colors.blue), onPressed: onEdit),
-            IconButton(icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent), onPressed: onDelete),
-          ],
+  Widget _buildListItem({required String title, required String subtitle, required IconData icon, required Color color, required VoidCallback onDelete, VoidCallback? onEdit, VoidCallback? onResetDevice}) {
+    final isDark = _ds.isDarkMode;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E26) : Colors.white,
+        borderRadius: BorderRadius.circular(25),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          )
+        ],
+        border: Border.all(color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade100),
+      ),
+      child: Column(
+        children: [
+          ListTile(
+            contentPadding: const EdgeInsets.fromLTRB(15, 12, 15, 0),
+            leading: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Icon(icon, color: color, size: 24),
+            ),
+            title: Text(title, style: GoogleFonts.cairo(fontWeight: FontWeight.w900, fontSize: 15, height: 1.2)),
+            subtitle: Text(subtitle, style: GoogleFonts.cairo(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.bold)),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(15, 5, 15, 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                if (onResetDevice != null)
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(end: 8),
+                    child: InkWell(
+                      onTap: onResetDevice,
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.orange.withOpacity(0.2)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.phonelink_erase_rounded, color: Colors.orange, size: 16),
+                            const SizedBox(width: 6),
+                            Text(
+                              _ds.isArabic ? "ضبط الجهاز" : "Reset Device",
+                              style: GoogleFonts.cairo(color: Colors.orange, fontSize: 10, fontWeight: FontWeight.w900),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                if (onEdit != null) _buildActionCircle(Icons.edit_note_rounded, Colors.blue, onEdit),
+                _buildActionCircle(Icons.delete_outline_rounded, Colors.redAccent, onDelete),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionCircle(IconData icon, Color color, VoidCallback onTap) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: color, size: 18),
         ),
       ),
     );

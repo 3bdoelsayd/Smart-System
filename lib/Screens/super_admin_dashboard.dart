@@ -26,32 +26,37 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     final adminName = _ds.currentAdmin?['name'] ?? _ds.translate('super_admin');
 
     final List<Map<String, dynamic>> cards = [
-      {'icon': Icons.layers_rounded, 'title': _ds.translate('manage_levels'), 'widget': const LevelsManagementView(), 'color': const Color(0xFF673AB7)},
-      {'icon': Icons.grid_view_rounded, 'title': _ds.translate('manage_sections'), 'widget': const SectionsManagementView(), 'color': const Color(0xFF00BCD4)},
-      {'icon': Icons.school_rounded, 'title': _ds.translate('manage_students'), 'widget': const StudentsManagementView(), 'color': const Color(0xFF4CAF50)},
-      {'icon': Icons.person_search_rounded, 'title': _ds.translate('manage_doctors'), 'widget': const DoctorsManagementView(), 'color': const Color(0xFFE91E63)},
-      {'icon': Icons.admin_panel_settings_rounded, 'title': _ds.translate('manage_managers'), 'widget': const ManagersManagementView(), 'color': const Color(0xFFFF9800)},
-      {'icon': Icons.calendar_month_rounded, 'title': _ds.translate('semesters'), 'widget': const SemestersManagementView(), 'color': const Color(0xFF607D8B)},
+      {'icon': Icons.layers_rounded, 'title': _ds.translate('manage_levels'), 'widget': const LevelsManagementView(), 'color': const Color(0xFF673AB7), 'subtitle': isAr ? 'إدارة الفرق الدراسية' : 'Manage academic levels'},
+      {'icon': Icons.grid_view_rounded, 'title': _ds.translate('manage_sections'), 'widget': const SectionsManagementView(), 'color': const Color(0xFF00BCD4), 'subtitle': isAr ? 'توزيع الطلاب والشعب' : 'Distribute sections'},
+      {'icon': Icons.school_rounded, 'title': _ds.translate('manage_students'), 'widget': const StudentsManagementView(), 'color': const Color(0xFF4CAF50), 'subtitle': isAr ? 'قاعدة بيانات الطلاب' : 'Students database'},
+      {'icon': Icons.person_search_rounded, 'title': _ds.translate('manage_doctors'), 'widget': const DoctorsManagementView(), 'color': const Color(0xFFE91E63), 'subtitle': isAr ? 'أعضاء هيئة التدريس' : 'Faculty members'},
+      {'icon': Icons.admin_panel_settings_rounded, 'title': _ds.translate('manage_managers'), 'widget': const ManagersManagementView(), 'color': const Color(0xFFFF9800), 'subtitle': isAr ? 'صلاحيات المديرين' : 'Managers roles'},
+      {'icon': Icons.calendar_month_rounded, 'title': _ds.translate('semesters'), 'widget': const SemestersManagementView(), 'color': const Color(0xFF607D8B), 'subtitle': isAr ? 'الفصول والتقويم' : 'Academic calendar'},
     ];
 
     return Directionality(
       textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
       child: Scaffold(
-        backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF8F9FE),
+        backgroundColor: isDark ? const Color(0xFF0F0F12) : const Color(0xFFF8F9FE),
         drawer: AppDrawer(name: adminName, role: _ds.translate('super_admin')),
         body: CustomScrollView(
+          physics: const BouncingScrollPhysics(),
           slivers: [
             SliverToBoxAdapter(
               child: Container(
-                padding: const EdgeInsets.fromLTRB(20, 60, 20, 40),
+                padding: const EdgeInsets.fromLTRB(25, 60, 25, 35),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    begin: Alignment.topRight,
-                    end: Alignment.bottomLeft,
-                    colors: isDark ? [const Color(0xFF1A237E), const Color(0xFF000000)] : [const Color(0xFF673AB7), const Color(0xFF512DA8)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: isDark 
+                      ? [const Color(0xFF2E1A47), const Color(0xFF121212)] 
+                      : [const Color(0xFF673AB7), const Color(0xFF512DA8)],
                   ),
-                  borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(50), bottomRight: Radius.circular(50)),
-                  boxShadow: [BoxShadow(color: Colors.black.withAlpha(50), blurRadius: 20, offset: const Offset(0, 10))],
+                  borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(45), bottomRight: Radius.circular(45)),
+                  boxShadow: [
+                    BoxShadow(color: (isDark ? Colors.black : const Color(0xFF673AB7)).withOpacity(0.3), blurRadius: 25, offset: const Offset(0, 10))
+                  ],
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -59,42 +64,153 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Builder(builder: (context) => IconButton(icon: const Icon(Icons.menu_open_rounded, color: Colors.white, size: 30), onPressed: () => Scaffold.of(context).openDrawer())),
+                        Builder(builder: (context) => Container(
+                          decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), borderRadius: BorderRadius.circular(15)),
+                          child: IconButton(icon: const Icon(Icons.menu_rounded, color: Colors.white, size: 28), onPressed: () => Scaffold.of(context).openDrawer()),
+                        )),
+                        Text(isAr ? 'نظام الإدارة' : 'Admin System', style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
                         Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(color: Colors.white.withAlpha(30), shape: BoxShape.circle),
-                          child: const Icon(Icons.admin_panel_settings, color: Colors.white),
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), shape: BoxShape.circle),
+                          child: const Icon(Icons.shield_rounded, color: Colors.white, size: 22),
                         )
                       ],
                     ),
-                    const SizedBox(height: 30),
-                    Text(_ds.translate('system_dashboard'), style: GoogleFonts.cairo(color: Colors.white70, fontSize: 16)),
-                    Text(adminName, style: GoogleFonts.cairo(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 35),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(_ds.translate('welcome'), style: GoogleFonts.cairo(color: Colors.white.withOpacity(0.7), fontSize: 14)),
+                              Text(adminName, style: GoogleFonts.cairo(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w900, height: 1.2)),
+                            ],
+                          ),
+                        ),
+                        _buildQuickStat(isAr ? "الحالة" : "Status", isAr ? "نشط" : "Online", Colors.greenAccent),
+                      ],
+                    ),
                   ],
                 ),
               ),
             ),
+            
             SliverPadding(
-              padding: const EdgeInsets.all(22),
+              padding: const EdgeInsets.fromLTRB(22, 25, 22, 10),
+              sliver: SliverToBoxAdapter(
+                child: Text(
+                  isAr ? "لوحة التحكم الرئيسية" : "Main Dashboard",
+                  style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.w900, color: isDark ? Colors.white : Colors.black87),
+                ),
+              ),
+            ),
+
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 15),
               sliver: SliverGrid(
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
-                  crossAxisSpacing: 20,
-                  mainAxisSpacing: 20,
-                  mainAxisExtent: 200, 
+                  crossAxisSpacing: 18,
+                  mainAxisSpacing: 18,
+                  mainAxisExtent: 155, // جعل الكروت أكثر تناسقاً
                 ),
                 delegate: SliverChildBuilderDelegate(
-                  (ctx, i) => DashboardCard(
+                  (ctx, i) => _buildModernAdminCard(
+                    context: context,
                     icon: cards[i]['icon'] as IconData,
                     title: cards[i]['title'] as String,
+                    subtitle: cards[i]['subtitle'] as String,
                     color: cards[i]['color'] as Color,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => SubPageWrapper(title: cards[i]['title'], child: cards[i]['widget']))),
+                    isDark: isDark,
                   ),
                   childCount: cards.length,
                 ),
               ),
             ),
+            const SliverToBoxAdapter(child: SizedBox(height: 50)),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickStat(String label, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(color: Colors.white.withOpacity(0.12), borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.white10)),
+      child: Column(
+        children: [
+          Text(label, style: GoogleFonts.cairo(color: Colors.white60, fontSize: 10)),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle, boxShadow: [BoxShadow(color: color.withOpacity(0.5), blurRadius: 5)])),
+              const SizedBox(width: 6),
+              Text(value, style: GoogleFonts.cairo(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModernAdminCard({required BuildContext context, required IconData icon, required String title, required String subtitle, required Color color, required VoidCallback onTap, required bool isDark}) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E24) : Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: isDark ? Colors.black.withOpacity(0.4) : color.withOpacity(0.08),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          ),
+        ],
+        border: Border.all(color: isDark ? Colors.white.withOpacity(0.03) : Colors.grey.shade100, width: 1),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(28),
+          splashColor: color.withOpacity(0.1),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(15)),
+                  child: Icon(icon, color: color, size: 24),
+                ),
+                const Spacer(),
+                Text(
+                  title,
+                  style: GoogleFonts.cairo(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                    color: isDark ? Colors.white : Colors.black87,
+                    height: 1.1,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: GoogleFonts.cairo(
+                    fontSize: 10,
+                    color: isDark ? Colors.white38 : Colors.grey.shade600,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -157,39 +273,258 @@ void _confirmGeneralDelete(BuildContext context, String title, String content, V
   );
 }
 
-Widget _buildListItem({required bool isDarkMode, required String title, required String subtitle, required IconData icon, required Color color, VoidCallback? onDelete, VoidCallback? onEdit, VoidCallback? onAttendance}) {
-  return Container(
-    margin: const EdgeInsets.only(bottom: 12),
-    decoration: BoxDecoration(color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.black.withAlpha(10), blurRadius: 10, offset: const Offset(0, 4))]),
-    child: ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-      leading: Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: color.withAlpha(15), borderRadius: BorderRadius.circular(15)), child: Icon(icon, color: color, size: 24)),
-      title: Text(title, style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 14)),
-      subtitle: Text(subtitle, style: GoogleFonts.cairo(fontSize: 11, color: Colors.grey)),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
+void _confirmResetDevice(BuildContext context, String uid, String? name) {
+  showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+      title: Column(
         children: [
-          if (onAttendance != null) IconButton(icon: const Icon(Icons.how_to_reg_rounded, color: Colors.indigo, size: 22), onPressed: onAttendance, tooltip: "سجلات الحضور"),
-          if (onEdit != null) IconButton(icon: const Icon(Icons.edit_rounded, color: Colors.blue, size: 20), onPressed: onEdit),
-          if (onDelete != null) IconButton(icon: const Icon(Icons.delete_rounded, color: Colors.redAccent, size: 20), onPressed: onDelete),
+          const Icon(Icons.phonelink_erase_rounded, color: Colors.orange, size: 50),
+          const SizedBox(height: 10),
+          Text("إعادة ضبط الجهاز", style: GoogleFonts.cairo(fontWeight: FontWeight.w900, color: Colors.orange.shade900)),
         ],
+      ),
+      content: Text(
+        "هل أنت متأكد من فك ربط حساب الطالب ($name) من جهازه الحالي؟ هذا سيسمح له بالدخول من جهاز جديد.",
+        textAlign: TextAlign.center,
+        style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 14),
+      ),
+      actions: [
+        Row(
+          children: [
+            Expanded(
+              child: TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text('إلغاء', style: GoogleFonts.cairo(color: Colors.grey, fontWeight: FontWeight.bold)),
+              ),
+            ),
+            Expanded(
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                  elevation: 0,
+                ),
+                onPressed: () async {
+                  await DataService().resetStudentDevice(uid);
+                  if (context.mounted) {
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('تمت إعادة ضبط الجهاز بنجاح', style: GoogleFonts.cairo()),
+                        backgroundColor: Colors.orangeAccent,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                },
+                child: Text('تأكيد الضبط', style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ],
+        )
+      ],
+    ),
+  );
+}
+
+Widget _buildListItem({required bool isDarkMode, required String title, required String subtitle, required IconData icon, required Color color, VoidCallback? onDelete, VoidCallback? onEdit, VoidCallback? onAttendance, VoidCallback? onResetDevice}) {
+  return Container(
+    margin: const EdgeInsets.only(bottom: 16),
+    decoration: BoxDecoration(
+      color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+      borderRadius: BorderRadius.circular(25),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.05),
+          blurRadius: 15,
+          offset: const Offset(0, 8),
+        )
+      ],
+      border: Border.all(color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey.shade100),
+    ),
+    child: Column(
+      children: [
+        ListTile(
+          contentPadding: const EdgeInsets.fromLTRB(15, 12, 15, 0),
+          leading: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Icon(icon, color: color, size: 26),
+          ),
+          title: Text(
+            title,
+            style: GoogleFonts.cairo(fontWeight: FontWeight.w900, fontSize: 15, height: 1.2),
+          ),
+          subtitle: Text(
+            subtitle,
+            style: GoogleFonts.cairo(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.bold),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(15, 5, 15, 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              if (onResetDevice != null)
+                Padding(
+                  padding: const EdgeInsetsDirectional.only(end: 8),
+                  child: InkWell(
+                    onTap: onResetDevice,
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.orange.withOpacity(0.2)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.phonelink_erase_rounded, color: Colors.orange, size: 16),
+                          const SizedBox(width: 6),
+                          Text(
+                            "ضبط الجهاز",
+                            style: GoogleFonts.cairo(color: Colors.orange, fontSize: 10, fontWeight: FontWeight.w900),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              if (onAttendance != null)
+                _buildActionCircle(Icons.how_to_reg_rounded, Colors.indigo, onAttendance),
+              if (onEdit != null)
+                _buildActionCircle(Icons.edit_rounded, Colors.blue, onEdit),
+              if (onDelete != null)
+                _buildActionCircle(Icons.delete_rounded, Colors.redAccent, onDelete),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _buildActionCircle(IconData icon, Color color, VoidCallback onTap) {
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 4),
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, color: color, size: 18),
       ),
     ),
   );
 }
 
-Widget _buildActionHeader({required bool isDarkMode, required VoidCallback onAddManual, required VoidCallback onAddExcel, required Function(String) onSearch, bool showExcel = true, String addLabel = "إضافة يدوي"}) {
+Widget _buildActionHeader({
+  required BuildContext context, 
+  required bool isDarkMode, 
+  required VoidCallback onAddManual, 
+  required VoidCallback onAddExcel, 
+  VoidCallback? onAutoUpload,
+  required Function(String) onSearch, 
+  bool showExcel = true, 
+  String addLabel = "إضافة يدوي", 
+  String type = 'student', 
+  required DataService ds
+}) {
   return Container(
     padding: const EdgeInsets.fromLTRB(15, 10, 15, 20),
     decoration: BoxDecoration(color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white, borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(35), bottomRight: Radius.circular(35)), boxShadow: [BoxShadow(color: Colors.black.withAlpha(10), blurRadius: 10, offset: const Offset(0, 5))]),
     child: Column(children: [
       Row(children: [
         Expanded(child: Container(height: 50, decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), gradient: const LinearGradient(colors: [Color(0xFF673AB7), Color(0xFF512DA8)])), child: ElevatedButton.icon(onPressed: onAddManual, icon: const Icon(Icons.person_add_rounded, color: Colors.white, size: 20), label: Text(addLabel, style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13)), style: ElevatedButton.styleFrom(backgroundColor: Colors.transparent, shadowColor: Colors.transparent)))),
-        if (showExcel) ...[const SizedBox(width: 12), Expanded(child: Container(height: 50, decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), gradient: const LinearGradient(colors: [Color(0xFF4CAF50), Color(0xFF388E3C)])), child: ElevatedButton.icon(onPressed: onAddExcel, icon: const Icon(Icons.table_chart_rounded, color: Colors.white, size: 20), label: Text('رفع Excel', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13)), style: ElevatedButton.styleFrom(backgroundColor: Colors.transparent, shadowColor: Colors.transparent))))],
+        if (showExcel) ...[
+          const SizedBox(width: 12), 
+          Expanded(
+            child: Container(
+              height: 50, 
+              decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), gradient: const LinearGradient(colors: [Color(0xFF4CAF50), Color(0xFF388E3C)])), 
+              child: ElevatedButton.icon(
+                onPressed: () => _showExcelOptions(context, isDarkMode, type, onAddExcel, ds, onAutoUpload: onAutoUpload), 
+                icon: const Icon(Icons.table_chart_rounded, color: Colors.white, size: 20), 
+                label: Text('خيارات Excel', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13)), 
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.transparent, shadowColor: Colors.transparent)
+              )
+            )
+          )
+        ],
       ]),
       const SizedBox(height: 15),
       Container(height: 45, padding: const EdgeInsets.symmetric(horizontal: 15), decoration: BoxDecoration(color: isDarkMode ? Colors.black26 : Colors.grey.shade100, borderRadius: BorderRadius.circular(15)), child: TextField(onChanged: onSearch, style: GoogleFonts.cairo(fontSize: 13), decoration: InputDecoration(hintText: 'ابحث بالاسم...', hintStyle: GoogleFonts.cairo(color: Colors.grey, fontSize: 13), border: InputBorder.none, icon: const Icon(Icons.search_rounded, color: Color(0xFF673AB7), size: 20)))),
     ]),
+  );
+}
+
+void _showExcelOptions(BuildContext context, bool isDark, String type, VoidCallback onUpload, DataService ds, {VoidCallback? onAutoUpload}) {
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) => Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(35)),
+      ),
+      padding: const EdgeInsets.all(25),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.withAlpha(50), borderRadius: BorderRadius.circular(10))),
+          const SizedBox(height: 25),
+          Text('خيارات الإكسيل والرفع السريع', style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 25),
+          ListTile(
+            leading: const CircleAvatar(backgroundColor: Colors.green, child: Icon(Icons.file_upload_rounded, color: Colors.white)),
+            title: Text('رفع ملف إكسيل', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+            subtitle: Text('اختر ملف إكسيل من جهازك لرفعه مباشرة', style: GoogleFonts.cairo(fontSize: 11)),
+            onTap: () {
+              Navigator.pop(ctx);
+              onUpload();
+            },
+          ),
+          if (onAutoUpload != null) ...[
+            const Divider(),
+            ListTile(
+              leading: const CircleAvatar(backgroundColor: Color(0xFF673AB7), child: Icon(Icons.flash_on_rounded, color: Colors.white)),
+              title: Text('رفع طلاب وهميين بنقرة واحدة ⚡', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: const Color(0xFF673AB7))),
+              subtitle: Text('رفع دفعة طلاب تجريبية تلقائياً لكل الفرق والشعب دون ملف إكسيل', style: GoogleFonts.cairo(fontSize: 11)),
+              onTap: () {
+                Navigator.pop(ctx);
+                onAutoUpload();
+              },
+            ),
+          ],
+          const Divider(),
+          ListTile(
+            leading: const CircleAvatar(backgroundColor: Colors.blue, child: Icon(Icons.file_download_rounded, color: Colors.white)),
+            title: Text('تحميل نموذج الإكسيل', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+            subtitle: Text('حمل النموذج واعرف الترتيب الصحيح للأعمدة لتجنب الأخطاء', style: GoogleFonts.cairo(fontSize: 11)),
+            onTap: () async {
+              Navigator.pop(ctx);
+              if (type == 'student') {
+                await ExcelHelper.downloadStudentTemplate(ds.isArabic);
+              } else if (type == 'doctor') {
+                await ExcelHelper.downloadDoctorTemplate(ds.isArabic);
+              }
+            },
+          ),
+          const SizedBox(height: 30),
+        ],
+      ),
+    ),
   );
 }
 
@@ -339,12 +674,14 @@ class _ManagersManagementViewState extends State<ManagersManagementView> {
     return Column(
       children: [
         _buildActionHeader(
+          context: context,
           isDarkMode: _ds.isDarkMode,
           onAddManual: _showAddManagerBS,
           onAddExcel: _pickAndUploadManagersExcel,
           onSearch: (v) => setState(() => _searchQuery = v),
           showExcel: true,
           addLabel: "إضافة مدير جديد",
+          ds: _ds,
         ),
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
@@ -499,7 +836,16 @@ class _LevelsManagementViewState extends State<LevelsManagementView> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        _buildActionHeader(isDarkMode: _ds.isDarkMode, onAddManual: _showAddLevelBS, onAddExcel: _pickAndUploadLevelsExcel, onSearch: (v) => setState(() => _searchQuery = v), showExcel: true, addLabel: "إضافة فرقة"),
+        _buildActionHeader(
+          context: context,
+          isDarkMode: _ds.isDarkMode, 
+          onAddManual: _showAddLevelBS, 
+          onAddExcel: _pickAndUploadLevelsExcel, 
+          onSearch: (v) => setState(() => _searchQuery = v), 
+          showExcel: true, 
+          addLabel: "إضافة فرقة",
+          ds: _ds,
+        ),
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
             stream: _ds.commerceLevelsColl.orderBy('createdAt', descending: true).snapshots(),
@@ -695,6 +1041,132 @@ class _StudentsManagementViewState extends State<StudentsManagementView> {
     }
   }
 
+  Future<void> _autoUploadFakeStudents() async {
+    if (_ds.selectedInstituteId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('يرجى اختيار الكلية أولاً من أعلى الشاشة', style: GoogleFonts.cairo()),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    int totalStudents = 100;
+    int progressCount = 0;
+    StateSetter? dialogSetState;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setS) {
+          dialogSetState = setS;
+          return AlertDialog(
+            backgroundColor: _ds.isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+            content: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CircularProgressIndicator(color: Color(0xFF673AB7)),
+                  const SizedBox(height: 20),
+                  Text(
+                    "جاري رفع 100 طالب موزعين على جميع الفرق...",
+                    style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 15),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 15),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: LinearProgressIndicator(
+                      value: progressCount / totalStudents,
+                      minHeight: 8,
+                      backgroundColor: Colors.grey.withAlpha(40),
+                      color: const Color(0xFF673AB7),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    "تم رفع $progressCount من $totalStudents طالب",
+                    style: GoogleFonts.cairo(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+
+    List<String> firstNames = [
+      "أحمد", "محمد", "محمود", "عمر", "يوسف", "علي", "مصطفى", "عبدالله", "إبراهيم", "حسن",
+      "حسين", "خالد", "سعيد", "طارق", "كريم", "ياسين", "عبدالرحمن", "حمزة", "زياد", "بلال",
+      "فاطمة", "مريم", "آية", "نور", "سارة", "هاجر", "سلمى", "ياسمين", "زينب", "منة الله"
+    ];
+
+    List<String> lastNames = [
+      "أحمد", "محمد", "حسن", "علي", "محمود", "السيد", "إبراهيم", "مصطفى", "صلاح", "جمال",
+      "منصور", "عبدالعزيز", "الشريف", "العوضي", "الشناوي", "عبدالحليم", "سليمان", "البدري", "الشيخ", "رضوان"
+    ];
+
+    List<String> divisionsList = ["نظم معلومات الاعمال", "محاسبه", "ادارة اعمال"];
+
+    int successCount = 0;
+    String lastError = "";
+    int timeBase = (DateTime.now().millisecondsSinceEpoch % 800000) + 100000;
+
+    for (int i = 0; i < totalStudents; i++) {
+      String studentId = "2025${timeBase + i}";
+      
+      String fn = firstNames[i % firstNames.length];
+      String sn = lastNames[(i * 3 + 1) % lastNames.length];
+      String tn = lastNames[(i * 5 + 2) % lastNames.length];
+      String fam = lastNames[(i * 7 + 3) % lastNames.length];
+      String studentName = "$fn $sn $tn $fam";
+
+      int levelNum = (i % 4) + 1;
+      String levelId = "level_$levelNum";
+      String div = divisionsList[i % divisionsList.length];
+
+      try {
+        await _ds.addStudentManual(levelId, studentId, studentName, "", div, "123456");
+        successCount++;
+      } catch (e) {
+        debugPrint("Auto upload error for student $studentId: $e");
+        lastError = e.toString();
+      }
+
+      progressCount++;
+      if (dialogSetState != null) {
+        dialogSetState!(() {});
+      }
+      await Future.delayed(const Duration(milliseconds: 25));
+    }
+
+    if (mounted) {
+      Navigator.pop(context);
+      if (successCount > 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ تم رفع $successCount طالب بنجاح موزعين على الفرقة 1 و 2 و 3 و 4! 🚀', style: GoogleFonts.cairo()),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ تعذر الرفع: $lastError', style: GoogleFonts.cairo()),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    }
+  }
+
   Widget _buildBreadcrumb() {
     return Container(
       width: double.infinity,
@@ -755,24 +1227,16 @@ class _StudentsManagementViewState extends State<StudentsManagementView> {
                       crossAxisCount: 2,
                       crossAxisSpacing: 15,
                       mainAxisSpacing: 15,
-                      mainAxisExtent: 165,
+                      mainAxisExtent: 190,
                     ),
                     itemCount: snap.data!.docs.length,
                     itemBuilder: (ctx, i) {
                       var d = snap.data!.docs[i];
-                      return FutureBuilder<QuerySnapshot>(
-                        future: _ds.getCommerceStudentsColl(d.id).get(),
-                        builder: (context, studentSnap) {
-                          String count = studentSnap.hasData ? studentSnap.data!.docs.length.toString() : "...";
-                          return DashboardCard(
-                            title: d['name'],
-                            icon: levelIcons[i % levelIcons.length],
-                            color: levelColors[i % levelColors.length],
-                            count: count,
-                            countLabel: "طالب",
-                            onTap: () => setState(() { _selectedLevelId = d.id; _selectedLevelName = d['name']; }),
-                          );
-                        }
+                      return DashboardCard(
+                        title: d['name'],
+                        icon: levelIcons[i % levelIcons.length],
+                        color: levelColors[i % levelColors.length],
+                        onTap: () => setState(() { _selectedLevelId = d.id; _selectedLevelName = d['name']; }),
                       );
                     },
                   );
@@ -792,24 +1256,16 @@ class _StudentsManagementViewState extends State<StudentsManagementView> {
                       crossAxisCount: 2,
                       crossAxisSpacing: 15,
                       mainAxisSpacing: 15,
-                      mainAxisExtent: 165,
+                      mainAxisExtent: 190,
                     ),
                     itemCount: snap.data!.docs.length,
                     itemBuilder: (ctx, i) {
                       var d = snap.data!.docs[i];
-                      return FutureBuilder<QuerySnapshot>(
-                        future: _ds.getCommerceStudentsColl(_selectedLevelId!).where('division', isEqualTo: d['name']).get(),
-                        builder: (context, sectionStudentSnap) {
-                          String count = sectionStudentSnap.hasData ? sectionStudentSnap.data!.docs.length.toString() : "...";
-                          return DashboardCard(
-                            title: d['name'],
-                            icon: Icons.grid_view_rounded,
-                            color: Colors.cyan,
-                            count: count,
-                            countLabel: "طالب",
-                            onTap: () => setState(() { _selectedSection = d['name']; }),
-                          );
-                        }
+                      return DashboardCard(
+                        title: d['name'],
+                        icon: Icons.grid_view_rounded,
+                        color: Colors.cyan,
+                        onTap: () => setState(() { _selectedSection = d['name']; }),
                       );
                     },
                   );
@@ -817,35 +1273,95 @@ class _StudentsManagementViewState extends State<StudentsManagementView> {
               ),
             )
           ] else ...[
-            _buildActionHeader(isDarkMode: _ds.isDarkMode, onAddManual: _showAddStudentBS, onAddExcel: _pickAndUploadStudentsExcel, onSearch: (v) => setState(() => _searchQuery = v)),
+            _buildActionHeader(
+              context: context,
+              isDarkMode: _ds.isDarkMode, 
+              onAddManual: _showAddStudentBS, 
+              onAddExcel: _pickAndUploadStudentsExcel, 
+              onAutoUpload: _autoUploadFakeStudents,
+              onSearch: (v) => setState(() => _searchQuery = v),
+              type: 'student',
+              ds: _ds,
+            ),
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
-                stream: _ds.getCommerceStudentsColl(_selectedLevelId!).where('division', isEqualTo: _selectedSection).snapshots(),
+                stream: _ds.studentsColl.snapshots(),
                 builder: (ctx, snap) {
                   if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+                  
+                  String cleanLevel = _ds.normalizeLevel(_selectedLevelId ?? '');
+
                   var docs = snap.data!.docs.where((d) {
                     var data = d.data() as Map<String, dynamic>;
-                    return (data['name'] ?? "").toString().toLowerCase().contains(_searchQuery.toLowerCase()) || (data['id'] ?? "").toString().contains(_searchQuery);
+                    String sLvl = _ds.normalizeLevel(data['level']?.toString() ?? '');
+                    String sDiv = (data['division'] ?? '').toString().trim();
+                    String targetDiv = (_selectedSection ?? '').trim();
+
+                    bool levelMatch = (sLvl == cleanLevel) ||
+                        (_selectedLevelId != null && (data['level']?.toString() == _selectedLevelId || data['level']?.toString() == _selectedLevelId!.replaceAll('level_', '')));
+
+                    bool divMatch = targetDiv.isEmpty ||
+                        sDiv == targetDiv ||
+                        sDiv.contains(targetDiv) ||
+                        targetDiv.contains(sDiv) ||
+                        sDiv.replaceAll('أ', 'ا').replaceAll('ة', 'ه') == targetDiv.replaceAll('أ', 'ا').replaceAll('ة', 'ه');
+
+                    String sName = (data['name'] ?? '').toString().toLowerCase();
+                    String sId = (data['id'] ?? '').toString();
+                    bool searchMatch = sName.contains(_searchQuery.toLowerCase()) || sId.contains(_searchQuery);
+
+                    return levelMatch && divMatch && searchMatch;
                   }).toList();
 
-                  docs.sort((a, b) => (a['name'] ?? "").toString().compareTo((b['name'] ?? "").toString()));
+                  docs.sort((a, b) => (a.data() as Map<String, dynamic>)['name'].toString().compareTo((b.data() as Map<String, dynamic>)['name'].toString()));
 
                   if (docs.isEmpty) return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.school_outlined, size: 80, color: Colors.grey.withAlpha(50)), const SizedBox(height: 10), Text('لا يوجد طلاب في هذه الشعبة حالياً', style: GoogleFonts.cairo(color: Colors.grey))]));
 
-                  return ListView.builder(
-                    padding: const EdgeInsets.all(15),
-                    itemCount: docs.length,
-                    itemBuilder: (ctx, i) {
-                      var d = docs[i].data() as Map<String, dynamic>;
-                      return _buildListItem(
-                        isDarkMode: _ds.isDarkMode, 
-                        title: d['name'] ?? 'بدون اسم', 
-                        subtitle: 'كود: ${d['id']}', 
-                        icon: Icons.school_rounded, 
-                        color: Colors.green, 
-                        onDelete: () => _confirmGeneralDelete(context, 'حذف طالب', 'هل أنت متأكد من حذف هذا الطالب؟', () => _ds.deleteStudent(docs[i].id, d['level'].toString()))
-                      );
-                    },
+                  return Column(
+                    children: [
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              "إجمالي الطلاب بالشعبة:",
+                              style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: Colors.grey),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: Colors.green.withAlpha(30),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                "${docs.length} طالب",
+                                style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: Colors.green),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: ListView.builder(
+                          padding: const EdgeInsets.all(15),
+                          itemCount: docs.length,
+                          itemBuilder: (ctx, i) {
+                            var d = docs[i].data() as Map<String, dynamic>;
+                            return _buildListItem(
+                              isDarkMode: _ds.isDarkMode, 
+                              title: d['name'] ?? 'بدون اسم', 
+                              subtitle: 'كود: ${d['id']}', 
+                              icon: Icons.school_rounded, 
+                              color: Colors.green, 
+                              onResetDevice: () => _confirmResetDevice(context, docs[i].id, d['name']),
+                              onDelete: () => _confirmGeneralDelete(context, 'حذف طالب', 'هل أنت متأكد من حذف هذا الطالب؟', () => _ds.deleteStudent(docs[i].id, d['level'].toString()))
+                            );
+                          },
+                        ),
+                      ),
+                    ],
                   );
                 },
               ),
@@ -954,7 +1470,15 @@ class _DoctorsManagementViewState extends State<DoctorsManagementView> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        _buildActionHeader(isDarkMode: _ds.isDarkMode, onAddManual: () => _showDoctorForm(), onAddExcel: _pickAndUploadDoctorsExcel, onSearch: (v) => setState(() => _searchQuery = v)),
+        _buildActionHeader(
+          context: context,
+          isDarkMode: _ds.isDarkMode, 
+          onAddManual: () => _showDoctorForm(), 
+          onAddExcel: _pickAndUploadDoctorsExcel, 
+          onSearch: (v) => setState(() => _searchQuery = v),
+          type: 'doctor',
+          ds: _ds,
+        ),
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
             stream: _ds.commerceDoctorsColl.snapshots(),
@@ -1039,7 +1563,16 @@ class _SemestersManagementViewState extends State<SemestersManagementView> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        _buildActionHeader(isDarkMode: _ds.isDarkMode, onAddManual: _showAddSemesterBS, onAddExcel: _pickAndUploadSemestersExcel, onSearch: (v) => setState(() => _searchQuery = v), showExcel: true, addLabel: "إضافة فصل دراسي"),
+        _buildActionHeader(
+          context: context,
+          isDarkMode: _ds.isDarkMode, 
+          onAddManual: _showAddSemesterBS, 
+          onAddExcel: _pickAndUploadSemestersExcel, 
+          onSearch: (v) => setState(() => _searchQuery = v), 
+          showExcel: true, 
+          addLabel: "إضافة فصل دراسي",
+          ds: _ds,
+        ),
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
             stream: _ds.commerceSemestersColl.snapshots(),

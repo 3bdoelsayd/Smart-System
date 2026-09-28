@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 import 'firebase_options.dart';
 import 'services/data_service.dart';
 import 'theme/app_theme.dart';
@@ -28,33 +29,53 @@ import 'Screens/manager_dashboard.dart';
 import 'Screens/college_selection_screen.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  
-  final ds = DataService();
-  await ds.loadSettings(); 
-  
-  String? initialRoute = '/';
-  final String? savedRole = await ds.loadSession();
-  final User? currentUser = FirebaseAuth.instance.currentUser;
+  try {
+    WidgetsFlutterBinding.ensureInitialized();
 
-  if (currentUser != null && savedRole != null) {
-    await ds.loadUserData(currentUser.uid, savedRole);
-    if (savedRole == 'student') initialRoute = '/student/home';
-    else if (savedRole == 'doctor') initialRoute = '/doctor/home';
-    else if (savedRole == 'super_admin') initialRoute = '/super-admin/dashboard';
-    else if (savedRole == 'manager') initialRoute = '/manager/dashboard';
-    else initialRoute = '/start';
-  } else {
-    initialRoute = '/start';
-  }
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  if (!kIsWeb) {
-    await ds.initNotifications();
+    // تفعيل Supabase مع معالجة الأخطاء لضمان استمرار التشغيل
+    try {
+      await Supabase.initialize(
+        url: 'https://dwkbyhyzkjzmynznilta.supabase.co',
+        anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR3a2J5aHl6a2p6bXluem5pbHRhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0NDc0MzEsImV4cCI6MjA5OTAyMzQzMX0.s_si7MkVvB9SuLWHQQMmoUbOOes5enaAW2Jq7oaTcNw',
+      );
+    } catch (e) {
+      debugPrint("Supabase Init Error: $e");
+    }
+
+    final ds = DataService();
+    await ds.loadSettings();
+
+    String? initialRoute = '/';
+    final String? savedRole = await ds.loadSession();
+    final User? currentUser = FirebaseAuth.instance.currentUser;
+
+    if (currentUser != null && savedRole != null) {
+      await ds.loadUserData(currentUser.uid, savedRole);
+      if (savedRole == 'student') initialRoute = '/student/home';
+      else if (savedRole == 'doctor') initialRoute = '/doctor/home';
+      else if (savedRole == 'super_admin') initialRoute = '/super-admin/dashboard';
+      else if (savedRole == 'manager') initialRoute = '/manager/dashboard';
+      else initialRoute = '/start';
+    } else {
+      initialRoute = '/start';
+    }
+
+    if (!kIsWeb) {
+      try {
+        await ds.initNotifications();
+      } catch (e) {
+        debugPrint("Notifications Init Error: $e");
+      }
+    }
+
+    runApp(UniversityApp(initialRoute: initialRoute));
+  } catch (e) {
+    debugPrint("CRITICAL STARTUP ERROR: $e");
+    // تشغيل تطبيق طوارئ لعرض رسالة الخطأ
+    runApp(MaterialApp(home: Scaffold(body: Center(child: SelectableText("Startup Failed: $e")))));
   }
-  
-  runApp(UniversityApp(initialRoute: initialRoute));
 }
 
 class UniversityApp extends StatelessWidget {
