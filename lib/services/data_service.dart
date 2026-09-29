@@ -183,14 +183,14 @@ class DataService extends ChangeNotifier {
 
       String uid = userCredential.user!.uid;
       
-      // --- نظام الأمان: التحقق من الجهاز (Fingerprinting) ---
+      // --- نظام الأمان المحسن: بصمة داتئمة للهاتف/المتصفح نفسه ---
       final prefs = await SharedPreferences.getInstance();
-      String? localDeviceId = prefs.getString('device_unique_id');
-      if (localDeviceId == null) {
-        localDeviceId = "DEV-${DateTime.now().millisecondsSinceEpoch}-${uid.hashCode}";
-        await prefs.setString('device_unique_id', localDeviceId);
+      String? localDeviceId = prefs.getString('app_device_fingerprint');
+      if (localDeviceId == null || localDeviceId.isEmpty) {
+        localDeviceId = "DEVICE-${DateTime.now().millisecondsSinceEpoch}-${(uid.hashCode.abs() + 1000)}";
+        await prefs.setString('app_device_fingerprint', localDeviceId);
       }
-      // ----------------------------------------------------
+      // --------------------------------------------------------
 
       String? role = await _findAndLoadUser(uid);
 
@@ -199,7 +199,7 @@ class DataService extends ChangeNotifier {
         if (role == 'student' && currentStudent != null) {
           String? storedDeviceId = currentStudent!['deviceId'];
           if (storedDeviceId == null || storedDeviceId.isEmpty) {
-            // ربط الجهاز لأول مرة
+            // ربط الجهاز لأول مرة بهذا الهاتف
             await studentsColl.doc(uid).update({'deviceId': localDeviceId});
             currentStudent!['deviceId'] = localDeviceId;
           } else if (storedDeviceId != localDeviceId) {
@@ -251,30 +251,7 @@ class DataService extends ChangeNotifier {
   Future<String?> _checkUserInCollege(String collegeId, String uid) async {
     var collegeRef = _firestore.collection('colleges').doc(collegeId);
 
-    List<String> adminColls = ['managers', 'manager', 'super_admins', 'super_admin'];
-    for (var c in adminColls) {
-      try {
-        var doc = await collegeRef.collection(c).doc(uid).get();
-        if (doc.exists && doc.data() != null) {
-          var data = Map<String, dynamic>.from(doc.data() as Map);
-          currentAdmin = data;
-          currentAdmin!['uid'] = uid;
-          userRole = data['role'] ?? (c.contains('manager') ? 'manager' : 'super_admin');
-          return userRole;
-        }
-      } catch (_) {}
-    }
-
-    try {
-      var doc = await collegeRef.collection('doctors').doc(uid).get();
-      if (doc.exists && doc.data() != null) {
-        currentDoctor = Map<String, dynamic>.from(doc.data() as Map);
-        currentDoctor!['uid'] = uid;
-        userRole = 'doctor';
-        return 'doctor';
-      }
-    } catch (_) {}
-
+    // 1. فحص الطلاب أولاً لسرعة البرق (95% من مستخدمي النظام طلاب)
     try {
       var doc = await collegeRef.collection('students').doc(uid).get();
       if (doc.exists && doc.data() != null) {
@@ -299,6 +276,32 @@ class DataService extends ChangeNotifier {
         }
       }
     } catch (_) {}
+
+    // 2. فحص الدكاترة
+    try {
+      var doc = await collegeRef.collection('doctors').doc(uid).get();
+      if (doc.exists && doc.data() != null) {
+        currentDoctor = Map<String, dynamic>.from(doc.data() as Map);
+        currentDoctor!['uid'] = uid;
+        userRole = 'doctor';
+        return 'doctor';
+      }
+    } catch (_) {}
+
+    // 3. فحص الإدارة والمديرين
+    List<String> adminColls = ['managers', 'manager', 'super_admins', 'super_admin'];
+    for (var c in adminColls) {
+      try {
+        var doc = await collegeRef.collection(c).doc(uid).get();
+        if (doc.exists && doc.data() != null) {
+          var data = Map<String, dynamic>.from(doc.data() as Map);
+          currentAdmin = data;
+          currentAdmin!['uid'] = uid;
+          userRole = data['role'] ?? (c.contains('manager') ? 'manager' : 'super_admin');
+          return userRole;
+        }
+      } catch (_) {}
+    }
 
     return null;
   }
@@ -823,14 +826,10 @@ class DataService extends ChangeNotifier {
   Future<void> toggleLanguage(bool v) async { isArabic = v; final prefs = await SharedPreferences.getInstance(); await prefs.setBool('persist_v3_arabic', v); notifyListeners(); }
 
   Future<void> toggleDarkMode(bool v) async {
-    isChangingTheme = true;
-    notifyListeners();
     isDarkMode = v;
+    notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('persist_v3_dark', v);
-    await Future.delayed(const Duration(milliseconds: 600));
-    isChangingTheme = false;
-    notifyListeners();
   }
 
   String normalize(String text) { if (text.isEmpty) return ""; String n = text.toLowerCase().trim(); return n.replaceAll('أ', 'ا').replaceAll('إ', 'ا').replaceAll('آ', 'ا').replaceAll('ة', 'ه').replaceAll('ى', 'ي').replaceAll('ال', '').replaceAll(' ', '').trim(); }

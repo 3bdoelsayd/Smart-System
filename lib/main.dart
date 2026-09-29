@@ -90,7 +90,6 @@ class UniversityApp extends StatelessWidget {
       listenable: ds,
       builder: (context, _) {
         return MaterialApp(
-          key: ValueKey("${ds.isDarkMode}${ds.isArabic}"),
           debugShowCheckedModeBanner: false,
           title: ds.translate('app_title'),
           themeMode: ds.isDarkMode ? ThemeMode.dark : ThemeMode.light,
@@ -99,41 +98,6 @@ class UniversityApp extends StatelessWidget {
           initialRoute: initialRoute ?? '/',
           // إضافة الـ locale لضمان قلب الواجهة (RTL/LTR)
           locale: ds.isArabic ? const Locale('ar') : const Locale('en'),
-          builder: (context, child) {
-            return Stack(
-              children: [
-                if (child != null) child,
-                if (ds.isChangingTheme)
-                  Positioned.fill(
-                    child: Directionality(
-                      textDirection: ds.isArabic ? TextDirection.rtl : TextDirection.ltr,
-                      child: Container(
-                        color: ds.isDarkMode ? Colors.black : Colors.white,
-                        child: Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const CircularProgressIndicator(color: Color(0xFF673AB7)),
-                              const SizedBox(height: 20),
-                              Material(
-                                color: Colors.transparent,
-                                child: Text(
-                                  ds.isArabic ? "جاري تحديث النظام..." : "Updating System...",
-                                  style: GoogleFonts.cairo(
-                                    color: ds.isDarkMode ? Colors.white : Colors.black,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            );
-          },
           routes: {
             '/': (context) => const SplashScreen(),
             '/start': (context) => const StartScreen(),

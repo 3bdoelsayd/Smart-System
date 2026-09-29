@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/data_service.dart';
 
 class StudentLoginScreen extends StatefulWidget {
@@ -15,6 +16,31 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
   final DataService _ds = DataService();
   bool _showPassword = false;
   bool _isLoading = false;
+  bool _rememberMe = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedCredentials();
+  }
+
+  Future<void> _loadSavedCredentials() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      String? savedUser = prefs.getString('saved_login_user');
+      String? savedPass = prefs.getString('saved_login_pass');
+      bool remember = prefs.getBool('saved_remember_me') ?? true;
+      if (remember && savedUser != null && savedPass != null) {
+        if (mounted) {
+          setState(() {
+            _idController.text = savedUser;
+            _passwordController.text = savedPass;
+            _rememberMe = true;
+          });
+        }
+      }
+    } catch (_) {}
+  }
 
   @override
   void dispose() {
@@ -148,7 +174,33 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
                               _buildTextField(_idController, isAr ? 'كود الطالب' : 'Student ID', Icons.badge_outlined, primaryColor, isDark),
                               const SizedBox(height: 20),
                               _buildTextField(_passwordController, isAr ? 'كلمة المرور' : 'Password', Icons.lock_person_outlined, primaryColor, isDark, isPass: true),
-                              const SizedBox(height: 40),
+                              const SizedBox(height: 15),
+                              Row(
+                                children: [
+                                  SizedBox(
+                                    height: 24, width: 24,
+                                    child: Checkbox(
+                                      value: _rememberMe,
+                                      activeColor: isDark ? const Color(0xFF03DAC6) : const Color(0xFF673AB7),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                                      onChanged: (v) => setState(() => _rememberMe = v ?? false),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  GestureDetector(
+                                    onTap: () => setState(() => _rememberMe = !_rememberMe),
+                                    child: Text(
+                                      isAr ? "تذكرني (حفظ بيانات الدخول)" : "Remember Me",
+                                      style: GoogleFonts.cairo(
+                                        fontSize: 13,
+                                        color: textColor,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 25),
                               _buildLoginButton(primaryColor, isAr, isDark),
                             ],
                           ),
@@ -229,6 +281,17 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
           }
 
           setState(() => _isLoading = true);
+
+          final prefs = await SharedPreferences.getInstance();
+          if (_rememberMe) {
+            await prefs.setString('saved_login_user', studentId);
+            await prefs.setString('saved_login_pass', password);
+            await prefs.setBool('saved_remember_me', true);
+          } else {
+            await prefs.remove('saved_login_user');
+            await prefs.remove('saved_login_pass');
+            await prefs.setBool('saved_remember_me', false);
+          }
 
           String email = "$studentId@smart.edu";
 

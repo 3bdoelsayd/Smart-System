@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/data_service.dart';
 
 class UnifiedLoginScreen extends StatefulWidget {
@@ -16,6 +17,7 @@ class _UnifiedLoginScreenState extends State<UnifiedLoginScreen> with SingleTick
   final _ds = DataService();
   bool _isLoading = false;
   bool _obscureText = true;
+  bool _rememberMe = true;
 
   late AnimationController _controller;
   late Animation<double> _fadeAnim;
@@ -24,6 +26,7 @@ class _UnifiedLoginScreenState extends State<UnifiedLoginScreen> with SingleTick
   @override
   void initState() {
     super.initState();
+    _loadSavedCredentials();
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
@@ -35,6 +38,24 @@ class _UnifiedLoginScreenState extends State<UnifiedLoginScreen> with SingleTick
     );
 
     _controller.forward();
+  }
+
+  Future<void> _loadSavedCredentials() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      String? savedUser = prefs.getString('saved_login_user');
+      String? savedPass = prefs.getString('saved_login_pass');
+      bool remember = prefs.getBool('saved_remember_me') ?? true;
+      if (remember && savedUser != null && savedPass != null) {
+        if (mounted) {
+          setState(() {
+            _emailController.text = savedUser;
+            _passController.text = savedPass;
+            _rememberMe = true;
+          });
+        }
+      }
+    } catch (_) {}
   }
 
   @override
@@ -55,6 +76,17 @@ class _UnifiedLoginScreenState extends State<UnifiedLoginScreen> with SingleTick
     try {
       String? role = await _ds.unifiedLogin(_emailController.text.trim(), _passController.text.trim());
       if (!mounted) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      if (_rememberMe) {
+        await prefs.setString('saved_login_user', _emailController.text.trim());
+        await prefs.setString('saved_login_pass', _passController.text.trim());
+        await prefs.setBool('saved_remember_me', true);
+      } else {
+        await prefs.remove('saved_login_user');
+        await prefs.remove('saved_login_pass');
+        await prefs.setBool('saved_remember_me', false);
+      }
 
       switch (role) {
         case 'super_admin': Navigator.pushReplacementNamed(context, '/super-admin/dashboard'); break;
@@ -291,7 +323,33 @@ class _UnifiedLoginScreenState extends State<UnifiedLoginScreen> with SingleTick
               isDark: isDark, color: color,
               isPass: true
           ),
-          const SizedBox(height: 35),
+          const SizedBox(height: 15),
+          Row(
+            children: [
+              SizedBox(
+                height: 24, width: 24,
+                child: Checkbox(
+                  value: _rememberMe,
+                  activeColor: color,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                  onChanged: (v) => setState(() => _rememberMe = v ?? false),
+                ),
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: () => setState(() => _rememberMe = !_rememberMe),
+                child: Text(
+                  isAr ? "تذكرني (حفظ بيانات الدخول)" : "Remember Me",
+                  style: GoogleFonts.cairo(
+                    fontSize: 13,
+                    color: isDark ? Colors.white70 : Colors.black87,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 25),
           _buildLoginButton(color, isDark, isAr),
         ],
       ),
