@@ -208,13 +208,6 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
                             ),
                           ),
                         ),
-                                ],
-                              ),
-                              const SizedBox(height: 25),
-                              _buildLoginButton(primaryColor, isAr, isDark),
-                            ],
-                          ),
-                        ),
                         
                         const SizedBox(height: 40),
                         GestureDetector(
