@@ -126,7 +126,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         trailing: Switch(
                           activeColor: primaryColor,
                           value: isDark,
-                          onChanged: (val) => _ds.toggleDarkMode(val),
+                          onChanged: (val) async {
+                            await _ds.toggleDarkMode(val);
+                            if (mounted) {
+                              Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+                            }
+                          },
                         ),
                       ),
                       isDark: isDark,
