@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/data_service.dart';
@@ -163,41 +164,50 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
                               BoxShadow(color: Colors.black.withAlpha(isDark ? 100 : 20), blurRadius: 30, offset: const Offset(0, 15))
                             ],
                           ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                isAr ? 'تسجيل الدخول' : 'Sign In',
-                                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: textColor),
-                              ),
-                              const SizedBox(height: 30),
-                              _buildTextField(_idController, isAr ? 'كود الطالب' : 'Student ID', Icons.badge_outlined, primaryColor, isDark),
-                              const SizedBox(height: 20),
-                              _buildTextField(_passwordController, isAr ? 'كلمة المرور' : 'Password', Icons.lock_person_outlined, primaryColor, isDark, isPass: true),
-                              const SizedBox(height: 15),
-                              Row(
-                                children: [
-                                  SizedBox(
-                                    height: 24, width: 24,
-                                    child: Checkbox(
-                                      value: _rememberMe,
-                                      activeColor: isDark ? const Color(0xFF03DAC6) : const Color(0xFF673AB7),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                                      onChanged: (v) => setState(() => _rememberMe = v ?? false),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  GestureDetector(
-                                    onTap: () => setState(() => _rememberMe = !_rememberMe),
-                                    child: Text(
-                                      isAr ? "تذكرني (حفظ بيانات الدخول)" : "Remember Me",
-                                      style: GoogleFonts.cairo(
-                                        fontSize: 13,
-                                        color: textColor,
-                                        fontWeight: FontWeight.w600,
+                          child: AutofillGroup(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  isAr ? 'تسجيل الدخول' : 'Sign In',
+                                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: textColor),
+                                ),
+                                const SizedBox(height: 30),
+                                _buildTextField(_idController, isAr ? 'كود الطالب' : 'Student ID', Icons.badge_outlined, primaryColor, isDark, autofillHints: const [AutofillHints.username, AutofillHints.telephoneNumber]),
+                                const SizedBox(height: 20),
+                                _buildTextField(_passwordController, isAr ? 'كلمة المرور' : 'Password', Icons.lock_person_outlined, primaryColor, isDark, isPass: true, autofillHints: const [AutofillHints.password]),
+                                const SizedBox(height: 15),
+                                Row(
+                                  children: [
+                                    SizedBox(
+                                      height: 24, width: 24,
+                                      child: Checkbox(
+                                        value: _rememberMe,
+                                        activeColor: isDark ? const Color(0xFF03DAC6) : const Color(0xFF673AB7),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                                        onChanged: (v) => setState(() => _rememberMe = v ?? false),
                                       ),
                                     ),
-                                  ),
+                                    const SizedBox(width: 8),
+                                    GestureDetector(
+                                      onTap: () => setState(() => _rememberMe = !_rememberMe),
+                                      child: Text(
+                                        isAr ? "تذكرني (حفظ بيانات الدخول)" : "Remember Me",
+                                        style: GoogleFonts.cairo(
+                                          fontSize: 13,
+                                          color: textColor,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 25),
+                                _buildLoginButton(primaryColor, isAr, isDark),
+                              ],
+                            ),
+                          ),
+                        ),
                                 ],
                               ),
                               const SizedBox(height: 25),
@@ -232,10 +242,11 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String label, IconData icon, Color color, bool isDark, {bool isPass = false}) {
+  Widget _buildTextField(TextEditingController controller, String label, IconData icon, Color color, bool isDark, {bool isPass = false, Iterable<String>? autofillHints}) {
     return TextField(
       controller: controller,
       obscureText: isPass && !_showPassword,
+      autofillHints: autofillHints,
       style: TextStyle(fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black),
       decoration: InputDecoration(
         labelText: label,
@@ -281,6 +292,7 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
           }
 
           setState(() => _isLoading = true);
+          TextInput.finishAutofillContext();
 
           final prefs = await SharedPreferences.getInstance();
           if (_rememberMe) {

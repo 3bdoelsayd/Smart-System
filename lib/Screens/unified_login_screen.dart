@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/data_service.dart';
@@ -74,6 +75,7 @@ class _UnifiedLoginScreenState extends State<UnifiedLoginScreen> with SingleTick
 
     setState(() => _isLoading = true);
     try {
+      TextInput.finishAutofillContext(); // إشعار المتصفح لحفظ الكود والباسورد
       String? role = await _ds.unifiedLogin(_emailController.text.trim(), _passController.text.trim());
       if (!mounted) return;
 
@@ -297,61 +299,68 @@ class _UnifiedLoginScreenState extends State<UnifiedLoginScreen> with SingleTick
           )
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            isAr ? "تسجيل الدخول" : "Login",
-            style: GoogleFonts.cairo(
-              fontSize: 22, fontWeight: FontWeight.bold,
-              height: 1.6,
-              color: isDark ? Colors.white : Colors.black87,
-            ),
-          ),
-          const SizedBox(height: 25),
-          _buildTextField(
-              controller: _emailController,
-              hint: isAr ? "البريد الإلكتروني" : "Email",
-              icon: Icons.alternate_email_rounded,
-              isDark: isDark, color: color
-          ),
-          const SizedBox(height: 18),
-          _buildTextField(
-              controller: _passController,
-              hint: isAr ? "كلمة المرور" : "Password",
-              icon: Icons.lock_outline_rounded,
-              isDark: isDark, color: color,
-              isPass: true
-          ),
-          const SizedBox(height: 15),
-          Row(
-            children: [
-              SizedBox(
-                height: 24, width: 24,
-                child: Checkbox(
-                  value: _rememberMe,
-                  activeColor: color,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                  onChanged: (v) => setState(() => _rememberMe = v ?? false),
-                ),
+      child: AutofillGroup(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              isAr ? "تسجيل الدخول" : "Login",
+              style: GoogleFonts.cairo(
+                fontSize: 22, fontWeight: FontWeight.bold,
+                height: 1.6,
+                color: isDark ? Colors.white : Colors.black87,
               ),
-              const SizedBox(width: 8),
-              GestureDetector(
-                onTap: () => setState(() => _rememberMe = !_rememberMe),
-                child: Text(
-                  isAr ? "تذكرني (حفظ بيانات الدخول)" : "Remember Me",
-                  style: GoogleFonts.cairo(
-                    fontSize: 13,
-                    color: isDark ? Colors.white70 : Colors.black87,
-                    fontWeight: FontWeight.w600,
+            ),
+            const SizedBox(height: 25),
+            _buildTextField(
+                controller: _emailController,
+                hint: isAr ? "البريد الإلكتروني" : "Email",
+                icon: Icons.alternate_email_rounded,
+                isDark: isDark, color: color,
+                autofillHints: const [AutofillHints.email, AutofillHints.username],
+                textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: 18),
+            _buildTextField(
+                controller: _passController,
+                hint: isAr ? "كلمة المرور" : "Password",
+                icon: Icons.lock_outline_rounded,
+                isDark: isDark, color: color,
+                isPass: true,
+                autofillHints: const [AutofillHints.password],
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _handleLogin(),
+            ),
+            const SizedBox(height: 15),
+            Row(
+              children: [
+                SizedBox(
+                  height: 24, width: 24,
+                  child: Checkbox(
+                    value: _rememberMe,
+                    activeColor: color,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                    onChanged: (v) => setState(() => _rememberMe = v ?? false),
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 25),
-          _buildLoginButton(color, isDark, isAr),
-        ],
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: () => setState(() => _rememberMe = !_rememberMe),
+                  child: Text(
+                    isAr ? "تذكرني (حفظ بيانات الدخول)" : "Remember Me",
+                    style: GoogleFonts.cairo(
+                      fontSize: 13,
+                      color: isDark ? Colors.white70 : Colors.black87,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 25),
+            _buildLoginButton(color, isDark, isAr),
+          ],
+        ),
       ),
     );
   }
@@ -362,7 +371,10 @@ class _UnifiedLoginScreenState extends State<UnifiedLoginScreen> with SingleTick
     required IconData icon,
     required bool isDark,
     required Color color,
-    bool isPass = false
+    bool isPass = false,
+    Iterable<String>? autofillHints,
+    TextInputAction? textInputAction,
+    ValueChanged<String>? onSubmitted,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -373,6 +385,9 @@ class _UnifiedLoginScreenState extends State<UnifiedLoginScreen> with SingleTick
       child: TextField(
         controller: controller,
         obscureText: isPass && _obscureText,
+        autofillHints: autofillHints,
+        textInputAction: textInputAction,
+        onSubmitted: onSubmitted,
         style: GoogleFonts.cairo(fontSize: 15, color: isDark ? Colors.white : Colors.black87),
         decoration: InputDecoration(
           prefixIcon: Icon(icon, color: color.withAlpha(180), size: 20),
