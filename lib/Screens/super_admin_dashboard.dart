@@ -21,22 +21,25 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    bool isAr = _ds.isArabic;
-    bool isDark = _ds.isDarkMode;
-    final adminName = _ds.currentAdmin?['name'] ?? _ds.translate('super_admin');
+    return ListenableBuilder(
+      listenable: _ds,
+      builder: (context, _) {
+        bool isAr = _ds.isArabic;
+        bool isDark = _ds.isDarkMode;
+        final adminName = _ds.currentAdmin?['name'] ?? _ds.translate('super_admin');
 
-    final List<Map<String, dynamic>> cards = [
-      {'icon': Icons.layers_rounded, 'title': _ds.translate('manage_levels'), 'widget': const LevelsManagementView(), 'color': const Color(0xFF673AB7), 'subtitle': isAr ? 'إدارة الفرق الدراسية' : 'Manage academic levels'},
-      {'icon': Icons.grid_view_rounded, 'title': _ds.translate('manage_sections'), 'widget': const SectionsManagementView(), 'color': const Color(0xFF00BCD4), 'subtitle': isAr ? 'توزيع الطلاب والشعب' : 'Distribute sections'},
-      {'icon': Icons.school_rounded, 'title': _ds.translate('manage_students'), 'widget': const StudentsManagementView(), 'color': const Color(0xFF4CAF50), 'subtitle': isAr ? 'قاعدة بيانات الطلاب' : 'Students database'},
-      {'icon': Icons.person_search_rounded, 'title': _ds.translate('manage_doctors'), 'widget': const DoctorsManagementView(), 'color': const Color(0xFFE91E63), 'subtitle': isAr ? 'أعضاء هيئة التدريس' : 'Faculty members'},
-      {'icon': Icons.admin_panel_settings_rounded, 'title': _ds.translate('manage_managers'), 'widget': const ManagersManagementView(), 'color': const Color(0xFFFF9800), 'subtitle': isAr ? 'صلاحيات المديرين' : 'Managers roles'},
-      {'icon': Icons.calendar_month_rounded, 'title': _ds.translate('semesters'), 'widget': const SemestersManagementView(), 'color': const Color(0xFF607D8B), 'subtitle': isAr ? 'الفصول والتقويم' : 'Academic calendar'},
-    ];
+        final List<Map<String, dynamic>> cards = [
+          {'icon': Icons.layers_rounded, 'title': _ds.translate('manage_levels'), 'widget': const LevelsManagementView(), 'color': const Color(0xFF673AB7), 'subtitle': isAr ? 'إدارة الفرق الدراسية' : 'Manage academic levels'},
+          {'icon': Icons.grid_view_rounded, 'title': _ds.translate('manage_sections'), 'widget': const SectionsManagementView(), 'color': const Color(0xFF00BCD4), 'subtitle': isAr ? 'توزيع الطلاب والشعب' : 'Distribute sections'},
+          {'icon': Icons.school_rounded, 'title': _ds.translate('manage_students'), 'widget': const StudentsManagementView(), 'color': const Color(0xFF4CAF50), 'subtitle': isAr ? 'قاعدة بيانات الطلاب' : 'Students database'},
+          {'icon': Icons.person_search_rounded, 'title': _ds.translate('manage_doctors'), 'widget': const DoctorsManagementView(), 'color': const Color(0xFFE91E63), 'subtitle': isAr ? 'أعضاء هيئة التدريس' : 'Faculty members'},
+          {'icon': Icons.admin_panel_settings_rounded, 'title': _ds.translate('manage_managers'), 'widget': const ManagersManagementView(), 'color': const Color(0xFFFF9800), 'subtitle': isAr ? 'صلاحيات المديرين' : 'Managers roles'},
+          {'icon': Icons.calendar_month_rounded, 'title': _ds.translate('semesters'), 'widget': const SemestersManagementView(), 'color': const Color(0xFF607D8B), 'subtitle': isAr ? 'الفصول والتقويم' : 'Academic calendar'},
+        ];
 
-    return Directionality(
-      textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
-      child: Scaffold(
+        return Directionality(
+          textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
+          child: Scaffold(
         backgroundColor: isDark ? const Color(0xFF0F0F12) : const Color(0xFFF8F9FE),
         drawer: AppDrawer(name: adminName, role: _ds.translate('super_admin')),
         body: CustomScrollView(
@@ -135,7 +138,9 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         ),
       ),
     );
-  }
+  },
+);
+}
 
   Widget _buildQuickStat(String label, String value, Color color) {
     return Container(

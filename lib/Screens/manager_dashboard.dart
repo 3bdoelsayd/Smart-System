@@ -42,13 +42,16 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    bool isDark = _ds.isDarkMode;
-    final managerName = _ds.currentAdmin?['name'] ?? 'المدير';
+    return ListenableBuilder(
+      listenable: _ds,
+      builder: (context, _) {
+        final theme = Theme.of(context);
+        bool isDark = _ds.isDarkMode;
+        final managerName = _ds.currentAdmin?['name'] ?? 'المدير';
 
-    if (_managedLevels.isEmpty) {
-      return Scaffold(body: Center(child: Text('لا توجد فرق دراسية مسندة إليك', style: GoogleFonts.cairo(fontSize: 18, color: Colors.grey))));
-    }
+        if (_managedLevels.isEmpty) {
+          return Scaffold(body: Center(child: Text('لا توجد فرق دراسية مسندة إليك', style: GoogleFonts.cairo(fontSize: 18, color: Colors.grey))));
+        }
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -135,6 +138,8 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
         ),
         floatingActionButton: _buildFAB(),
       ),
+    );
+      },
     );
   }
 
