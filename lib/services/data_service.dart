@@ -9,7 +9,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:url_launcher/url_launcher.dart';
@@ -764,7 +764,26 @@ class DataService extends ChangeNotifier {
     }
   }
 
-  Future<bool> updatePassword(String newPass) async { try { await _auth.currentUser?.updatePassword(newPass); return true; } catch (_) { return false; } }
+  Future<bool> updatePassword(String newPass) async {
+    try {
+      User? user = _auth.currentUser;
+      if (user != null) {
+        await user.updatePassword(newPass);
+        String uid = user.uid;
+        if (currentStudent != null) {
+          await studentsColl.doc(uid).update({'password': hashPassword(newPass)});
+        } else if (currentDoctor != null) {
+          await commerceDoctorsColl.doc(uid).update({'password': hashPassword(newPass)});
+        } else if (currentAdmin != null) {
+          await commerceManagersColl.doc(uid).update({'password': hashPassword(newPass)}).catchError((_){});
+        }
+      }
+      return true;
+    } catch (e) {
+      debugPrint("Update password error: $e");
+      return false;
+    }
+  }
 
   Future<void> syncScheduleNotifications() async {
     if (kIsWeb || currentStudent == null) return;
@@ -937,6 +956,45 @@ class DataService extends ChangeNotifier {
     } catch (e) {
       await tempApp.delete();
       rethrow;
+    }
+  }
+
+  Future<void> updateDoctorProfile({String? phone, String? email, String? photoUrl, Map<String, dynamic>? preferences}) async {
+    if (currentDoctor == null) return;
+    String uid = currentDoctor!['uid'];
+    Map<String, dynamic> updateData = {};
+    if (phone != null) updateData['phone'] = phone;
+    if (email != null) updateData['email'] = email;
+    if (photoUrl != null) updateData['photoUrl'] = photoUrl;
+    if (preferences != null) updateData['preferences'] = preferences;
+
+    await commerceDoctorsColl.doc(uid).update(updateData);
+    currentDoctor!.addAll(updateData);
+    notifyListeners();
+  }
+
+  Future<void> updateStudentProfile({String? phone, String? photoUrl}) async {
+    if (currentStudent == null) return;
+    String uid = currentStudent!['uid'];
+    Map<String, dynamic> updateData = {};
+    if (phone != null) updateData['phone'] = phone;
+    if (photoUrl != null) updateData['photoUrl'] = photoUrl;
+
+    await studentsColl.doc(uid).update(updateData);
+    currentStudent!.addAll(updateData);
+    notifyListeners();
+  }
+
+  Future<void> launchWhatsApp(String phoneNumber) async {
+    String cleanNum = phoneNumber.replaceAll(RegExp(r'[^0-9+]'), '');
+    if (cleanNum.startsWith('0')) {
+      cleanNum = '+2$cleanNum';
+    }
+    final Uri uri = Uri.parse("https://wa.me/$cleanNum");
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      debugPrint("WhatsApp launch error: $e");
     }
   }
 }

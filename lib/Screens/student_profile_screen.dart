@@ -1,8 +1,58 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../services/data_service.dart';
 
-class StudentProfileScreen extends StatelessWidget {
+class StudentProfileScreen extends StatefulWidget {
   const StudentProfileScreen({super.key});
+
+  @override
+  State<StudentProfileScreen> createState() => _StudentProfileScreenState();
+}
+
+class _StudentProfileScreenState extends State<StudentProfileScreen> {
+  final DataService _ds = DataService();
+
+  void _showEditProfileDialog(BuildContext context, bool isDark) {
+    final phoneController = TextEditingController(text: _ds.currentStudent?['phone'] ?? '');
+    bool isAr = _ds.isArabic;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(isAr ? "تعديل البيانات الشخصية" : "Edit Profile", style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: phoneController,
+              keyboardType: TextInputType.phone,
+              style: TextStyle(color: isDark ? Colors.white : Colors.black),
+              decoration: InputDecoration(
+                labelText: isAr ? "رقم الهاتف" : "Phone Number",
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(isAr ? "إلغاء" : "Cancel")),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF673AB7)),
+            onPressed: () async {
+              await _ds.updateStudentProfile(phone: phoneController.text.trim());
+              if (mounted) {
+                Navigator.pop(ctx);
+                setState(() {});
+              }
+            },
+            child: Text(isAr ? "حفظ" : "Save", style: const TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -31,6 +81,13 @@ class StudentProfileScreen extends StatelessWidget {
           backgroundColor: isDark ? const Color(0xFF1A1A1A) : primaryColor,
           foregroundColor: Colors.white,
           elevation: 0,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.edit_rounded),
+              tooltip: isAr ? 'تعديل البيانات' : 'Edit Profile',
+              onPressed: () => _showEditProfileDialog(context, isDark),
+            ),
+          ],
         ),
         body: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
@@ -131,6 +188,15 @@ class StudentProfileScreen extends StatelessWidget {
                 value: isAr ? 'نشط' : 'Active',
                 isDark: isDark,
                 color: Colors.green,
+                surfaceColor: cardColor,
+              ),
+              const SizedBox(height: 15),
+              _buildInfoCard(
+                icon: Icons.phone_rounded,
+                title: isAr ? 'رقم الهاتف' : 'Phone Number',
+                value: student?['phone'] ?? (isAr ? 'غير مسجل (اضغط تعديل)' : 'Not registered'),
+                isDark: isDark,
+                color: Colors.blue,
                 surfaceColor: cardColor,
               ),
               

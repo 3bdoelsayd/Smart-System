@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/data_service.dart';
 import '../widgets/dashboard_card.dart';
 import '../widgets/app_drawer.dart';
@@ -36,6 +37,49 @@ class _StudentHomeScreenState extends State<_StudentHomeScreenContent> {
       const _StudentSchedulePage(),
       const _StudentProfilePage(),
     ];
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkDefaultPasswordWarning());
+  }
+
+  Future<void> _checkDefaultPasswordWarning() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      String uid = _ds.currentStudent?['uid'] ?? '';
+      bool warned = prefs.getBool('warned_pass_$uid') ?? false;
+      if (!warned && mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            backgroundColor: _ds.isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+            title: Text(_ds.isArabic ? "تنبيه أمني للحساب" : "Security Notice", style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+            content: Text(
+              _ds.isArabic 
+                ? "أهلاً بك! لحماية حسابك وأمان بياناتك، نوصي بالذهاب إلى (الإعدادات) وتغيير كلمة المرور الافتراضية."
+                : "Welcome! To protect your account, we recommend going to Settings and changing your default password.",
+              style: GoogleFonts.cairo(color: _ds.isDarkMode ? Colors.white70 : Colors.black87),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () async {
+                  await prefs.setBool('warned_pass_$uid', true);
+                  Navigator.pop(ctx);
+                },
+                child: Text(_ds.isArabic ? "لاحقاً" : "Later", style: GoogleFonts.cairo(color: Colors.grey)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF673AB7)),
+                onPressed: () async {
+                  await prefs.setBool('warned_pass_$uid', true);
+                  Navigator.pop(ctx);
+                  Navigator.pushNamed(context, '/settings');
+                },
+                child: Text(_ds.isArabic ? "تغيير الآن" : "Change Now", style: const TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (_) {}
   }
 
   void _onTap(int idx) {

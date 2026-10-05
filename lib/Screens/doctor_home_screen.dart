@@ -90,6 +90,7 @@ class DoctorHomeScreen extends StatelessWidget {
         final List<Map<String, dynamic>> cards = [
           {'icon': Icons.qr_code_rounded, 'title': ds.translate('attendance_mng'), 'route': '/doctor/attendance', 'color': Colors.blue},
           {'icon': Icons.assignment_turned_in_rounded, 'title': ds.translate('research_review'), 'route': '/doctor/researches', 'color': Colors.orange},
+          {'icon': Icons.chat_bubble_rounded, 'title': isAr ? 'مراسلة الطلاب والواتساب' : 'Students Chat & WhatsApp', 'route': '/doctor/students-chat', 'color': Colors.green},
           {'icon': Icons.forum_rounded, 'title': ds.translate('forum'), 'color': Colors.cyan, 'action': 'open_picker'},
           {'icon': Icons.settings_rounded, 'title': ds.translate('settings'), 'route': '/settings', 'color': Colors.purple},
         ];

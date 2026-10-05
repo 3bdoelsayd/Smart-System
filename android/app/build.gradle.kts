@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.example.untitled27"
-    compileSdk = 35 
+    compileSdk = 36 
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -22,7 +22,7 @@ android {
     defaultConfig {
         applicationId = "com.example.untitled27"
         minSdk = 24
-        targetSdk = 35
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         multiDexEnabled = true

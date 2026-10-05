@@ -27,6 +27,7 @@ import 'Screens/bulk_upload_results_screen.dart';
 import 'Screens/super_admin_dashboard.dart';
 import 'Screens/manager_dashboard.dart';
 import 'Screens/college_selection_screen.dart';
+import 'Screens/doctor_students_list_screen.dart';
 
 void main() async {
   try {
@@ -116,6 +117,7 @@ class UniversityApp extends StatelessWidget {
             '/student/attendance-scan': (context) => const AttendanceScanScreen(),
             '/doctor/attendance': (context) => const AttendanceManagementScreen(),
             '/doctor/researches': (context) => const ResearchSubmissionsScreen(),
+            '/doctor/students-chat': (context) => const DoctorStudentsListScreen(),
             '/doctor/exam-results': (context) => const ExamResultsManagementScreen(),
             '/notifications': (context) => const NotificationsScreen(),
             '/settings': (context) => const SettingsScreen(),

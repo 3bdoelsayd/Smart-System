@@ -137,20 +137,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       isDark: isDark,
                     ),
                     
-                    // إخفاء قسم الأمان إذا لم يكن المستخدم أدمن
-                    if (isAdmin) ...[
-                      const SizedBox(height: 10),
-                      _buildSectionTitle(isAr ? 'الأمان' : 'Security', isDark),
-                      _buildSettingCard(
-                        child: ListTile(
-                          title: Text(isAr ? "تغيير كلمة المرور" : "Change Password", style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
-                          leading: Icon(Icons.lock_reset_rounded, color: primaryColor),
-                          trailing: Icon(Icons.arrow_forward_ios_rounded, size: 16, color: primaryColor),
-                          onTap: () => _showChangePasswordDialog(context, primaryColor, isDark),
-                        ),
-                        isDark: isDark,
+                    const SizedBox(height: 10),
+                    _buildSectionTitle(isAr ? 'الأمان' : 'Security', isDark),
+                    _buildSettingCard(
+                      child: ListTile(
+                        title: Text(isAr ? "تغيير كلمة المرور" : "Change Password", style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+                        leading: Icon(Icons.lock_reset_rounded, color: primaryColor),
+                        trailing: Icon(Icons.arrow_forward_ios_rounded, size: 16, color: primaryColor),
+                        onTap: () => _showChangePasswordDialog(context, primaryColor, isDark),
                       ),
-                    ],
+                      isDark: isDark,
+                    ),
 
                     const SizedBox(height: 40),
                     ElevatedButton.icon(
