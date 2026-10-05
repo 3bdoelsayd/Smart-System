@@ -959,12 +959,13 @@ class DataService extends ChangeNotifier {
     }
   }
 
-  Future<void> updateDoctorProfile({String? phone, String? email, String? photoUrl, Map<String, dynamic>? preferences}) async {
+  Future<void> updateDoctorProfile({String? phone, String? email, String? personalEmail, String? photoUrl, Map<String, dynamic>? preferences}) async {
     if (currentDoctor == null) return;
     String uid = currentDoctor!['uid'];
     Map<String, dynamic> updateData = {};
     if (phone != null) updateData['phone'] = phone;
     if (email != null) updateData['email'] = email;
+    if (personalEmail != null) updateData['personalEmail'] = personalEmail;
     if (photoUrl != null) updateData['photoUrl'] = photoUrl;
     if (preferences != null) updateData['preferences'] = preferences;
 
@@ -973,16 +974,38 @@ class DataService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> updateStudentProfile({String? phone, String? photoUrl}) async {
+  Future<void> updateStudentProfile({String? phone, String? personalEmail, String? photoUrl}) async {
     if (currentStudent == null) return;
     String uid = currentStudent!['uid'];
     Map<String, dynamic> updateData = {};
     if (phone != null) updateData['phone'] = phone;
+    if (personalEmail != null) updateData['personalEmail'] = personalEmail;
     if (photoUrl != null) updateData['photoUrl'] = photoUrl;
 
     await studentsColl.doc(uid).update(updateData);
     currentStudent!.addAll(updateData);
     notifyListeners();
+  }
+
+  Future<String?> uploadAvatarFile(PlatformFile file) async {
+    try {
+      final supabase = Supabase.instance.client;
+      String fileName = 'avatar_${DateTime.now().millisecondsSinceEpoch}_${file.name}';
+      
+      if (kIsWeb) {
+        if (file.bytes == null) return null;
+        await supabase.storage.from('research-pdfs').uploadBinary(fileName, file.bytes!);
+      } else {
+        if (file.path == null) return null;
+        await supabase.storage.from('research-pdfs').upload(fileName, io.File(file.path!));
+      }
+
+      final String publicUrl = supabase.storage.from('research-pdfs').getPublicUrl(fileName);
+      return publicUrl;
+    } catch (e) {
+      debugPrint("Upload avatar error: $e");
+      return null;
+    }
   }
 
   Future<void> launchWhatsApp(String phoneNumber) async {

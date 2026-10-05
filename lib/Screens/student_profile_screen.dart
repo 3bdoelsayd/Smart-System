@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/data_service.dart';
 
@@ -13,58 +14,94 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
   final DataService _ds = DataService();
 
   void _showEditProfileDialog(BuildContext context, bool isDark) {
-    final phoneController = TextEditingController(text: _ds.currentStudent?['phone'] ?? '');
-    final photoController = TextEditingController(text: _ds.currentStudent?['photoUrl'] ?? '');
+    final student = _ds.currentStudent;
+    final phoneController = TextEditingController(text: student?['phone'] ?? '');
+    final personalEmailController = TextEditingController(text: student?['personalEmail'] ?? '');
+    
+    PlatformFile? pickedImageFile;
+    bool isUploading = false;
     bool isAr = _ds.isArabic;
+    Color primaryColor = isDark ? const Color(0xFF03DAC6) : const Color(0xFF673AB7);
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(isAr ? "تعديل البيانات والصورة الشخصية" : "Edit Profile", style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: phoneController,
-                keyboardType: TextInputType.phone,
-                style: TextStyle(color: isDark ? Colors.white : Colors.black),
-                decoration: InputDecoration(
-                  labelText: isAr ? "رقم الهاتف" : "Phone Number",
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text(isAr ? "تعديل البيانات الشخصية والصورة" : "Edit Profile", style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(backgroundColor: primaryColor, foregroundColor: Colors.white),
+                  icon: const Icon(Icons.image_rounded),
+                  label: Text(pickedImageFile != null ? (isAr ? "تم اختيار صورة" : "Image Selected") : (isAr ? "اختر صورة شخصية من الملفات" : "Pick Image from Files")),
+                  onPressed: () async {
+                    FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.image);
+                    if (result != null && result.files.single != null) {
+                      setDialogState(() {
+                        pickedImageFile = result.files.single;
+                      });
+                    }
+                  },
                 ),
-              ),
-              const SizedBox(height: 15),
-              TextField(
-                controller: photoController,
-                style: TextStyle(color: isDark ? Colors.white : Colors.black),
-                decoration: InputDecoration(
-                  labelText: isAr ? "رابط الصورة الشخصية (URL)" : "Photo URL",
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                if (pickedImageFile != null) ...[
+                  const SizedBox(height: 8),
+                  Text(pickedImageFile!.name, style: const TextStyle(fontSize: 12, color: Colors.green)),
+                ],
+                const SizedBox(height: 15),
+                TextField(
+                  controller: phoneController,
+                  keyboardType: TextInputType.phone,
+                  style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                  decoration: InputDecoration(
+                    labelText: isAr ? "رقم الهاتف" : "Phone Number",
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 15),
+                TextField(
+                  controller: personalEmailController,
+                  keyboardType: TextInputType.emailAddress,
+                  style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                  decoration: InputDecoration(
+                    labelText: isAr ? "البريد الإلكتروني الشخصي" : "Personal Email",
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ],
+            ),
           ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(isAr ? "إلغاء" : "Cancel")),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
+              onPressed: isUploading ? null : () async {
+                setDialogState(() => isUploading = true);
+                String? photoUrl = student?['photoUrl'];
+                if (pickedImageFile != null) {
+                  photoUrl = await _ds.uploadAvatarFile(pickedImageFile!);
+                }
+
+                await _ds.updateStudentProfile(
+                  phone: phoneController.text.trim(),
+                  personalEmail: personalEmailController.text.trim(),
+                  photoUrl: photoUrl,
+                );
+                if (mounted) {
+                  Navigator.pop(ctx);
+                  setState(() {});
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(isAr ? "تم تحديث البيانات بنجاح" : "Profile updated")));
+                }
+              },
+              child: isUploading 
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                : Text(isAr ? "حفظ" : "Save", style: const TextStyle(color: Colors.white)),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(isAr ? "إلغاء" : "Cancel")),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF673AB7)),
-            onPressed: () async {
-              await _ds.updateStudentProfile(
-                phone: phoneController.text.trim(),
-                photoUrl: photoController.text.trim(),
-              );
-              if (mounted) {
-                Navigator.pop(ctx);
-                setState(() {});
-              }
-            },
-            child: Text(isAr ? "حفظ" : "Save", style: const TextStyle(color: Colors.white)),
-          ),
-        ],
       ),
     );
   }

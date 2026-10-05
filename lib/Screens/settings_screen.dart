@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../services/data_service.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -14,69 +16,181 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _showDoctorProfileDialog(BuildContext context, Color primaryColor, bool isDark) {
     final doc = _ds.currentDoctor;
     final phoneController = TextEditingController(text: doc?['phone'] ?? '');
-    final emailController = TextEditingController(text: doc?['email'] ?? '');
-    final photoController = TextEditingController(text: doc?['photoUrl'] ?? '');
+    final personalEmailController = TextEditingController(text: doc?['personalEmail'] ?? '');
+    
+    PlatformFile? pickedImageFile;
+    bool isUploading = false;
     bool isAr = _ds.isArabic;
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(isAr ? "الملف الشخصي والبيانات" : "Doctor Profile", style: const TextStyle(fontWeight: FontWeight.bold)),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: phoneController,
-                keyboardType: TextInputType.phone,
-                style: TextStyle(color: isDark ? Colors.white : Colors.black),
-                decoration: InputDecoration(
-                  labelText: isAr ? "رقم الهاتف" : "Phone Number",
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text(isAr ? "الملف الشخصي والبيانات" : "Doctor Profile", style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(backgroundColor: primaryColor, foregroundColor: Colors.white),
+                  icon: const Icon(Icons.image_rounded),
+                  label: Text(pickedImageFile != null ? (isAr ? "تم اختيار صورة" : "Image Selected") : (isAr ? "اختر صورة شخصية من الملفات" : "Pick Image from Files")),
+                  onPressed: () async {
+                    FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.image);
+                    if (result != null && result.files.single != null) {
+                      setDialogState(() {
+                        pickedImageFile = result.files.single;
+                      });
+                    }
+                  },
                 ),
-              ),
-              const SizedBox(height: 15),
-              TextField(
-                controller: emailController,
-                keyboardType: TextInputType.emailAddress,
-                style: TextStyle(color: isDark ? Colors.white : Colors.black),
-                decoration: InputDecoration(
-                  labelText: isAr ? "البريد الإلكتروني" : "Email",
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                if (pickedImageFile != null) ...[
+                  const SizedBox(height: 8),
+                  Text(pickedImageFile!.name, style: const TextStyle(fontSize: 12, color: Colors.green)),
+                ],
+                const SizedBox(height: 15),
+                TextField(
+                  controller: phoneController,
+                  keyboardType: TextInputType.phone,
+                  style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                  decoration: InputDecoration(
+                    labelText: isAr ? "رقم الهاتف" : "Phone Number",
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 15),
-              TextField(
-                controller: photoController,
-                style: TextStyle(color: isDark ? Colors.white : Colors.black),
-                decoration: InputDecoration(
-                  labelText: isAr ? "رابط الصورة الشخصية (اختياري)" : "Photo URL",
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                const SizedBox(height: 15),
+                TextField(
+                  controller: personalEmailController,
+                  keyboardType: TextInputType.emailAddress,
+                  style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                  decoration: InputDecoration(
+                    labelText: isAr ? "البريد الإلكتروني الشخصي" : "Personal Email",
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(isAr ? "إلغاء" : "Cancel")),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
+              onPressed: isUploading ? null : () async {
+                setDialogState(() => isUploading = true);
+                String? photoUrl = doc?['photoUrl'];
+                if (pickedImageFile != null) {
+                  photoUrl = await _ds.uploadAvatarFile(pickedImageFile!);
+                }
+
+                await _ds.updateDoctorProfile(
+                  phone: phoneController.text.trim(),
+                  personalEmail: personalEmailController.text.trim(),
+                  photoUrl: photoUrl,
+                );
+                if (mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(isAr ? "تم تحديث البيانات بنجاح" : "Profile updated")));
+                }
+              },
+              child: isUploading 
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                : Text(isAr ? "حفظ" : "Save", style: const TextStyle(color: Colors.white)),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(isAr ? "إلغاء" : "Cancel")),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
-            onPressed: () async {
-              await _ds.updateDoctorProfile(
-                phone: phoneController.text.trim(),
-                email: emailController.text.trim(),
-                photoUrl: photoController.text.trim(),
-              );
-              if (mounted) {
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(isAr ? "تم تحديث البيانات بنجاح" : "Profile updated")));
-              }
-            },
-            child: Text(isAr ? "حفظ" : "Save", style: const TextStyle(color: Colors.white)),
+      ),
+    );
+  }
+
+  void _showStudentProfileDialog(BuildContext context, Color primaryColor, bool isDark) {
+    final student = _ds.currentStudent;
+    final phoneController = TextEditingController(text: student?['phone'] ?? '');
+    final personalEmailController = TextEditingController(text: student?['personalEmail'] ?? '');
+    
+    PlatformFile? pickedImageFile;
+    bool isUploading = false;
+    bool isAr = _ds.isArabic;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text(isAr ? "الملف الشخصي والبيانات" : "Student Profile", style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(backgroundColor: primaryColor, foregroundColor: Colors.white),
+                  icon: const Icon(Icons.image_rounded),
+                  label: Text(pickedImageFile != null ? (isAr ? "تم اختيار صورة" : "Image Selected") : (isAr ? "اختر صورة شخصية من الملفات" : "Pick Image from Files")),
+                  onPressed: () async {
+                    FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.image);
+                    if (result != null && result.files.single != null) {
+                      setDialogState(() {
+                        pickedImageFile = result.files.single;
+                      });
+                    }
+                  },
+                ),
+                if (pickedImageFile != null) ...[
+                  const SizedBox(height: 8),
+                  Text(pickedImageFile!.name, style: const TextStyle(fontSize: 12, color: Colors.green)),
+                ],
+                const SizedBox(height: 15),
+                TextField(
+                  controller: phoneController,
+                  keyboardType: TextInputType.phone,
+                  style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                  decoration: InputDecoration(
+                    labelText: isAr ? "رقم الهاتف" : "Phone Number",
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                const SizedBox(height: 15),
+                TextField(
+                  controller: personalEmailController,
+                  keyboardType: TextInputType.emailAddress,
+                  style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                  decoration: InputDecoration(
+                    labelText: isAr ? "البريد الإلكتروني الشخصي" : "Personal Email",
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ],
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(isAr ? "إلغاء" : "Cancel")),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
+              onPressed: isUploading ? null : () async {
+                setDialogState(() => isUploading = true);
+                String? photoUrl = student?['photoUrl'];
+                if (pickedImageFile != null) {
+                  photoUrl = await _ds.uploadAvatarFile(pickedImageFile!);
+                }
+
+                await _ds.updateStudentProfile(
+                  phone: phoneController.text.trim(),
+                  personalEmail: personalEmailController.text.trim(),
+                  photoUrl: photoUrl,
+                );
+                if (mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(isAr ? "تم تحديث البيانات بنجاح" : "Profile updated")));
+                }
+              },
+              child: isUploading 
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                : Text(isAr ? "حفظ" : "Save", style: const TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -174,6 +288,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
+                    if (_ds.currentStudent != null || _ds.currentDoctor != null || _ds.currentAdmin != null) ...[
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        margin: const EdgeInsets.only(bottom: 15),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [BoxShadow(color: Colors.black.withAlpha(isDark ? 50 : 10), blurRadius: 10)],
+                        ),
+                        child: Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 30,
+                              backgroundColor: primaryColor.withAlpha(30),
+                              backgroundImage: (_ds.currentStudent?['photoUrl'] ?? _ds.currentDoctor?['photoUrl'] ?? _ds.currentAdmin?['photoUrl'] ?? '').toString().isNotEmpty 
+                                ? NetworkImage(_ds.currentStudent?['photoUrl'] ?? _ds.currentDoctor?['photoUrl'] ?? _ds.currentAdmin?['photoUrl']) 
+                                : null,
+                              child: (_ds.currentStudent?['photoUrl'] ?? _ds.currentDoctor?['photoUrl'] ?? _ds.currentAdmin?['photoUrl'] ?? '').toString().isEmpty 
+                                ? Icon(Icons.person, size: 30, color: primaryColor) 
+                                : null,
+                            ),
+                            const SizedBox(width: 15),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _ds.currentStudent?['name'] ?? _ds.currentDoctor?['name'] ?? _ds.currentAdmin?['name'] ?? 'مستخدم',
+                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    _ds.currentStudent != null ? ('ID: ${_ds.currentStudent?['id']}') : (_ds.currentDoctor != null ? (_ds.currentDoctor?['email'] ?? '') : 'Admin'),
+                                    style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.grey),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     _buildSectionTitle(isAr ? 'اللغة' : 'Language', isDark),
                     _buildSettingCard(
                       child: ListTile(
@@ -216,6 +372,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           leading: Icon(Icons.person_outline_rounded, color: primaryColor),
                           trailing: Icon(Icons.arrow_forward_ios_rounded, size: 16, color: primaryColor),
                           onTap: () => _showDoctorProfileDialog(context, primaryColor, isDark),
+                        ),
+                        isDark: isDark,
+                      ),
+                    ],
+
+                    if (_ds.currentStudent != null) ...[
+                      const SizedBox(height: 10),
+                      _buildSectionTitle(isAr ? 'الملف الشخصي والبيانات' : 'Profile & Info', isDark),
+                      _buildSettingCard(
+                        child: ListTile(
+                          title: Text(isAr ? "تعديل بياناتي الشخصية (الهاتف، البريد، والصورة)" : "Edit Profile Info", style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+                          leading: Icon(Icons.person_outline_rounded, color: primaryColor),
+                          trailing: Icon(Icons.arrow_forward_ios_rounded, size: 16, color: primaryColor),
+                          onTap: () => _showStudentProfileDialog(context, primaryColor, isDark),
                         ),
                         isDark: isDark,
                       ),
