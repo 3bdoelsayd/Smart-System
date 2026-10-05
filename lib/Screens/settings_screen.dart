@@ -11,6 +11,76 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final DataService _ds = DataService();
 
+  void _showDoctorProfileDialog(BuildContext context, Color primaryColor, bool isDark) {
+    final doc = _ds.currentDoctor;
+    final phoneController = TextEditingController(text: doc?['phone'] ?? '');
+    final emailController = TextEditingController(text: doc?['email'] ?? '');
+    final photoController = TextEditingController(text: doc?['photoUrl'] ?? '');
+    bool isAr = _ds.isArabic;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(isAr ? "الملف الشخصي والبيانات" : "Doctor Profile", style: const TextStyle(fontWeight: FontWeight.bold)),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: phoneController,
+                keyboardType: TextInputType.phone,
+                style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                decoration: InputDecoration(
+                  labelText: isAr ? "رقم الهاتف" : "Phone Number",
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+              const SizedBox(height: 15),
+              TextField(
+                controller: emailController,
+                keyboardType: TextInputType.emailAddress,
+                style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                decoration: InputDecoration(
+                  labelText: isAr ? "البريد الإلكتروني" : "Email",
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+              const SizedBox(height: 15),
+              TextField(
+                controller: photoController,
+                style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                decoration: InputDecoration(
+                  labelText: isAr ? "رابط الصورة الشخصية (اختياري)" : "Photo URL",
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(isAr ? "إلغاء" : "Cancel")),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
+            onPressed: () async {
+              await _ds.updateDoctorProfile(
+                phone: phoneController.text.trim(),
+                email: emailController.text.trim(),
+                photoUrl: photoController.text.trim(),
+              );
+              if (mounted) {
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(isAr ? "تم تحديث البيانات بنجاح" : "Profile updated")));
+              }
+            },
+            child: Text(isAr ? "حفظ" : "Save", style: const TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showChangePasswordDialog(BuildContext context, Color primaryColor, bool isDark) {
     final TextEditingController passController = TextEditingController();
     bool isAr = _ds.isArabic;
@@ -136,6 +206,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                       isDark: isDark,
                     ),
+
+                    if (_ds.currentDoctor != null) ...[
+                      const SizedBox(height: 10),
+                      _buildSectionTitle(isAr ? 'الملف الشخصي والبيانات' : 'Profile & Info', isDark),
+                      _buildSettingCard(
+                        child: ListTile(
+                          title: Text(isAr ? "تعديل البيانات الشخصية (الهاتف والبريد والصورة)" : "Edit Profile Info", style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+                          leading: Icon(Icons.person_outline_rounded, color: primaryColor),
+                          trailing: Icon(Icons.arrow_forward_ios_rounded, size: 16, color: primaryColor),
+                          onTap: () => _showDoctorProfileDialog(context, primaryColor, isDark),
+                        ),
+                        isDark: isDark,
+                      ),
+                    ],
                     
                     const SizedBox(height: 10),
                     _buildSectionTitle(isAr ? 'الأمان' : 'Security', isDark),

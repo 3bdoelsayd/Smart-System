@@ -14,6 +14,7 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
 
   void _showEditProfileDialog(BuildContext context, bool isDark) {
     final phoneController = TextEditingController(text: _ds.currentStudent?['phone'] ?? '');
+    final photoController = TextEditingController(text: _ds.currentStudent?['photoUrl'] ?? '');
     bool isAr = _ds.isArabic;
 
     showDialog(
@@ -21,27 +22,41 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(isAr ? "تعديل البيانات الشخصية" : "Edit Profile", style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: phoneController,
-              keyboardType: TextInputType.phone,
-              style: TextStyle(color: isDark ? Colors.white : Colors.black),
-              decoration: InputDecoration(
-                labelText: isAr ? "رقم الهاتف" : "Phone Number",
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text(isAr ? "تعديل البيانات والصورة الشخصية" : "Edit Profile", style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: phoneController,
+                keyboardType: TextInputType.phone,
+                style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                decoration: InputDecoration(
+                  labelText: isAr ? "رقم الهاتف" : "Phone Number",
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 15),
+              TextField(
+                controller: photoController,
+                style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                decoration: InputDecoration(
+                  labelText: isAr ? "رابط الصورة الشخصية (URL)" : "Photo URL",
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: Text(isAr ? "إلغاء" : "Cancel")),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF673AB7)),
             onPressed: () async {
-              await _ds.updateStudentProfile(phone: phoneController.text.trim());
+              await _ds.updateStudentProfile(
+                phone: phoneController.text.trim(),
+                photoUrl: photoController.text.trim(),
+              );
               if (mounted) {
                 Navigator.pop(ctx);
                 setState(() {});
@@ -124,7 +139,8 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
                           child: CircleAvatar(
                             radius: 40,
                             backgroundColor: Colors.grey.shade200,
-                            child: Icon(Icons.person, size: 50, color: primaryColor),
+                            backgroundImage: (student?['photoUrl'] ?? '').toString().isNotEmpty ? NetworkImage(student!['photoUrl']) : null,
+                            child: (student?['photoUrl'] ?? '').toString().isEmpty ? Icon(Icons.person, size: 50, color: primaryColor) : null,
                           ),
                         ),
                         const SizedBox(width: 15),

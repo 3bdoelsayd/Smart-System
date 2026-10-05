@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/data_service.dart';
+import 'private_chat_screen.dart';
+import 'doctor_students_list_screen.dart';
 
 class DiscussionForumScreen extends StatefulWidget {
   final String levelId;
@@ -205,6 +207,24 @@ class _DiscussionForumScreenState extends State<DiscussionForumScreen> {
             Text(studentData['name'] ?? '', style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.bold)),
             Text("كود الطالب: ${studentData['id']}", style: const TextStyle(color: Colors.grey)),
             const Divider(height: 30),
+            if ((studentData['phone'] ?? '').toString().isNotEmpty)
+              _optionTile(Icons.chat_rounded, "مراسلة عبر واتساب", Colors.green, () {
+                Navigator.pop(ctx);
+                _ds.launchWhatsApp(studentData['phone']);
+              }),
+            _optionTile(Icons.forum_rounded, "فتح شات خاص", Colors.blue, () {
+              Navigator.pop(ctx);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (c) => PrivateChatScreen(
+                    otherUserId: studentUid,
+                    otherUserName: studentData['name'] ?? 'الطالب',
+                    otherUserRole: 'student',
+                  ),
+                ),
+              );
+            }),
             _optionTile(Icons.block, "حظر من هذا النقاش", Colors.red, () async {
               Navigator.pop(ctx);
               await _courseRef.update({
@@ -254,6 +274,14 @@ class _DiscussionForumScreenState extends State<DiscussionForumScreen> {
               foregroundColor: Colors.white,
               actions: [
                 if (_ds.userRole == 'doctor') ...[
+                  IconButton(
+                    icon: const Icon(Icons.chat_bubble_outline_rounded),
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (ctx) => const DoctorStudentsListScreen()),
+                    ),
+                    tooltip: isAr ? "قائمة الطلاب والواتساب" : "Students Chat",
+                  ),
                   IconButton(
                     icon: const Icon(Icons.people_outline_rounded),
                     onPressed: _showBannedList,
