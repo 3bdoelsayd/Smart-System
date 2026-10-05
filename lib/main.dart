@@ -28,6 +28,7 @@ import 'Screens/super_admin_dashboard.dart';
 import 'Screens/manager_dashboard.dart';
 import 'Screens/college_selection_screen.dart';
 import 'Screens/doctor_students_list_screen.dart';
+import 'Screens/edit_profile_screen.dart';
 
 void main() async {
   try {
@@ -121,6 +122,7 @@ class UniversityApp extends StatelessWidget {
             '/doctor/exam-results': (context) => const ExamResultsManagementScreen(),
             '/notifications': (context) => const NotificationsScreen(),
             '/settings': (context) => const SettingsScreen(),
+            '/edit-profile': (context) => const EditProfileScreen(),
           },
         );
       },

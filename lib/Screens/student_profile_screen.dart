@@ -137,7 +137,7 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
             IconButton(
               icon: const Icon(Icons.edit_rounded),
               tooltip: isAr ? 'تعديل البيانات' : 'Edit Profile',
-              onPressed: () => _showEditProfileDialog(context, isDark),
+              onPressed: () => Navigator.pushNamed(context, '/edit-profile'),
             ),
           ],
         ),

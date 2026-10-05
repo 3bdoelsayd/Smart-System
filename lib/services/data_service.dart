@@ -989,21 +989,20 @@ class DataService extends ChangeNotifier {
 
   Future<String?> uploadAvatarFile(PlatformFile file) async {
     try {
-      final supabase = Supabase.instance.client;
-      String fileName = 'avatar_${DateTime.now().millisecondsSinceEpoch}_${file.name}';
-      
-      if (kIsWeb) {
-        if (file.bytes == null) return null;
-        await supabase.storage.from('research-pdfs').uploadBinary(fileName, file.bytes!);
-      } else {
-        if (file.path == null) return null;
-        await supabase.storage.from('research-pdfs').upload(fileName, io.File(file.path!));
+      if (file.bytes != null) {
+        String base64Str = base64Encode(file.bytes!);
+        String ext = file.extension?.toLowerCase() ?? 'jpeg';
+        if (ext == 'jpg') ext = 'jpeg';
+        return 'data:image/$ext;base64,$base64Str';
+      } else if (file.path != null && !kIsWeb) {
+        io.File f = io.File(file.path!);
+        List<int> bytes = await f.readAsBytes();
+        String base64Str = base64Encode(bytes);
+        return 'data:image/jpeg;base64,$base64Str';
       }
-
-      final String publicUrl = supabase.storage.from('research-pdfs').getPublicUrl(fileName);
-      return publicUrl;
+      return null;
     } catch (e) {
-      debugPrint("Upload avatar error: $e");
+      debugPrint("Convert avatar to base64 error: $e");
       return null;
     }
   }

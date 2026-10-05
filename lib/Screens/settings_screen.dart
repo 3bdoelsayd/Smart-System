@@ -363,29 +363,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       isDark: isDark,
                     ),
 
-                    if (_ds.currentDoctor != null) ...[
+                    if (_ds.currentStudent != null || _ds.currentDoctor != null) ...[
                       const SizedBox(height: 10),
                       _buildSectionTitle(isAr ? 'الملف الشخصي والبيانات' : 'Profile & Info', isDark),
                       _buildSettingCard(
                         child: ListTile(
-                          title: Text(isAr ? "تعديل البيانات الشخصية (الهاتف والبريد والصورة)" : "Edit Profile Info", style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+                          title: Text(isAr ? "تعديل البيانات الشخصية والصورة" : "Edit Profile Info", style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
                           leading: Icon(Icons.person_outline_rounded, color: primaryColor),
                           trailing: Icon(Icons.arrow_forward_ios_rounded, size: 16, color: primaryColor),
-                          onTap: () => _showDoctorProfileDialog(context, primaryColor, isDark),
-                        ),
-                        isDark: isDark,
-                      ),
-                    ],
-
-                    if (_ds.currentStudent != null) ...[
-                      const SizedBox(height: 10),
-                      _buildSectionTitle(isAr ? 'الملف الشخصي والبيانات' : 'Profile & Info', isDark),
-                      _buildSettingCard(
-                        child: ListTile(
-                          title: Text(isAr ? "تعديل بياناتي الشخصية (الهاتف، البريد، والصورة)" : "Edit Profile Info", style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
-                          leading: Icon(Icons.person_outline_rounded, color: primaryColor),
-                          trailing: Icon(Icons.arrow_forward_ios_rounded, size: 16, color: primaryColor),
-                          onTap: () => _showStudentProfileDialog(context, primaryColor, isDark),
+                          onTap: () => Navigator.pushNamed(context, '/edit-profile'),
                         ),
                         isDark: isDark,
                       ),
