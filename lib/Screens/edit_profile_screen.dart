@@ -144,7 +144,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         backgroundColor: Colors.grey.shade200,
                         backgroundImage: _previewBytes != null
                             ? MemoryImage(_previewBytes!)
-                            : ((_currentPhotoUrl ?? '').isNotEmpty ? NetworkImage(_currentPhotoUrl!) as ImageProvider : null),
+                            : _ds.getAvatarImageProvider(_currentPhotoUrl),
                         child: (_previewBytes == null && (_currentPhotoUrl ?? '').isEmpty)
                             ? Icon(Icons.person, size: 60, color: primaryColor)
                             : null,

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:flutter/material.dart';
@@ -985,6 +986,30 @@ class DataService extends ChangeNotifier {
     await studentsColl.doc(uid).update(updateData);
     currentStudent!.addAll(updateData);
     notifyListeners();
+  }
+
+  Uint8List? getBytesFromPhotoUrl(String? photoUrl) {
+    if (photoUrl == null || photoUrl.isEmpty) return null;
+    try {
+      if (photoUrl.startsWith('data:image')) {
+        final base64String = photoUrl.split(',').last;
+        return base64Decode(base64String);
+      }
+    } catch (e) {
+      debugPrint("Error decoding base64 photo: $e");
+    }
+    return null;
+  }
+
+  ImageProvider? getAvatarImageProvider(String? photoUrl) {
+    if (photoUrl == null || photoUrl.isEmpty) return null;
+    final bytes = getBytesFromPhotoUrl(photoUrl);
+    if (bytes != null) {
+      return MemoryImage(bytes);
+    } else if (photoUrl.startsWith('http')) {
+      return NetworkImage(photoUrl);
+    }
+    return null;
   }
 
   Future<String?> uploadAvatarFile(PlatformFile file) async {

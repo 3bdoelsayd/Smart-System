@@ -176,7 +176,7 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
                           child: CircleAvatar(
                             radius: 40,
                             backgroundColor: Colors.grey.shade200,
-                            backgroundImage: (student?['photoUrl'] ?? '').toString().isNotEmpty ? NetworkImage(student!['photoUrl']) : null,
+                            backgroundImage: ds.getAvatarImageProvider(student?['photoUrl']),
                             child: (student?['photoUrl'] ?? '').toString().isEmpty ? Icon(Icons.person, size: 50, color: primaryColor) : null,
                           ),
                         ),

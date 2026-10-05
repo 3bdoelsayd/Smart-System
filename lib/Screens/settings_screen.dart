@@ -302,9 +302,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             CircleAvatar(
                               radius: 30,
                               backgroundColor: primaryColor.withAlpha(30),
-                              backgroundImage: (_ds.currentStudent?['photoUrl'] ?? _ds.currentDoctor?['photoUrl'] ?? _ds.currentAdmin?['photoUrl'] ?? '').toString().isNotEmpty 
-                                ? NetworkImage(_ds.currentStudent?['photoUrl'] ?? _ds.currentDoctor?['photoUrl'] ?? _ds.currentAdmin?['photoUrl']) 
-                                : null,
+                              backgroundImage: _ds.getAvatarImageProvider(_ds.currentStudent?['photoUrl'] ?? _ds.currentDoctor?['photoUrl'] ?? _ds.currentAdmin?['photoUrl']),
                               child: (_ds.currentStudent?['photoUrl'] ?? _ds.currentDoctor?['photoUrl'] ?? _ds.currentAdmin?['photoUrl'] ?? '').toString().isEmpty 
                                 ? Icon(Icons.person, size: 30, color: primaryColor) 
                                 : null,
