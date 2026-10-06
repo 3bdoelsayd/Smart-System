@@ -100,7 +100,10 @@ class _DoctorStudentsListScreenState extends State<DoctorStudentsListScreen> {
                           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                           leading: CircleAvatar(
                             backgroundColor: primaryColor.withAlpha(26),
-                            child: Icon(Icons.school_rounded, color: primaryColor),
+                            backgroundImage: _ds.getAvatarImageProvider(studentData['photoUrl']),
+                            child: (studentData['photoUrl'] ?? '').toString().isEmpty
+                                ? Icon(Icons.school_rounded, color: primaryColor)
+                                : null,
                           ),
                           title: Text(studentName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: isDark ? Colors.white : Colors.black87)),
                           subtitle: Text("ID: $studentId | $division\n${studentPhone.isNotEmpty ? '📞 $studentPhone' : (isAr ? 'رقم الهاتف غير مسجل' : 'No phone')}", style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.grey.shade600)),

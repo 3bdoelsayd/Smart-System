@@ -9,30 +9,63 @@ void showRichStudentProfileModal({
   required String studentIdOrUid,
   String? studentName,
   String? subject,
+  Map<String, dynamic>? initialStudentData,
 }) async {
   final ds = DataService();
   bool isAr = ds.isArabic;
   bool isDark = ds.isDarkMode;
   Color primaryColor = isDark ? const Color(0xFF03DAC6) : const Color(0xFF673AB7);
 
-  // Show loading indicator
-  showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (ctx) => const Center(child: CircularProgressIndicator()),
-  );
+  Map<String, dynamic>? studentData = initialStudentData;
 
-  Map<String, dynamic>? studentData;
-  try {
-    var snap = await ds.studentsColl.where('id', isEqualTo: studentIdOrUid.trim()).get();
-    if (snap.docs.isEmpty) {
-      snap = await ds.studentsColl.where('uid', isEqualTo: studentIdOrUid.trim()).get();
+  if (studentData == null) {
+    // Show loading indicator
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      var docSnap = await ds.studentsColl.doc(studentIdOrUid.trim()).get();
+      if (docSnap.exists && docSnap.data() != null) {
+        studentData = docSnap.data() as Map<String, dynamic>;
+      }
+
+      if (studentData == null) {
+        var snap = await ds.studentsColl.where('id', isEqualTo: studentIdOrUid.trim()).get();
+        if (snap.docs.isEmpty && int.tryParse(studentIdOrUid.trim()) != null) {
+          snap = await ds.studentsColl.where('id', isEqualTo: int.tryParse(studentIdOrUid.trim())).get();
+        }
+        if (snap.docs.isEmpty) {
+          snap = await ds.studentsColl.where('uid', isEqualTo: studentIdOrUid.trim()).get();
+        }
+        if (snap.docs.isNotEmpty) {
+          studentData = snap.docs.first.data() as Map<String, dynamic>;
+        }
+      }
+
+      if (studentData == null) {
+        var allSnap = await ds.studentsColl.get();
+        for (var d in allSnap.docs) {
+          var data = d.data() as Map<String, dynamic>;
+          String sId = (data['id'] ?? '').toString().trim();
+          String sUid = (data['uid'] ?? '').toString().trim();
+          String sName = (data['name'] ?? '').toString().trim();
+
+          if (sId == studentIdOrUid.trim() || sUid == studentIdOrUid.trim() || (studentName != null && sName == studentName.trim())) {
+            studentData = data;
+            break;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Fetch student error: $e");
     }
-    if (snap.docs.isNotEmpty) {
-      studentData = snap.docs.first.data() as Map<String, dynamic>;
+
+    if (context.mounted) {
+      Navigator.pop(context); // إغلاق مؤشر التحميل فقط عندما يفتح
     }
-  } catch (e) {
-    debugPrint("Fetch student error: $e");
   }
 
   int attCount = 0;
@@ -48,10 +81,6 @@ void showRichStudentProfileModal({
       attCount = results[0].docs.length;
       resCount = results[1].docs.length;
     } catch (_) {}
-  }
-
-  if (context.mounted) {
-    Navigator.pop(context); // Close loading dialog
   }
 
   if (studentData == null) {

@@ -268,7 +268,10 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
                               leading: CircleAvatar(
                                 radius: 20,
                                 backgroundColor: Colors.red.withAlpha(26),
-                                child: const Icon(Icons.list_alt, color: Colors.red, size: 22),
+                                backgroundImage: _ds.getAvatarImageProvider(r['photoUrl']),
+                                child: (r['photoUrl'] ?? '').toString().isEmpty
+                                    ? const Icon(Icons.list_alt, color: Colors.red, size: 22)
+                                    : null,
                               ),
                               title: Text(r['studentName'] ?? 'Student', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: isDark ? Colors.white : Colors.black87)),
                               subtitle: Column(

@@ -630,12 +630,30 @@ class _AttendanceManagementScreenState extends State<AttendanceManagementScreen>
                               ),
                               Expanded(
                                 child: ListTile(
-                                  onTap: () => _showStudentProfile(id, s['name'] ?? 'Unknown', s['division'] ?? 'ALL'),
+                                  onTap: () => _showStudentProfile(s),
                                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                  leading: CircleAvatar(
-                                    radius: 22,
-                                    backgroundColor: isP ? Colors.green.withAlpha(20) : (isAr ? Colors.red.withAlpha(10) : Colors.grey.withAlpha(20)),
-                                    child: Icon(isP ? Icons.check_circle_rounded : Icons.person_outline_rounded, color: isP ? Colors.green : Colors.grey, size: 20),
+                                  leading: Stack(
+                                    clipBehavior: Clip.none,
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 22,
+                                        backgroundColor: isP ? Colors.green.withAlpha(20) : Colors.grey.shade200,
+                                        backgroundImage: _ds.getAvatarImageProvider(s['photoUrl']),
+                                        child: (s['photoUrl'] ?? '').toString().isEmpty
+                                            ? Icon(Icons.person_rounded, color: isP ? Colors.green : Colors.grey, size: 22)
+                                            : null,
+                                      ),
+                                      if (isP)
+                                        const Positioned(
+                                          bottom: -2,
+                                          right: -2,
+                                          child: CircleAvatar(
+                                            radius: 8,
+                                            backgroundColor: Colors.green,
+                                            child: Icon(Icons.check, size: 10, color: Colors.white),
+                                          ),
+                                        ),
+                                    ],
                                   ),
                                   title: Text(s['name'] ?? '', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: _ds.isDarkMode ? Colors.white : Colors.black87)),
                                   subtitle: Text("ID: $id | ${_displayName(s['division'])}", style: TextStyle(color: _ds.isDarkMode ? Colors.white38 : Colors.grey, fontSize: 11)),
@@ -695,12 +713,15 @@ class _AttendanceManagementScreenState extends State<AttendanceManagementScreen>
     );
   }
 
-  void _showStudentProfile(String studentId, String studentName, String division) {
+  void _showStudentProfile(Map<String, dynamic> studentData) {
+    String id = studentData['id']?.toString().trim() ?? '';
+    String name = studentData['name']?.toString() ?? 'Student';
     showRichStudentProfileModal(
       context: context,
-      studentIdOrUid: studentId,
-      studentName: studentName,
+      studentIdOrUid: id,
+      studentName: name,
       subject: _selectedSubject,
+      initialStudentData: studentData,
     );
   }
 

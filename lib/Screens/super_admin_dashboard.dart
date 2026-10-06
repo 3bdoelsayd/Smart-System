@@ -334,7 +334,7 @@ void _confirmResetDevice(BuildContext context, String uid, String? name) {
   );
 }
 
-Widget _buildListItem({required bool isDarkMode, required String title, required String subtitle, required IconData icon, required Color color, VoidCallback? onDelete, VoidCallback? onEdit, VoidCallback? onAttendance, VoidCallback? onResetDevice}) {
+Widget _buildListItem({required bool isDarkMode, required String title, required String subtitle, required IconData icon, required Color color, String? photoUrl, VoidCallback? onDelete, VoidCallback? onEdit, VoidCallback? onAttendance, VoidCallback? onResetDevice}) {
   return Container(
     margin: const EdgeInsets.only(bottom: 16),
     decoration: BoxDecoration(
@@ -353,14 +353,20 @@ Widget _buildListItem({required bool isDarkMode, required String title, required
       children: [
         ListTile(
           contentPadding: const EdgeInsets.fromLTRB(15, 12, 15, 0),
-          leading: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Icon(icon, color: color, size: 26),
-          ),
+          leading: photoUrl != null && photoUrl.isNotEmpty
+              ? CircleAvatar(
+                  radius: 24,
+                  backgroundColor: color.withOpacity(0.12),
+                  backgroundImage: DataService().getAvatarImageProvider(photoUrl),
+                )
+              : Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Icon(icon, color: color, size: 26),
+                ),
           title: Text(
             title,
             style: GoogleFonts.cairo(fontWeight: FontWeight.w900, fontSize: 15, height: 1.2),
@@ -1360,6 +1366,7 @@ class _StudentsManagementViewState extends State<StudentsManagementView> {
                               subtitle: 'كود: ${d['id']}', 
                               icon: Icons.school_rounded, 
                               color: Colors.green, 
+                              photoUrl: d['photoUrl'],
                               onResetDevice: () => _confirmResetDevice(context, docs[i].id, d['name']),
                               onDelete: () => _confirmGeneralDelete(context, 'حذف طالب', 'هل أنت متأكد من حذف هذا الطالب؟', () => _ds.deleteStudent(docs[i].id, d['level'].toString()))
                             );
