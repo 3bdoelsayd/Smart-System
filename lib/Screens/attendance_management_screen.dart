@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/data_service.dart';
 import '../utils/excel_helper.dart';
+import '../widgets/student_profile_modal.dart';
 
 class AttendanceManagementScreen extends StatefulWidget {
   const AttendanceManagementScreen({super.key});
@@ -694,41 +695,12 @@ class _AttendanceManagementScreenState extends State<AttendanceManagementScreen>
     );
   }
 
-  void _showStudentProfile(String studentId, String studentName, String division) async {
-    bool isAr = _ds.isArabic;
-    final results = await Future.wait<QuerySnapshot>([
-      _ds.attendanceColl.where('studentId', isEqualTo: studentId.trim()).where('subject', isEqualTo: _selectedSubject?.trim()).get(),
-      _ds.submissionsColl.where('studentId', isEqualTo: studentId.trim()).where('subject', isEqualTo: _selectedSubject?.trim()).get(),
-    ]);
-
-    final attQuery = results[0];
-    final subQuery = results[1];
-
-    if (!mounted) return;
-
-    showDialog(
+  void _showStudentProfile(String studentId, String studentName, String division) {
+    showRichStudentProfileModal(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: _ds.isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-        title: Column(
-          children: [
-            CircleAvatar(radius: 40, backgroundColor: const Color(0xFF673AB7).withAlpha(20), child: const Icon(Icons.person, size: 45, color: Color(0xFF673AB7))),
-            const SizedBox(height: 15),
-            Text(studentName, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: _ds.isDarkMode ? Colors.white : Colors.black87), textAlign: TextAlign.center),
-            Text("ID: $studentId", style: const TextStyle(fontSize: 12, color: Colors.grey)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _profileDetailRow(Icons.account_tree_rounded, isAr ? "الشعبة:" : "Division:", _displayName(division)),
-            _profileDetailRow(Icons.event_available, isAr ? "حضور المادة:" : "Attendance:", "${attQuery.docs.length}"),
-            _profileDetailRow(Icons.cloud_done_rounded, isAr ? "أبحاث مرفوعة:" : "Researches:", "${subQuery.docs.length}"),
-          ],
-        ),
-        actions: [Center(child: TextButton(onPressed: () => Navigator.pop(ctx), child: Text(isAr ? "فهمت" : "Close", style: TextStyle(fontWeight: FontWeight.w900, color: _ds.isDarkMode ? const Color(0xFF03DAC6) : const Color(0xFF673AB7)))) )],
-      ),
+      studentIdOrUid: studentId,
+      studentName: studentName,
+      subject: _selectedSubject,
     );
   }
 

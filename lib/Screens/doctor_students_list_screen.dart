@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/data_service.dart';
+import '../widgets/student_profile_modal.dart';
 import 'private_chat_screen.dart';
 
 class DoctorStudentsListScreen extends StatefulWidget {
@@ -95,6 +96,7 @@ class _DoctorStudentsListScreenState extends State<DoctorStudentsListScreen> {
                           boxShadow: [BoxShadow(color: Colors.black.withAlpha(isDark ? 50 : 8), blurRadius: 10)],
                         ),
                         child: ListTile(
+                          onTap: () => showRichStudentProfileModal(context: context, studentIdOrUid: studentUid, studentName: studentName),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                           leading: CircleAvatar(
                             backgroundColor: primaryColor.withAlpha(26),
