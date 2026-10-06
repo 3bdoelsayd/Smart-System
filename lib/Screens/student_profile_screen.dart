@@ -226,14 +226,17 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
               const SizedBox(height: 30),
 
               // --- معلومات إضافية ---
-              _buildInfoCard(
-                icon: Icons.email_rounded,
-                title: isAr ? 'البريد الأكاديمي' : 'Academic Email',
-                value: '$id@university.edu.eg',
-                isDark: isDark,
-                color: isDark ? const Color(0xFF03DAC6) : Colors.orange,
-                surfaceColor: cardColor,
-              ),
+              if ((student?['personalEmail'] ?? '').toString().isNotEmpty) ...[
+                _buildInfoCard(
+                  icon: Icons.email_rounded,
+                  title: isAr ? 'البريد الإلكتروني الشخصي' : 'Personal Email',
+                  value: student!['personalEmail'],
+                  isDark: isDark,
+                  color: isDark ? const Color(0xFF03DAC6) : Colors.orange,
+                  surfaceColor: cardColor,
+                ),
+                const SizedBox(height: 15),
+              ],
               const SizedBox(height: 15),
               _buildInfoCard(
                 icon: Icons.verified_user_rounded,

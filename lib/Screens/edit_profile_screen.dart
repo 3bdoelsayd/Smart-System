@@ -28,7 +28,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final userData = isStudent ? _ds.currentStudent : _ds.currentDoctor;
 
     _phoneController = TextEditingController(text: userData?['phone'] ?? '');
-    _emailController = TextEditingController(text: userData?['personalEmail'] ?? userData?['email'] ?? '');
+    _emailController = TextEditingController(text: userData?['personalEmail'] ?? '');
     _currentPhotoUrl = userData?['photoUrl'];
   }
 
@@ -75,7 +75,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       } else if (_ds.currentDoctor != null) {
         await _ds.updateDoctorProfile(
           phone: _phoneController.text.trim(),
-          email: _emailController.text.trim(),
+          personalEmail: _emailController.text.trim(),
           photoUrl: photoUrl,
         );
       }
