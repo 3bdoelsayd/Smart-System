@@ -1065,38 +1065,48 @@ class DataService extends ChangeNotifier {
   Future<String?> uploadAvatarFile(PlatformFile file) async {
     try {
       if (kIsWeb && file.bytes != null) {
+        bool isIOSWeb = false;
         try {
-          final blob = html.Blob([file.bytes!]);
-          final url = html.Url.createObjectUrlFromBlob(blob);
-          final img = html.ImageElement();
-          final completer = Completer<void>();
-
-          img.onLoad.listen((_) {
-            if (!completer.isCompleted) completer.complete();
-          });
-          img.onError.listen((_) {
-            if (!completer.isCompleted) completer.complete();
-          });
-
-          img.src = url;
-          if ((img.complete == true) && !completer.isCompleted) {
-            completer.complete();
+          final ua = html.window.navigator.userAgent.toLowerCase();
+          if (ua.contains('iphone') || ua.contains('ipad') || ua.contains('ipod') || (ua.contains('macintosh') && (html.window.navigator.maxTouchPoints ?? 0) > 0)) {
+            isIOSWeb = true;
           }
+        } catch (_) {}
 
-          await completer.future.timeout(const Duration(seconds: 2), onTimeout: () {});
-          html.Url.revokeObjectUrl(url);
+        if (!isIOSWeb) {
+          try {
+            final blob = html.Blob([file.bytes!]);
+            final url = html.Url.createObjectUrlFromBlob(blob);
+            final img = html.ImageElement();
+            final completer = Completer<void>();
 
-          if ((img.naturalWidth ?? 0) > 0 && (img.naturalHeight ?? 0) > 0) {
-            final canvas = html.CanvasElement(width: 200, height: 200);
-            final ctx = canvas.context2D;
-            ctx.drawImageScaled(img, 0, 0, 200, 200);
-            final dataUrl = canvas.toDataUrl('image/jpeg', 0.7);
-            if (dataUrl.length > 50) {
-              return dataUrl;
+            img.onLoad.listen((_) {
+              if (!completer.isCompleted) completer.complete();
+            });
+            img.onError.listen((_) {
+              if (!completer.isCompleted) completer.complete();
+            });
+
+            img.src = url;
+            if ((img.complete == true) && !completer.isCompleted) {
+              completer.complete();
             }
+
+            await completer.future.timeout(const Duration(milliseconds: 800), onTimeout: () {});
+            html.Url.revokeObjectUrl(url);
+
+            if ((img.naturalWidth ?? 0) > 0 && (img.naturalHeight ?? 0) > 0) {
+              final canvas = html.CanvasElement(width: 200, height: 200);
+              final ctx = canvas.context2D;
+              ctx.drawImageScaled(img, 0, 0, 200, 200);
+              final dataUrl = canvas.toDataUrl('image/jpeg', 0.7);
+              if (dataUrl.length > 50) {
+                return dataUrl;
+              }
+            }
+          } catch (e) {
+            debugPrint("Web fast compress error: $e");
           }
-        } catch (e) {
-          debugPrint("Web fast compress error: $e");
         }
 
         String base64Str = base64Encode(file.bytes!);
