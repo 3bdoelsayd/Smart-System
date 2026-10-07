@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/data_service.dart';
 import 'private_chat_screen.dart';
 import 'doctor_students_list_screen.dart';
+import 'student_doctors_list_screen.dart';
 
 class DiscussionForumScreen extends StatefulWidget {
   final String levelId;
@@ -294,6 +295,15 @@ class _DiscussionForumScreenState extends State<DiscussionForumScreen> {
                   IconButton(
                     icon: const Icon(Icons.delete_sweep_rounded),
                     onPressed: _clearChat,
+                  ),
+                ] else ...[
+                  IconButton(
+                    icon: const Icon(Icons.forum_rounded),
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (ctx) => const StudentDoctorsListScreen()),
+                    ),
+                    tooltip: isAr ? "مراسلة المحاضرين (شات خاص)" : "Doctors Private Chat",
                   ),
                 ]
               ],
