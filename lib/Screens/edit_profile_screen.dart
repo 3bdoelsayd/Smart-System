@@ -20,6 +20,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Uint8List? _previewBytes;
   String? _currentPhotoUrl;
   bool _isSaving = false;
+  bool _hidePhone = false;
+  bool _hideEmail = false;
+  bool _hidePhoto = false;
 
   @override
   void initState() {
@@ -30,6 +33,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _phoneController = TextEditingController(text: userData?['phone'] ?? '');
     _emailController = TextEditingController(text: userData?['personalEmail'] ?? '');
     _currentPhotoUrl = userData?['photoUrl'];
+
+    if (!isStudent && userData?['privacy'] != null) {
+      final Map privacy = userData!['privacy'] as Map;
+      _hidePhone = privacy['hidePhone'] ?? false;
+      _hideEmail = privacy['hideEmail'] ?? false;
+      _hidePhoto = privacy['hidePhoto'] ?? false;
+    }
   }
 
   @override
@@ -77,6 +87,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           phone: _phoneController.text.trim(),
           personalEmail: _emailController.text.trim(),
           photoUrl: photoUrl,
+          hidePhone: _hidePhone,
+          hideEmail: _hideEmail,
+          hidePhoto: _hidePhoto,
         );
       }
 
@@ -224,6 +237,50 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   ],
                 ),
               ),
+              if (!isStudent) ...[
+                const SizedBox(height: 25),
+                Container(
+                  padding: const EdgeInsets.all(25),
+                  decoration: BoxDecoration(
+                    color: surfaceColor,
+                    borderRadius: BorderRadius.circular(25),
+                    boxShadow: [BoxShadow(color: Colors.black.withAlpha(isDark ? 50 : 10), blurRadius: 15, offset: const Offset(0, 5))],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isAr ? 'إعدادات الخصوصية والظهور للطلاب' : 'Privacy Settings for Students',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white70 : Colors.black87),
+                      ),
+                      const SizedBox(height: 15),
+                      SwitchListTile(
+                        activeColor: primaryColor,
+                        title: Text(isAr ? 'إخفاء الصورة الشخصية عن الطلاب' : 'Hide Profile Photo from Students', style: TextStyle(fontSize: 14, color: isDark ? Colors.white : Colors.black87)),
+                        subtitle: Text(isAr ? 'عند التفعيل، يظهر أيقونة افتراضية للطلاب بدل صورتك' : 'Show default icon instead of photo to students', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                        value: _hidePhoto,
+                        onChanged: (v) => setState(() => _hidePhoto = v),
+                      ),
+                      const Divider(),
+                      SwitchListTile(
+                        activeColor: primaryColor,
+                        title: Text(isAr ? 'إخفاء رقم الهاتف والواتساب' : 'Hide Phone & WhatsApp from Students', style: TextStyle(fontSize: 14, color: isDark ? Colors.white : Colors.black87)),
+                        subtitle: Text(isAr ? 'عند التفعيل، يُخفى زر الواتساب ورقم هاتفك' : 'Hide phone and WhatsApp shortcut', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                        value: _hidePhone,
+                        onChanged: (v) => setState(() => _hidePhone = v),
+                      ),
+                      const Divider(),
+                      SwitchListTile(
+                        activeColor: primaryColor,
+                        title: Text(isAr ? 'إخفاء البريد الإلكتروني الشخصي' : 'Hide Personal Email from Students', style: TextStyle(fontSize: 14, color: isDark ? Colors.white : Colors.black87)),
+                        subtitle: Text(isAr ? 'عند التفعيل، يُخفى بريدك عن الطلاب' : 'Hide personal email', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                        value: _hideEmail,
+                        onChanged: (v) => setState(() => _hideEmail = v),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 40),
 
               // --- زر الحفظ ---

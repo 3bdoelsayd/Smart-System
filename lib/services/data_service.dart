@@ -960,9 +960,20 @@ class DataService extends ChangeNotifier {
     }
   }
 
-  Future<void> updateDoctorProfile({String? phone, String? email, String? personalEmail, String? photoUrl, Map<String, dynamic>? preferences}) async {
+  Future<void> updateDoctorProfile({
+    String? phone, 
+    String? email, 
+    String? personalEmail, 
+    String? photoUrl, 
+    Map<String, dynamic>? preferences,
+    bool? hidePhone,
+    bool? hideEmail,
+    bool? hidePhoto,
+  }) async {
     if (currentDoctor == null) return;
-    String uid = currentDoctor!['uid'];
+    String uid = (currentDoctor!['uid'] ?? currentDoctor!['id'] ?? '').toString();
+    if (uid.isEmpty) return;
+
     Map<String, dynamic> updateData = {};
     if (phone != null) updateData['phone'] = phone;
     if (email != null) updateData['email'] = email;
@@ -970,21 +981,58 @@ class DataService extends ChangeNotifier {
     if (photoUrl != null) updateData['photoUrl'] = photoUrl;
     if (preferences != null) updateData['preferences'] = preferences;
 
-    await commerceDoctorsColl.doc(uid).update(updateData);
+    Map<String, dynamic> currentPrivacy = Map<String, dynamic>.from(currentDoctor!['privacy'] ?? {});
+    if (hidePhone != null) currentPrivacy['hidePhone'] = hidePhone;
+    if (hideEmail != null) currentPrivacy['hideEmail'] = hideEmail;
+    if (hidePhoto != null) currentPrivacy['hidePhoto'] = hidePhoto;
+    updateData['privacy'] = currentPrivacy;
+
+    try {
+      await commerceDoctorsColl.doc(uid).set(updateData, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint("Update doctor failed: $e");
+    }
+
     currentDoctor!.addAll(updateData);
     notifyListeners();
   }
 
   Future<void> updateStudentProfile({String? phone, String? personalEmail, String? photoUrl}) async {
     if (currentStudent == null) return;
-    String uid = currentStudent!['uid'];
+    String uid = (currentStudent!['uid'] ?? currentStudent!['id'] ?? '').toString();
+    if (uid.isEmpty) return;
+
     Map<String, dynamic> updateData = {};
     if (phone != null) updateData['phone'] = phone;
     if (personalEmail != null) updateData['personalEmail'] = personalEmail;
     if (photoUrl != null) updateData['photoUrl'] = photoUrl;
 
-    await studentsColl.doc(uid).update(updateData);
+    try {
+      await studentsColl.doc(uid).set(updateData, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint("Update student doc failed: $e");
+    }
+
     currentStudent!.addAll(updateData);
+
+    try {
+      String sId = (currentStudent!['id'] ?? '').toString().trim();
+      if (sId.isNotEmpty) {
+        var snap = await studentsColl.where('id', isEqualTo: sId).get();
+        for (var doc in snap.docs) {
+          await doc.reference.set(updateData, SetOptions(merge: true));
+        }
+        if (int.tryParse(sId) != null) {
+          var intSnap = await studentsColl.where('id', isEqualTo: int.parse(sId)).get();
+          for (var doc in intSnap.docs) {
+            await doc.reference.set(updateData, SetOptions(merge: true));
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Error syncing student profile update: $e");
+    }
+
     notifyListeners();
   }
 

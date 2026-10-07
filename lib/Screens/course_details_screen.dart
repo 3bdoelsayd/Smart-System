@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/data_service.dart';
+import '../widgets/doctor_profile_modal.dart';
 
 class CourseDetailsScreen extends StatefulWidget {
   final String levelId;
@@ -111,6 +112,13 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
           elevation: 0,
           backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
           foregroundColor: isDark ? Colors.white : Colors.black87,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.person_pin_rounded),
+              tooltip: 'محاضر المادة',
+              onPressed: () => showRichDoctorProfileModal(context: context, doctorUidOrEmail: widget.courseName),
+            ),
+          ],
         ),
         body: StreamBuilder<QuerySnapshot>(
           stream: _ds.getCommerceLecturesColl(widget.levelId, widget.courseId).orderBy('number').snapshots(),
