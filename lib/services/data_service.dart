@@ -14,6 +14,7 @@ import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:url_launcher/url_launcher.dart';
+import 'package:universal_html/html.dart' as html;
 import 'dart:io' as io;
 
 class DataService extends ChangeNotifier {
@@ -1062,43 +1063,44 @@ class DataService extends ChangeNotifier {
 
   Future<String?> uploadAvatarFile(PlatformFile file) async {
     try {
-      String fileName = 'avatar_${DateTime.now().millisecondsSinceEpoch}_${file.name.replaceAll(' ', '_')}';
-      
-      try {
-        final ref = FirebaseStorage.instance.ref().child('avatars/$fileName');
-        if (kIsWeb) {
-          if (file.bytes != null) {
-            await ref.putData(file.bytes!, SettableMetadata(contentType: 'image/jpeg'));
-            return await ref.getDownloadURL();
-          }
-        } else {
-          if (file.path != null) {
-            await ref.putFile(io.File(file.path!));
-            return await ref.getDownloadURL();
-          }
-        }
-      } catch (e) {
-        debugPrint("Firebase Storage upload error: $e");
-      }
+      if (kIsWeb && file.bytes != null) {
+        try {
+          final blob = html.Blob([file.bytes!]);
+          final url = html.Url.createObjectUrlFromBlob(blob);
+          final img = html.ImageElement(src: url);
+          await img.onLoad.first;
+          html.Url.revokeObjectUrl(url);
 
-      try {
-        final supabase = Supabase.instance.client;
-        if (kIsWeb && file.bytes != null) {
-          await supabase.storage.from('research-pdfs').uploadBinary(fileName, file.bytes!);
-          return supabase.storage.from('research-pdfs').getPublicUrl(fileName);
+          final canvas = html.CanvasElement(width: 200, height: 200);
+          final ctx = canvas.context2D;
+          ctx.drawImageScaled(img, 0, 0, 200, 200);
+
+          final dataUrl = canvas.toDataUrl('image/jpeg', 0.7);
+          return dataUrl;
+        } catch (e) {
+          debugPrint("Web fast compress error: $e");
+        }
+
+        if (file.bytes!.length < 600 * 1024) {
+          String base64Str = base64Encode(file.bytes!);
+          String ext = file.extension?.toLowerCase() ?? 'jpeg';
+          if (ext == 'jpg') ext = 'jpeg';
+          return 'data:image/$ext;base64,$base64Str';
+        }
+      } else {
+        if (file.bytes != null && file.bytes!.length < 600 * 1024) {
+          String base64Str = base64Encode(file.bytes!);
+          String ext = file.extension?.toLowerCase() ?? 'jpeg';
+          if (ext == 'jpg') ext = 'jpeg';
+          return 'data:image/$ext;base64,$base64Str';
         } else if (file.path != null) {
-          await supabase.storage.from('research-pdfs').upload(fileName, io.File(file.path!));
-          return supabase.storage.from('research-pdfs').getPublicUrl(fileName);
+          io.File f = io.File(file.path!);
+          List<int> bytes = await f.readAsBytes();
+          if (bytes.length < 600 * 1024) {
+            String base64Str = base64Encode(bytes);
+            return 'data:image/jpeg;base64,$base64Str';
+          }
         }
-      } catch (e) {
-        debugPrint("Supabase Storage upload error: $e");
-      }
-
-      if (file.bytes != null && file.bytes!.length < 600 * 1024) {
-        String base64Str = base64Encode(file.bytes!);
-        String ext = file.extension?.toLowerCase() ?? 'jpeg';
-        if (ext == 'jpg') ext = 'jpeg';
-        return 'data:image/$ext;base64,$base64Str';
       }
 
       return null;
