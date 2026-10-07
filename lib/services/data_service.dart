@@ -1067,7 +1067,7 @@ class DataService extends ChangeNotifier {
         try {
           final blob = html.Blob([file.bytes!]);
           final url = html.Url.createObjectUrlFromBlob(blob);
-          final img = html.ImageElement(src: url);
+          final img = html.ImageElement()..src = url;
           await img.onLoad.first;
           html.Url.revokeObjectUrl(url);
 
