@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
@@ -1067,28 +1068,43 @@ class DataService extends ChangeNotifier {
         try {
           final blob = html.Blob([file.bytes!]);
           final url = html.Url.createObjectUrlFromBlob(blob);
-          final img = html.ImageElement()..src = url;
-          await img.onLoad.first;
+          final img = html.ImageElement();
+          final completer = Completer<void>();
+
+          img.onLoad.listen((_) {
+            if (!completer.isCompleted) completer.complete();
+          });
+          img.onError.listen((_) {
+            if (!completer.isCompleted) completer.complete();
+          });
+
+          img.src = url;
+          if ((img.complete == true) && !completer.isCompleted) {
+            completer.complete();
+          }
+
+          await completer.future.timeout(const Duration(seconds: 2), onTimeout: () {});
           html.Url.revokeObjectUrl(url);
 
-          final canvas = html.CanvasElement(width: 200, height: 200);
-          final ctx = canvas.context2D;
-          ctx.drawImageScaled(img, 0, 0, 200, 200);
-
-          final dataUrl = canvas.toDataUrl('image/jpeg', 0.7);
-          return dataUrl;
+          if ((img.naturalWidth ?? 0) > 0 && (img.naturalHeight ?? 0) > 0) {
+            final canvas = html.CanvasElement(width: 200, height: 200);
+            final ctx = canvas.context2D;
+            ctx.drawImageScaled(img, 0, 0, 200, 200);
+            final dataUrl = canvas.toDataUrl('image/jpeg', 0.7);
+            if (dataUrl.length > 50) {
+              return dataUrl;
+            }
+          }
         } catch (e) {
           debugPrint("Web fast compress error: $e");
         }
 
-        if (file.bytes!.length < 600 * 1024) {
-          String base64Str = base64Encode(file.bytes!);
-          String ext = file.extension?.toLowerCase() ?? 'jpeg';
-          if (ext == 'jpg') ext = 'jpeg';
-          return 'data:image/$ext;base64,$base64Str';
-        }
+        String base64Str = base64Encode(file.bytes!);
+        String ext = file.extension?.toLowerCase() ?? 'jpeg';
+        if (ext == 'jpg') ext = 'jpeg';
+        return 'data:image/$ext;base64,$base64Str';
       } else {
-        if (file.bytes != null && file.bytes!.length < 600 * 1024) {
+        if (file.bytes != null) {
           String base64Str = base64Encode(file.bytes!);
           String ext = file.extension?.toLowerCase() ?? 'jpeg';
           if (ext == 'jpg') ext = 'jpeg';
@@ -1096,10 +1112,8 @@ class DataService extends ChangeNotifier {
         } else if (file.path != null) {
           io.File f = io.File(file.path!);
           List<int> bytes = await f.readAsBytes();
-          if (bytes.length < 600 * 1024) {
-            String base64Str = base64Encode(bytes);
-            return 'data:image/jpeg;base64,$base64Str';
-          }
+          String base64Str = base64Encode(bytes);
+          return 'data:image/jpeg;base64,$base64Str';
         }
       }
 
