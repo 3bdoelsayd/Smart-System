@@ -74,6 +74,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       String? photoUrl = _currentPhotoUrl;
       if (_pickedFile != null) {
         photoUrl = await _ds.uploadAvatarFile(_pickedFile!);
+        if (photoUrl == null) {
+          throw isAr ? "فشل معالجة الصورة، يرجى اختيار صورة أحدث أو بحجم أصغر" : "Failed to upload image. Please select a smaller photo.";
+        }
       }
 
       if (_ds.currentStudent != null) {

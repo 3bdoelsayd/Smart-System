@@ -1062,20 +1062,48 @@ class DataService extends ChangeNotifier {
 
   Future<String?> uploadAvatarFile(PlatformFile file) async {
     try {
-      if (file.bytes != null) {
+      String fileName = 'avatar_${DateTime.now().millisecondsSinceEpoch}_${file.name.replaceAll(' ', '_')}';
+      
+      try {
+        final ref = FirebaseStorage.instance.ref().child('avatars/$fileName');
+        if (kIsWeb) {
+          if (file.bytes != null) {
+            await ref.putData(file.bytes!, SettableMetadata(contentType: 'image/jpeg'));
+            return await ref.getDownloadURL();
+          }
+        } else {
+          if (file.path != null) {
+            await ref.putFile(io.File(file.path!));
+            return await ref.getDownloadURL();
+          }
+        }
+      } catch (e) {
+        debugPrint("Firebase Storage upload error: $e");
+      }
+
+      try {
+        final supabase = Supabase.instance.client;
+        if (kIsWeb && file.bytes != null) {
+          await supabase.storage.from('research-pdfs').uploadBinary(fileName, file.bytes!);
+          return supabase.storage.from('research-pdfs').getPublicUrl(fileName);
+        } else if (file.path != null) {
+          await supabase.storage.from('research-pdfs').upload(fileName, io.File(file.path!));
+          return supabase.storage.from('research-pdfs').getPublicUrl(fileName);
+        }
+      } catch (e) {
+        debugPrint("Supabase Storage upload error: $e");
+      }
+
+      if (file.bytes != null && file.bytes!.length < 600 * 1024) {
         String base64Str = base64Encode(file.bytes!);
         String ext = file.extension?.toLowerCase() ?? 'jpeg';
         if (ext == 'jpg') ext = 'jpeg';
         return 'data:image/$ext;base64,$base64Str';
-      } else if (file.path != null && !kIsWeb) {
-        io.File f = io.File(file.path!);
-        List<int> bytes = await f.readAsBytes();
-        String base64Str = base64Encode(bytes);
-        return 'data:image/jpeg;base64,$base64Str';
       }
+
       return null;
     } catch (e) {
-      debugPrint("Convert avatar to base64 error: $e");
+      debugPrint("Convert avatar error: $e");
       return null;
     }
   }
