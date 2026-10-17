@@ -31,7 +31,7 @@ class DoctorHomeScreen extends StatelessWidget {
             const SizedBox(height: 20),
             StreamBuilder<List<QuerySnapshot>>(
               stream: Stream.fromFuture(Future.wait(
-                teachingLevels.map((lvlId) => ds.getCommerceCoursesColl(lvlId).where('doctor_id', isEqualTo: doctorId).get())
+                teachingLevels.map((lvlId) => ds.getCommerceCoursesColl(lvlId).where(ds.userRole == 'ta' ? 'ta_id' : 'doctor_id', isEqualTo: doctorId).get())
               )),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
@@ -75,6 +75,13 @@ class DoctorHomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ds = DataService();
+
+    if ((ds.userRole != 'doctor' && ds.userRole != 'ta') || ds.currentDoctor == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.pushNamedAndRemoveUntil(context, '/start', (r) => false);
+      });
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     
     return ListenableBuilder(
       listenable: ds,
@@ -88,9 +95,8 @@ class DoctorHomeScreen extends StatelessWidget {
         final List<String> teachingLevels = List<String>.from(ds.currentDoctor?['teachingLevels'] ?? []);
 
         final List<Map<String, dynamic>> cards = [
-          {'icon': Icons.qr_code_rounded, 'title': ds.translate('attendance_mng'), 'route': '/doctor/attendance', 'color': Colors.blue},
+          {'icon': Icons.qr_code_rounded, 'title': ds.userRole == 'ta' ? (isAr ? 'حضور السكاشن' : 'Section Attendance') : ds.translate('attendance_mng'), 'route': '/doctor/attendance', 'color': Colors.blue},
           {'icon': Icons.assignment_turned_in_rounded, 'title': ds.translate('research_review'), 'route': '/doctor/researches', 'color': Colors.orange},
-          {'icon': Icons.chat_bubble_rounded, 'title': isAr ? 'مراسلة الطلاب والواتساب' : 'Students Chat & WhatsApp', 'route': '/doctor/students-chat', 'color': Colors.green},
           {'icon': Icons.forum_rounded, 'title': ds.translate('forum'), 'color': Colors.cyan, 'action': 'open_picker'},
           {'icon': Icons.settings_rounded, 'title': ds.translate('settings'), 'route': '/settings', 'color': Colors.purple},
         ];
@@ -99,7 +105,7 @@ class DoctorHomeScreen extends StatelessWidget {
           textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
           child: Scaffold(
             backgroundColor: isDark ? const Color(0xFF121212) : Colors.grey.shade50,
-            drawer: AppDrawer(name: doctorName, role: ds.translate('faculty_member')),
+            drawer: AppDrawer(name: doctorName, role: ds.userRole == 'ta' ? (isAr ? 'معيد السكشن' : 'Teaching Assistant') : ds.translate('faculty_member')),
             body: CustomScrollView(
               slivers: [
                 SliverToBoxAdapter(
@@ -162,7 +168,7 @@ class DoctorHomeScreen extends StatelessWidget {
                 ? SliverToBoxAdapter(child: Center(child: Padding(padding: const EdgeInsets.all(40), child: Text(isAr ? "لم يتم إسناد فرق دراسية لك بعد" : "No levels assigned"))))
                 : StreamBuilder<List<QuerySnapshot>>(
                   stream: Stream.fromFuture(Future.wait(
-                    teachingLevels.map((lvlId) => ds.getCommerceCoursesColl(lvlId).where('doctor_id', isEqualTo: doctorId).get())
+                    teachingLevels.map((lvlId) => ds.getCommerceCoursesColl(lvlId).where(ds.userRole == 'ta' ? 'ta_id' : 'doctor_id', isEqualTo: doctorId).get())
                   )),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) return const SliverToBoxAdapter(child: Center(child: CircularProgressIndicator()));

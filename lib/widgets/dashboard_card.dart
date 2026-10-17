@@ -88,8 +88,10 @@ class DashboardCard extends StatelessWidget {
                       // Title
                       Text(
                         title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.cairo(
-                          fontSize: 15,
+                          fontSize: 14,
                           fontWeight: FontWeight.w900,
                           color: isDark ? Colors.white : Colors.black87,
                           height: 1.2,

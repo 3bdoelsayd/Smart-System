@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
@@ -56,10 +57,31 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         withData: true,
       );
       if (result != null && result.files.single != null) {
-        setState(() {
-          _pickedFile = result.files.single;
-          _previewBytes = result.files.single.bytes;
-        });
+        final picked = result.files.single;
+
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => const Center(child: CircularProgressIndicator()),
+        );
+
+        String? processedUrl = await _ds.uploadAvatarFile(picked);
+
+        if (context.mounted) Navigator.pop(context);
+
+        if (processedUrl != null && processedUrl.startsWith('data:image')) {
+          final base64Str = processedUrl.split(',').last;
+          final bytes = base64Decode(base64Str);
+          setState(() {
+            _pickedFile = picked;
+            _previewBytes = bytes;
+          });
+        } else {
+          setState(() {
+            _pickedFile = picked;
+            _previewBytes = picked.bytes;
+          });
+        }
       }
     } catch (e) {
       debugPrint("Pick image error: $e");
@@ -83,13 +105,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         await _ds.updateStudentProfile(
           phone: _phoneController.text.trim(),
           personalEmail: _emailController.text.trim(),
-          photoUrl: photoUrl,
+          photoUrl: photoUrl ?? "",
         );
       } else if (_ds.currentDoctor != null) {
         await _ds.updateDoctorProfile(
           phone: _phoneController.text.trim(),
           personalEmail: _emailController.text.trim(),
-          photoUrl: photoUrl,
+          photoUrl: photoUrl ?? "",
           hidePhone: _hidePhone,
           hideEmail: _hideEmail,
           hidePhoto: _hidePhoto,
@@ -147,37 +169,56 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             children: [
               // --- معاينة الصورة الشخصية الحية (Live Preview) ---
               Center(
-                child: Stack(
+                child: Column(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: primaryColor, width: 3),
-                      ),
-                      child: CircleAvatar(
-                        radius: 55,
-                        backgroundColor: Colors.grey.shade200,
-                        backgroundImage: _previewBytes != null
-                            ? MemoryImage(_previewBytes!)
-                            : _ds.getAvatarImageProvider(_currentPhotoUrl),
-                        child: (_previewBytes == null && (_currentPhotoUrl ?? '').isEmpty)
-                            ? Icon(Icons.person, size: 60, color: primaryColor)
-                            : null,
-                      ),
-                    ),
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: CircleAvatar(
-                        backgroundColor: primaryColor,
-                        radius: 18,
-                        child: IconButton(
-                          icon: const Icon(Icons.camera_alt_rounded, size: 16, color: Colors.white),
-                          onPressed: _pickImage,
+                    Stack(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: primaryColor, width: 3),
+                          ),
+                          child: CircleAvatar(
+                            radius: 55,
+                            backgroundColor: Colors.grey.shade200,
+                            backgroundImage: _previewBytes != null
+                                ? MemoryImage(_previewBytes!)
+                                : _ds.getAvatarImageProvider(_currentPhotoUrl),
+                            child: (_previewBytes == null && (_currentPhotoUrl ?? '').isEmpty)
+                                ? Icon(Icons.person, size: 60, color: primaryColor)
+                                : null,
+                          ),
                         ),
-                      ),
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: CircleAvatar(
+                            backgroundColor: primaryColor,
+                            radius: 18,
+                            child: IconButton(
+                              icon: const Icon(Icons.camera_alt_rounded, size: 16, color: Colors.white),
+                              onPressed: _pickImage,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
+                    if (_previewBytes != null || (_currentPhotoUrl ?? '').isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      TextButton.icon(
+                        style: TextButton.styleFrom(foregroundColor: Colors.red),
+                        icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                        label: Text(isAr ? 'حذف الصورة الشخصية' : 'Remove Photo', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+                        onPressed: () {
+                          setState(() {
+                            _pickedFile = null;
+                            _previewBytes = null;
+                            _currentPhotoUrl = "";
+                          });
+                        },
+                      ),
+                    ],
                   ],
                 ),
               ),

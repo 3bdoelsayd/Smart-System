@@ -108,86 +108,88 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final ds = DataService();
-    bool isAr = ds.isArabic;
-    bool isDark = ds.isDarkMode;
-    
-    // الألوان الجديدة للوضع الداكن (رمادي غامق وفيروزي)
-    final Color primaryColor = isDark ? const Color(0xFF03DAC6) : const Color(0xFF673AB7);
-    final Color bgColor = isDark ? const Color(0xFF121212) : Colors.grey.shade50;
-    final Color cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    return ListenableBuilder(
+      listenable: _ds,
+      builder: (context, _) {
+        bool isAr = _ds.isArabic;
+        bool isDark = _ds.isDarkMode;
+        
+        // الألوان الجديدة للوضع الداكن (رمادي غامق وفيروزي)
+        final Color primaryColor = isDark ? const Color(0xFF03DAC6) : const Color(0xFF673AB7);
+        final Color bgColor = isDark ? const Color(0xFF121212) : Colors.grey.shade50;
 
-    final student = ds.currentStudent;
-    final name = student?['name'] ?? (isAr ? 'غير معروف' : 'Unknown');
-    final id = student?['id'] ?? '---';
-    final level = student?['level'] ?? '---';
-    final group = student?['group'] ?? '---';
-    final division = student?['division'] ?? '---';
+        final student = _ds.currentStudent;
+        final name = student?['name'] ?? (isAr ? 'غير معروف' : 'Unknown');
+        final id = student?['id'] ?? '---';
+        final level = student?['level'] ?? '---';
+        final group = student?['group'] ?? '---';
+        final division = student?['division'] ?? '---';
+        final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
 
-    return Directionality(
-      textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
-      child: Scaffold(
-        backgroundColor: bgColor,
-        appBar: AppBar(
-          title: Text(isAr ? 'الملف الشخصي' : 'Profile'),
-          backgroundColor: isDark ? const Color(0xFF1A1A1A) : primaryColor,
-          foregroundColor: Colors.white,
-          elevation: 0,
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.edit_rounded),
-              tooltip: isAr ? 'تعديل البيانات' : 'Edit Profile',
-              onPressed: () => Navigator.pushNamed(context, '/edit-profile'),
-            ),
-          ],
-        ),
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            children: [
-              // --- كارت الهوية الرقمي الجديد ---
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: isDark 
-                      ? [const Color(0xFF232323), const Color(0xFF1A1A1A)] 
-                      : [primaryColor, primaryColor.withBlue(200)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(25),
-                  boxShadow: [
-                    BoxShadow(
-                      color: primaryColor.withOpacity(isDark ? 0.2 : 0.3),
-                      blurRadius: 15,
-                      offset: const Offset(0, 8),
-                    )
-                  ],
+        return Directionality(
+          textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
+          child: Scaffold(
+            backgroundColor: bgColor,
+            appBar: AppBar(
+              title: Text(isAr ? 'الملف الشخصي' : 'Profile'),
+              backgroundColor: isDark ? const Color(0xFF1A1A1A) : primaryColor,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.edit_rounded),
+                  tooltip: isAr ? 'تعديل البيانات' : 'Edit Profile',
+                  onPressed: () => Navigator.pushNamed(context, '/edit-profile'),
                 ),
-                child: Column(
-                  children: [
-                    Row(
+              ],
+            ),
+            body: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  // --- كارت الهوية الرقمي الجديد ---
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: isDark 
+                          ? [const Color(0xFF232323), const Color(0xFF1A1A1A)] 
+                          : [primaryColor, primaryColor.withBlue(200)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(25),
+                      boxShadow: [
+                        BoxShadow(
+                          color: primaryColor.withOpacity(isDark ? 0.2 : 0.3),
+                          blurRadius: 15,
+                          offset: const Offset(0, 8),
+                        )
+                      ],
+                    ),
+                    child: Column(
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(3),
-                          decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                          child: CircleAvatar(
-                            radius: 40,
-                            backgroundColor: Colors.grey.shade200,
-                            backgroundImage: ds.getAvatarImageProvider(student?['photoUrl']),
-                            child: (student?['photoUrl'] ?? '').toString().isEmpty ? Icon(Icons.person, size: 50, color: primaryColor) : null,
-                          ),
-                        ),
-                        const SizedBox(width: 15),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                name,
-                                style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(3),
+                              decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                              child: CircleAvatar(
+                                radius: 40,
+                                backgroundColor: Colors.grey.shade200,
+                                backgroundImage: _ds.getAvatarImageProvider(student?['photoUrl']),
+                                child: (student?['photoUrl'] ?? '').toString().isEmpty ? Icon(Icons.person, size: 50, color: primaryColor) : null,
+                              ),
+                            ),
+                            const SizedBox(width: 15),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    name,
+                                    style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
                                 overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 5),
@@ -278,6 +280,8 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
           ),
         ),
       ),
+    );
+      },
     );
   }
 

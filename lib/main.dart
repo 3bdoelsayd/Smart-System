@@ -57,7 +57,7 @@ void main() async {
     if (currentUser != null && savedRole != null) {
       await ds.loadUserData(currentUser.uid, savedRole);
       if (savedRole == 'student') initialRoute = '/student/home';
-      else if (savedRole == 'doctor') initialRoute = '/doctor/home';
+      else if (savedRole == 'doctor' || savedRole == 'ta') initialRoute = '/doctor/home';
       else if (savedRole == 'super_admin') initialRoute = '/super-admin/dashboard';
       else if (savedRole == 'manager') initialRoute = '/manager/dashboard';
       else initialRoute = '/start';

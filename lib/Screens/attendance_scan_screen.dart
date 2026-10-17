@@ -151,6 +151,8 @@ class _AttendanceScanScreenState extends State<AttendanceScanScreen> {
               }
             }
 
+            String sessionType = parts.length >= 8 ? parts[7] : 'lecture';
+
             // 5. تسجيل الحضور
             await _ds.recordAttendanceCloud(
               subject: subject,
@@ -158,11 +160,12 @@ class _AttendanceScanScreenState extends State<AttendanceScanScreen> {
               lectureNumber: lecture,
               division: division,
               studentLocation: "${pos.latitude},${pos.longitude}",
+              sessionType: sessionType,
             );
 
             if (mounted) {
               setState(() => _isProcessing = false); 
-              _showSuccess(subject, lecture);
+              _showSuccess(subject, lecture, sessionType);
             }
           } else {
             throw _ds.isArabic ? "رمز QR غير صالح." : "Invalid QR.";
@@ -182,7 +185,8 @@ class _AttendanceScanScreenState extends State<AttendanceScanScreen> {
     }
   }
 
-  void _showSuccess(String subject, int lecture) {
+  void _showSuccess(String subject, int lecture, [String sessionType = 'lecture']) {
+    bool isSection = sessionType == 'section';
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -192,8 +196,8 @@ class _AttendanceScanScreenState extends State<AttendanceScanScreen> {
         title: const Icon(Icons.check_circle, color: Colors.green, size: 60),
         content: Text(
           _ds.isArabic
-            ? "تم تسجيل حضورك بنجاح\nالمادة: $subject\nالمحاضرة: $lecture"
-            : "Attendance Recorded\nSubject: $subject\nLecture: $lecture",
+            ? "تم تسجيل حضورك بنجاح\nالمادة: $subject\n${isSection ? 'السكشن رقم' : 'المحاضرة رقم'}: $lecture"
+            : "Attendance Recorded\nSubject: $subject\n${isSection ? 'Section No.' : 'Lecture No.'}: $lecture",
           textAlign: TextAlign.center,
           style: TextStyle(color: _ds.isDarkMode ? Colors.white70 : Colors.black87),
         ),

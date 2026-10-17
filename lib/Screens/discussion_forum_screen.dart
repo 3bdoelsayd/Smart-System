@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/data_service.dart';
+import '../widgets/doctor_profile_modal.dart';
+import '../widgets/student_profile_modal.dart';
 import 'private_chat_screen.dart';
 import 'doctor_students_list_screen.dart';
 import 'student_doctors_list_screen.dart';
@@ -68,6 +70,7 @@ class _DiscussionForumScreenState extends State<DiscussionForumScreen> {
         'authorId': user['uid'] ?? user['id'],
         'authorName': user['name'],
         'authorRole': _ds.userRole,
+        'photoUrl': user['photoUrl'] ?? '',
         'content': content,
         'timestamp': FieldValue.serverTimestamp(),
       });
@@ -156,7 +159,18 @@ class _DiscussionForumScreenState extends State<DiscussionForumScreen> {
                         if (!sSnap.hasData || sSnap.data!.docs.isEmpty) return const SizedBox();
                         final sData = sSnap.data!.docs.first.data() as Map<String, dynamic>;
                         return ListTile(
-                          leading: const CircleAvatar(child: Icon(Icons.person)),
+                          onTap: () {
+                            showRichStudentProfileModal(
+                              context: context,
+                              studentIdOrUid: bannedUids[i],
+                              studentName: sData['name'],
+                              initialStudentData: sData,
+                            );
+                          },
+                          leading: CircleAvatar(
+                            backgroundImage: _ds.getAvatarImageProvider(sData['photoUrl']),
+                            child: (sData['photoUrl'] ?? '').toString().isEmpty ? const Icon(Icons.person) : null,
+                          ),
                           title: Text(sData['name'] ?? ''),
                           subtitle: Text("ID: ${sData['id']}"),
                           trailing: TextButton(
@@ -203,11 +217,25 @@ class _DiscussionForumScreenState extends State<DiscussionForumScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircleAvatar(radius: 35, backgroundColor: Colors.blue.withAlpha(30), child: const Icon(Icons.person, size: 40, color: Colors.blue)),
+            CircleAvatar(
+              radius: 35,
+              backgroundColor: Colors.blue.withAlpha(30),
+              backgroundImage: _ds.getAvatarImageProvider(studentData['photoUrl']),
+              child: (studentData['photoUrl'] ?? '').toString().isEmpty ? const Icon(Icons.person, size: 40, color: Colors.blue) : null,
+            ),
             const SizedBox(height: 15),
             Text(studentData['name'] ?? '', style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.bold)),
             Text("كود الطالب: ${studentData['id']}", style: const TextStyle(color: Colors.grey)),
             const Divider(height: 30),
+            _optionTile(Icons.person_rounded, "عرض الملف الشخصي", Colors.purple, () {
+              Navigator.pop(ctx);
+              showRichStudentProfileModal(
+                context: context,
+                studentIdOrUid: studentUid,
+                studentName: studentData['name'],
+                initialStudentData: studentData,
+              );
+            }),
             if ((studentData['phone'] ?? '').toString().isNotEmpty)
               _optionTile(Icons.chat_rounded, "مراسلة عبر واتساب", Colors.green, () {
                 Navigator.pop(ctx);
@@ -222,6 +250,7 @@ class _DiscussionForumScreenState extends State<DiscussionForumScreen> {
                     otherUserId: studentUid,
                     otherUserName: studentData['name'] ?? 'الطالب',
                     otherUserRole: 'student',
+                    otherUserPhotoUrl: studentData['photoUrl'],
                   ),
                 ),
               );
@@ -407,10 +436,34 @@ class _DiscussionForumScreenState extends State<DiscussionForumScreen> {
           children: [
             if (!isMe)
               InkWell(
-                onTap: () => _showStudentOptions(data),
+                onTap: () {
+                  if (isDoc) {
+                    showRichDoctorProfileModal(
+                      context: context,
+                      doctorUidOrEmail: data['authorId'] ?? '',
+                      doctorName: data['authorName'],
+                    );
+                  } else {
+                    if (_ds.userRole == 'doctor') {
+                      _showStudentOptions(data);
+                    } else {
+                      showRichStudentProfileModal(
+                        context: context,
+                        studentIdOrUid: data['authorId'] ?? '',
+                        studentName: data['authorName'],
+                      );
+                    }
+                  }
+                },
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    CircleAvatar(
+                      radius: 10,
+                      backgroundImage: _ds.getAvatarImageProvider(data['photoUrl']),
+                      child: (data['photoUrl'] ?? '').toString().isEmpty ? const Icon(Icons.person, size: 12) : null,
+                    ),
+                    const SizedBox(width: 6),
                     Text(
                       data['authorName'] ?? 'Unknown',
                       style: TextStyle(

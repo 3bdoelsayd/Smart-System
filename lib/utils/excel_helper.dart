@@ -90,7 +90,12 @@ class ExcelHelper {
     required String subject,
     required String level,
     required String division,
+    String? lectureNumber,
     required List<Map<String, dynamic>> students,
+    Set<String>? presentIds,
+    Set<String>? presentStudentIds,
+    Map<String, String>? attendanceTimes,
+    String filterType = 'all', // 'all', 'present', 'absent'
     required bool isArabic,
   }) async {
     var excel = Excel.createExcel();
@@ -99,18 +104,52 @@ class ExcelHelper {
     sheetObject.appendRow([
       TextCellValue(isArabic ? 'اسم الطالب' : 'Student Name'),
       TextCellValue(isArabic ? 'الرقم الجامعي' : 'Student ID'),
-      TextCellValue(isArabic ? 'الحالة' : 'Status'),
+      TextCellValue(isArabic ? 'الشعبة' : 'Division'),
+      TextCellValue(isArabic ? 'حالة الحضور' : 'Attendance Status'),
+      TextCellValue(isArabic ? 'وقت تسجيل الحضور' : 'Attendance Time'),
     ]);
 
+    Set<String> activePresentIds = presentStudentIds ?? presentIds ?? {};
+
     for (var student in students) {
+      String studentId = student['id']?.toString().trim() ?? '';
+      String studentName = student['name']?.toString() ?? '';
+      String studentDiv = student['division']?.toString() ?? division;
+
+      bool isPresent = activePresentIds.contains(studentId) || activePresentIds.contains(studentId.toLowerCase());
+
+      if (filterType == 'present' && !isPresent) continue;
+      if (filterType == 'absent' && isPresent) continue;
+
+      String status = isPresent
+          ? (isArabic ? 'حاضر' : 'Present')
+          : (isArabic ? 'غائب' : 'Absent');
+      String timeText = isPresent ? (attendanceTimes?[studentId] ?? (isArabic ? 'تم التسجيل' : 'Recorded')) : '--';
+
       sheetObject.appendRow([
-        TextCellValue(student['name']?.toString() ?? ''),
-        TextCellValue(student['id']?.toString() ?? ''),
-        TextCellValue(isArabic ? 'حاضر' : 'Present'),
+        TextCellValue(studentName),
+        TextCellValue(studentId),
+        TextCellValue(studentDiv),
+        TextCellValue(status),
+        TextCellValue(timeText),
       ]);
     }
 
-    String fileName = "${subject}_Level_${level}_Attendance";
+    String sanitizedSubject = subject.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_').trim();
+    String suffix = filterType == 'present'
+        ? (isArabic ? "_الحاضرين" : "_Present")
+        : filterType == 'absent'
+            ? (isArabic ? "_الغائبين" : "_Absent")
+            : (isArabic ? "_الجميع" : "_All");
+
+    String fileName;
+    if (lectureNumber != null && lectureNumber.toString().trim().isNotEmpty) {
+      String lec = lectureNumber.toString().trim();
+      fileName = isArabic ? "كشف_حضور_${sanitizedSubject}_محاضرة_$lec$suffix" : "Attendance_${sanitizedSubject}_Lecture_$lec$suffix";
+    } else {
+      fileName = isArabic ? "كشف_حضور_${sanitizedSubject}_فرقة_$level$suffix" : "Attendance_${sanitizedSubject}_Level_$level$suffix";
+    }
+
     await _saveAndShareExcel(excel, fileName);
   }
 

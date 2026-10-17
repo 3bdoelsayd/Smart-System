@@ -62,16 +62,24 @@ class _DoctorStudentsListScreenState extends State<DoctorStudentsListScreen> {
                 stream: _ds.studentsColl.snapshots(),
                 builder: (context, snapshot) {
                   if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-                  var docs = snapshot.data!.docs;
+                  
+                  final teachingLevels = List<String>.from(_ds.currentDoctor?['teachingLevels'] ?? []);
+                  final normalizedDoctorLevels = teachingLevels.map((l) => _ds.normalizeLevel(l)).toList();
 
-                  if (_searchQuery.isNotEmpty) {
-                    docs = docs.where((doc) {
-                      final data = doc.data() as Map<String, dynamic>;
+                  var docs = snapshot.data!.docs.where((doc) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    final studentLevel = _ds.normalizeLevel(data['level']?.toString() ?? '1');
+                    
+                    bool levelMatch = teachingLevels.isEmpty || normalizedDoctorLevels.contains(studentLevel);
+                    if (!levelMatch) return false;
+
+                    if (_searchQuery.isNotEmpty) {
                       String name = (data['name'] ?? '').toLowerCase();
                       String id = (data['id'] ?? '').toString();
                       return name.contains(_searchQuery.toLowerCase()) || id.contains(_searchQuery);
-                    }).toList();
-                  }
+                    }
+                    return true;
+                  }).toList();
 
                   if (docs.isEmpty) {
                     return Center(child: Text(isAr ? 'لا يوجد طلاب مسجلين' : 'No students found', style: TextStyle(color: isDark ? Colors.white38 : Colors.grey)));
@@ -96,14 +104,24 @@ class _DoctorStudentsListScreenState extends State<DoctorStudentsListScreen> {
                           boxShadow: [BoxShadow(color: Colors.black.withAlpha(isDark ? 50 : 8), blurRadius: 10)],
                         ),
                         child: ListTile(
-                          onTap: () => showRichStudentProfileModal(context: context, studentIdOrUid: studentUid, studentName: studentName),
+                          onTap: () => showRichStudentProfileModal(context: context, studentIdOrUid: studentUid, studentName: studentName, initialStudentData: studentData),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          leading: CircleAvatar(
-                            backgroundColor: primaryColor.withAlpha(26),
-                            backgroundImage: _ds.getAvatarImageProvider(studentData['photoUrl']),
-                            child: (studentData['photoUrl'] ?? '').toString().isEmpty
-                                ? Icon(Icons.school_rounded, color: primaryColor)
-                                : null,
+                          leading: GestureDetector(
+                            onTap: () {
+                              if ((studentData['photoUrl'] ?? '').toString().isNotEmpty) {
+                                showFullScreenImageViewer(context, studentData['photoUrl'], studentName);
+                              } else {
+                                showRichStudentProfileModal(context: context, studentIdOrUid: studentUid, studentName: studentName, initialStudentData: studentData);
+                              }
+                            },
+                            child: CircleAvatar(
+                              radius: 24,
+                              backgroundColor: primaryColor.withAlpha(26),
+                              backgroundImage: _ds.getAvatarImageProvider(studentData['photoUrl']),
+                              child: (studentData['photoUrl'] ?? '').toString().isEmpty
+                                  ? Text(studentName.isNotEmpty ? studentName[0] : 'ط', style: TextStyle(fontWeight: FontWeight.bold, color: primaryColor, fontSize: 18))
+                                  : null,
+                            ),
                           ),
                           title: Text(studentName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: isDark ? Colors.white : Colors.black87)),
                           subtitle: Text("ID: $studentId | $division\n${studentPhone.isNotEmpty ? '📞 $studentPhone' : (isAr ? 'رقم الهاتف غير مسجل' : 'No phone')}", style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.grey.shade600)),
@@ -130,6 +148,7 @@ class _DoctorStudentsListScreenState extends State<DoctorStudentsListScreen> {
                                         otherUserId: studentUid,
                                         otherUserName: studentName,
                                         otherUserRole: 'student',
+                                        otherUserPhotoUrl: studentData['photoUrl'],
                                       ),
                                     ),
                                   );

@@ -4,8 +4,11 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../services/data_service.dart';
 import '../utils/excel_helper.dart';
+import '../utils/fourth_year_bis_students_data.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/dashboard_card.dart';
+import '../widgets/doctor_profile_modal.dart';
+import '../widgets/student_profile_modal.dart';
 import '../widgets/sub_page_wrapper.dart';
 import 'attendance_management_screen.dart';
 
@@ -21,6 +24,13 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
 
   @override
   Widget build(BuildContext context) {
+    if (_ds.userRole != 'super_admin' || _ds.currentAdmin == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.pushNamedAndRemoveUntil(context, '/start', (r) => false);
+      });
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     return ListenableBuilder(
       listenable: _ds,
       builder: (context, _) {
@@ -33,6 +43,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           {'icon': Icons.grid_view_rounded, 'title': _ds.translate('manage_sections'), 'widget': const SectionsManagementView(), 'color': const Color(0xFF00BCD4), 'subtitle': isAr ? 'توزيع الطلاب والشعب' : 'Distribute sections'},
           {'icon': Icons.school_rounded, 'title': _ds.translate('manage_students'), 'widget': const StudentsManagementView(), 'color': const Color(0xFF4CAF50), 'subtitle': isAr ? 'قاعدة بيانات الطلاب' : 'Students database'},
           {'icon': Icons.person_search_rounded, 'title': _ds.translate('manage_doctors'), 'widget': const DoctorsManagementView(), 'color': const Color(0xFFE91E63), 'subtitle': isAr ? 'أعضاء هيئة التدريس' : 'Faculty members'},
+          {'icon': Icons.badge_rounded, 'title': isAr ? 'إدارة المعيدين' : 'Manage TAs', 'widget': const TAsManagementView(), 'color': Colors.teal, 'subtitle': isAr ? 'معيدو السكاشن والهيئة' : 'Teaching assistants'},
           {'icon': Icons.admin_panel_settings_rounded, 'title': _ds.translate('manage_managers'), 'widget': const ManagersManagementView(), 'color': const Color(0xFFFF9800), 'subtitle': isAr ? 'صلاحيات المديرين' : 'Managers roles'},
           {'icon': Icons.calendar_month_rounded, 'title': _ds.translate('semesters'), 'widget': const SemestersManagementView(), 'color': const Color(0xFF607D8B), 'subtitle': isAr ? 'الفصول والتقويم' : 'Academic calendar'},
         ];
@@ -334,7 +345,7 @@ void _confirmResetDevice(BuildContext context, String uid, String? name) {
   );
 }
 
-Widget _buildListItem({required bool isDarkMode, required String title, required String subtitle, required IconData icon, required Color color, String? photoUrl, VoidCallback? onDelete, VoidCallback? onEdit, VoidCallback? onAttendance, VoidCallback? onResetDevice}) {
+Widget _buildListItem({required bool isDarkMode, required String title, required String subtitle, required IconData icon, required Color color, String? photoUrl, VoidCallback? onTap, VoidCallback? onDelete, VoidCallback? onEdit, VoidCallback? onAttendance, VoidCallback? onResetDevice}) {
   return Container(
     margin: const EdgeInsets.only(bottom: 16),
     decoration: BoxDecoration(
@@ -352,21 +363,30 @@ Widget _buildListItem({required bool isDarkMode, required String title, required
     child: Column(
       children: [
         ListTile(
+          onTap: onTap,
           contentPadding: const EdgeInsets.fromLTRB(15, 12, 15, 0),
-          leading: photoUrl != null && photoUrl.isNotEmpty
-              ? CircleAvatar(
-                  radius: 24,
-                  backgroundColor: color.withOpacity(0.12),
-                  backgroundImage: DataService().getAvatarImageProvider(photoUrl),
-                )
-              : Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: Icon(icon, color: color, size: 26),
-                ),
+          leading: Builder(
+            builder: (ctx) => GestureDetector(
+              onTap: () {
+                if (photoUrl != null && photoUrl.isNotEmpty) {
+                  showFullScreenImageViewer(ctx, photoUrl, title);
+                } else if (onTap != null) {
+                  onTap();
+                }
+              },
+              child: CircleAvatar(
+                radius: 24,
+                backgroundColor: color.withOpacity(0.12),
+                backgroundImage: photoUrl != null && photoUrl.isNotEmpty ? DataService().getAvatarImageProvider(photoUrl) : null,
+                child: (photoUrl ?? '').isEmpty
+                    ? Text(
+                        title.isNotEmpty ? title[0] : 'ط',
+                        style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 18),
+                      )
+                    : null,
+              ),
+            ),
+          ),
           title: Text(
             title,
             style: GoogleFonts.cairo(fontWeight: FontWeight.w900, fontSize: 15, height: 1.2),
@@ -532,11 +552,145 @@ void _showExcelOptions(BuildContext context, bool isDark, String type, VoidCallb
               }
             },
           ),
+          if (type == 'student') ...[
+            const Divider(),
+            ListTile(
+              leading: const CircleAvatar(backgroundColor: Color(0xFF673AB7), child: Icon(Icons.cloud_upload_rounded, color: Colors.white)),
+              title: Text('رفع طلاب الفرقة الرابعة (نظم معلومات) تلقائياً ⚡', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: const Color(0xFF673AB7))),
+              subtitle: Text('رفع 249 طالباً للفرقة الرابعة بكلمة مرور 123456 بضغطة زر واحدة', style: GoogleFonts.cairo(fontSize: 11)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _autoUploadFourthYearStudents(context, ds);
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: const CircleAvatar(backgroundColor: Colors.red, child: Icon(Icons.delete_sweep_rounded, color: Colors.white)),
+              title: Text('حذف جميع الطلاب نهائياً 🗑️', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: Colors.red)),
+              subtitle: Text('مسح كل بيانات الطلاب من قاعدة البيانات لإضافة بيانات حقيقية', style: GoogleFonts.cairo(fontSize: 11)),
+              onTap: () async {
+                Navigator.pop(ctx);
+                bool? confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (dialogCtx) => AlertDialog(
+                    title: Text('تحذير خطير', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: Colors.red)),
+                    content: Text('هل أنت متأكد من حذف جميع الطلاب من قاعدة البيانات؟ لا يمكن التراجع عن هذا الإجراء.', style: GoogleFonts.cairo()),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(dialogCtx, false), child: Text('إلغاء')),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                        onPressed: () => Navigator.pop(dialogCtx, true),
+                        child: Text('تأكيد الحذف', style: TextStyle(color: Colors.white)),
+                      ),
+                    ],
+                  ),
+                );
+
+                if (confirm == true) {
+                  try {
+                    await ds.deleteAllStudents();
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حذف جميع الطلاب نهائياً من فايربيس بنجاح 🗑️'), backgroundColor: Colors.green));
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل الحذف: $e'), backgroundColor: Colors.red));
+                    }
+                  }
+                }
+              },
+            ),
+          ],
           const SizedBox(height: 30),
         ],
       ),
     ),
   );
+}
+
+void _autoUploadFourthYearStudents(BuildContext context, DataService ds) async {
+  if (ds.selectedInstituteId == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('يرجى اختيار الكلية أولاً من أعلى الشاشة', style: GoogleFonts.cairo()),
+        backgroundColor: Colors.orange,
+      ),
+    );
+    return;
+  }
+
+  final studentsList = FourthYearBisStudents.list;
+  int totalStudents = studentsList.length;
+  int progressCount = 0;
+  StateSetter? dialogSetState;
+
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) => StatefulBuilder(
+      builder: (context, setS) {
+        dialogSetState = setS;
+        return AlertDialog(
+          backgroundColor: ds.isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+          content: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(color: Color(0xFF673AB7)),
+                const SizedBox(height: 20),
+                Text(
+                  "جاري رفع $totalStudents طالباً للفرقة الرابعة (نظم معلومات الاعمال)...",
+                  style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 15),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 15),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: LinearProgressIndicator(
+                    value: totalStudents > 0 ? progressCount / totalStudents : 0,
+                    minHeight: 8,
+                    backgroundColor: Colors.grey.withAlpha(40),
+                    color: const Color(0xFF673AB7),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text("$progressCount من $totalStudents", style: GoogleFonts.cairo(fontSize: 13, color: Colors.grey)),
+              ],
+            ),
+          ),
+        );
+      },
+    ),
+  );
+
+  for (var s in studentsList) {
+    String sId = s['id'] ?? '';
+    String sName = s['name'] ?? '';
+
+    if (sId.isNotEmpty && sName.isNotEmpty) {
+      try {
+        await ds.addStudentManual('level_4', sId, sName, "", "نظم معلومات الأعمال", "123456", notify: false);
+        progressCount++;
+        if (dialogSetState != null) dialogSetState!(() {});
+        await Future.delayed(const Duration(milliseconds: 10));
+      } catch (e) {
+        debugPrint("Error uploading student $sId: $e");
+      }
+    }
+  }
+
+  if (context.mounted) {
+    Navigator.pop(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('✅ تم رفع جميع طلاب الفرقة الرابعة بنجاح ($progressCount طالب)', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 5),
+      ),
+    );
+  }
 }
 
 void _showStyledBS({required BuildContext context, required bool isDarkMode, required String title, required IconData icon, required Color color, required List<Widget> children, required VoidCallback onSave}) {
@@ -1210,177 +1364,137 @@ class _StudentsManagementViewState extends State<StudentsManagementView> {
 
   @override
   Widget build(BuildContext context) {
-    final List<IconData> levelIcons = [Icons.auto_stories, Icons.menu_book_rounded, Icons.school_rounded, Icons.emoji_events_rounded];
-    final List<Color> levelColors = [const Color(0xFF3F51B5), const Color(0xFF009688), const Color(0xFFFF9800), const Color(0xFFE91E63)];
+    return Column(
+      children: [
+        _buildActionHeader(
+          context: context,
+          isDarkMode: _ds.isDarkMode, 
+          onAddManual: _showAddStudentBS, 
+          onAddExcel: _pickAndUploadStudentsExcel, 
+          onAutoUpload: _autoUploadFakeStudents,
+          onSearch: (v) => setState(() => _searchQuery = v),
+          type: 'student',
+          ds: _ds,
+        ),
+        _buildBreadcrumb(),
+        Expanded(
+          child: StreamBuilder<QuerySnapshot>(
+            stream: _ds.studentsColl.snapshots(),
+            builder: (ctx, snap) {
+              if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+              
+              String cleanLevel = _selectedLevelId != null ? _ds.normalizeLevel(_selectedLevelId!) : '';
 
-    return PopScope(
-      canPop: _selectedLevelId == null,
-      onPopInvokedWithResult: (didPop, result) {
-        if (didPop) return;
-        if (_selectedSection != null) {
-          setState(() => _selectedSection = null);
-        } else if (_selectedLevelId != null) {
-          setState(() => _selectedLevelId = null);
-        }
-      },
-      child: Column(
-        children: [
-          _buildBreadcrumb(),
-          if (_selectedLevelId == null) ...[
-            Expanded(
-              child: StreamBuilder<QuerySnapshot>(
-                stream: _ds.commerceLevelsColl.orderBy('name').snapshots(),
-                builder: (ctx, snap) {
-                  if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-                  return GridView.builder(
-                    padding: const EdgeInsets.all(20),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 15,
-                      mainAxisSpacing: 15,
-                      mainAxisExtent: 190,
+              var docs = snap.data!.docs.where((d) {
+                var data = d.data() as Map<String, dynamic>;
+                String sLvl = _ds.normalizeLevel(data['level']?.toString() ?? '');
+                String sDiv = (data['division'] ?? '').toString().trim();
+                String targetDiv = (_selectedSection ?? '').trim();
+
+                bool levelMatch = _selectedLevelId == null ||
+                    (sLvl == cleanLevel) ||
+                    (data['level']?.toString() == _selectedLevelId || data['level']?.toString() == _selectedLevelId!.replaceAll('level_', ''));
+
+                String normSDiv = sDiv.replaceAll('أ', 'ا').replaceAll('إ', 'ا').replaceAll('آ', 'ا').replaceAll('ة', 'ه').toLowerCase();
+                String normTargetDiv = targetDiv.replaceAll('أ', 'ا').replaceAll('إ', 'ا').replaceAll('آ', 'ا').replaceAll('ة', 'ه').toLowerCase();
+
+                bool divMatch = targetDiv.isEmpty ||
+                    normSDiv == normTargetDiv ||
+                    normSDiv.contains(normTargetDiv) ||
+                    normTargetDiv.contains(normSDiv);
+
+                String sName = (data['name'] ?? '').toString().toLowerCase();
+                String sId = (data['id'] ?? '').toString();
+                bool searchMatch = _searchQuery.isEmpty || sName.contains(_searchQuery.toLowerCase()) || sId.contains(_searchQuery);
+
+                return levelMatch && divMatch && searchMatch;
+              }).toList();
+
+              docs.sort((a, b) => (a.data() as Map<String, dynamic>)['name'].toString().compareTo((b.data() as Map<String, dynamic>)['name'].toString()));
+
+              return Column(
+                children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          _selectedSection != null
+                            ? "إجمالي الطلاب بالشعبة:"
+                            : (_selectedLevelId != null ? "إجمالي الطلاب بالفرقة:" : "إجمالي جميع الطلاب:"),
+                          style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: Colors.grey),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withAlpha(30),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            "${docs.length} طالب",
+                            style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: Colors.green),
+                          ),
+                        ),
+                      ],
                     ),
-                    itemCount: snap.data!.docs.length,
-                    itemBuilder: (ctx, i) {
-                      var d = snap.data!.docs[i];
-                      return DashboardCard(
-                        title: d['name'],
-                        icon: levelIcons[i % levelIcons.length],
-                        color: levelColors[i % levelColors.length],
-                        onTap: () => setState(() { _selectedLevelId = d.id; _selectedLevelName = d['name']; }),
-                      );
-                    },
-                  );
-                },
-              ),
-            )
-          ] else if (_selectedSection == null) ...[
-            Expanded(
-              child: StreamBuilder<QuerySnapshot>(
-                stream: _ds.getCommerceSectionsColl(_selectedLevelId!).snapshots(),
-                builder: (ctx, snap) {
-                  if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-                  if (snap.data!.docs.isEmpty) return Center(child: Text('لا توجد شعب مضافة لهذه الفرقة', style: GoogleFonts.cairo()));
-                  return GridView.builder(
-                    padding: const EdgeInsets.all(20),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 15,
-                      mainAxisSpacing: 15,
-                      mainAxisExtent: 190,
-                    ),
-                    itemCount: snap.data!.docs.length,
-                    itemBuilder: (ctx, i) {
-                      var d = snap.data!.docs[i];
-                      return DashboardCard(
-                        title: d['name'],
-                        icon: Icons.grid_view_rounded,
-                        color: Colors.cyan,
-                        onTap: () => setState(() { _selectedSection = d['name']; }),
-                      );
-                    },
-                  );
-                },
-              ),
-            )
-          ] else ...[
-            _buildActionHeader(
-              context: context,
-              isDarkMode: _ds.isDarkMode, 
-              onAddManual: _showAddStudentBS, 
-              onAddExcel: _pickAndUploadStudentsExcel, 
-              onAutoUpload: _autoUploadFakeStudents,
-              onSearch: (v) => setState(() => _searchQuery = v),
-              type: 'student',
-              ds: _ds,
-            ),
-            Expanded(
-              child: StreamBuilder<QuerySnapshot>(
-                stream: _ds.studentsColl.snapshots(),
-                builder: (ctx, snap) {
-                  if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-                  
-                  String cleanLevel = _ds.normalizeLevel(_selectedLevelId ?? '');
-
-                  var docs = snap.data!.docs.where((d) {
-                    var data = d.data() as Map<String, dynamic>;
-                    String sLvl = _ds.normalizeLevel(data['level']?.toString() ?? '');
-                    String sDiv = (data['division'] ?? '').toString().trim();
-                    String targetDiv = (_selectedSection ?? '').trim();
-
-                    bool levelMatch = (sLvl == cleanLevel) ||
-                        (_selectedLevelId != null && (data['level']?.toString() == _selectedLevelId || data['level']?.toString() == _selectedLevelId!.replaceAll('level_', '')));
-
-                    bool divMatch = targetDiv.isEmpty ||
-                        sDiv == targetDiv ||
-                        sDiv.contains(targetDiv) ||
-                        targetDiv.contains(sDiv) ||
-                        sDiv.replaceAll('أ', 'ا').replaceAll('ة', 'ه') == targetDiv.replaceAll('أ', 'ا').replaceAll('ة', 'ه');
-
-                    String sName = (data['name'] ?? '').toString().toLowerCase();
-                    String sId = (data['id'] ?? '').toString();
-                    bool searchMatch = sName.contains(_searchQuery.toLowerCase()) || sId.contains(_searchQuery);
-
-                    return levelMatch && divMatch && searchMatch;
-                  }).toList();
-
-                  docs.sort((a, b) => (a.data() as Map<String, dynamic>)['name'].toString().compareTo((b.data() as Map<String, dynamic>)['name'].toString()));
-
-                  if (docs.isEmpty) return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.school_outlined, size: 80, color: Colors.grey.withAlpha(50)), const SizedBox(height: 10), Text('لا يوجد طلاب في هذه الشعبة حالياً', style: GoogleFonts.cairo(color: Colors.grey))]));
-
-                  return Column(
-                    children: [
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  ),
+                  if (docs.isEmpty)
+                    Expanded(
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text(
-                              "إجمالي الطلاب بالشعبة:",
-                              style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: Colors.grey),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
-                              decoration: BoxDecoration(
-                                color: Colors.green.withAlpha(30),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                "${docs.length} طالب",
-                                style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: Colors.green),
-                              ),
-                            ),
+                            Icon(Icons.school_outlined, size: 80, color: Colors.grey.withAlpha(50)),
+                            const SizedBox(height: 10),
+                            Text('لا يوجد طلاب حالياً', style: GoogleFonts.cairo(color: Colors.grey)),
                           ],
                         ),
                       ),
-                      Expanded(
-                        child: ListView.builder(
-                          padding: const EdgeInsets.all(15),
-                          itemCount: docs.length,
-                          itemBuilder: (ctx, i) {
-                            var d = docs[i].data() as Map<String, dynamic>;
-                            return _buildListItem(
-                              isDarkMode: _ds.isDarkMode, 
-                              title: d['name'] ?? 'بدون اسم', 
-                              subtitle: 'كود: ${d['id']}', 
-                              icon: Icons.school_rounded, 
-                              color: Colors.green, 
-                              photoUrl: d['photoUrl'],
-                              onResetDevice: () => _confirmResetDevice(context, docs[i].id, d['name']),
-                              onDelete: () => _confirmGeneralDelete(context, 'حذف طالب', 'هل أنت متأكد من حذف هذا الطالب؟', () => _ds.deleteStudent(docs[i].id, d['level'].toString()))
-                            );
-                          },
-                        ),
+                    )
+                  else
+                    Expanded(
+                      child: ListView.builder(
+                        padding: const EdgeInsets.all(15),
+                        itemCount: docs.length,
+                        itemBuilder: (ctx, i) {
+                          var d = docs[i].data() as Map<String, dynamic>;
+                          return _buildListItem(
+                            isDarkMode: _ds.isDarkMode, 
+                            title: d['name'] ?? 'بدون اسم', 
+                            subtitle: 'ID: ${d['id']} | الفرقة ${d['level']} | ${d['division']}', 
+                            icon: Icons.school_rounded, 
+                            color: Colors.green, 
+                            photoUrl: d['photoUrl'],
+                            onTap: () => showRichStudentProfileModal(
+                              context: context,
+                              studentIdOrUid: docs[i].id,
+                              studentName: d['name'],
+                              initialStudentData: d,
+                            ),
+                            onResetDevice: () => _confirmGeneralDelete(
+                              context,
+                              'إعادة ضبط الجهاز',
+                              'هل أنت متأكد من فك ربط جهاز الطالب (${d['name']})؟',
+                              () => _ds.resetStudentDevice(docs[i].id),
+                            ),
+                            onDelete: () => _confirmGeneralDelete(
+                              context,
+                              'حذف طالب',
+                              'هل أنت متأكد من حذف هذا الطالب؟',
+                              () => _ds.deleteStudent(docs[i].id, d['level']?.toString() ?? '1'),
+                            ),
+                          );
+                        },
                       ),
-                    ],
-                  );
-                },
-              ),
-            ),
-          ],
-        ],
-      ),
+                    ),
+                ],
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1602,6 +1716,142 @@ class _SemestersManagementViewState extends State<SemestersManagementView> {
                     icon: Icons.calendar_month_rounded, 
                     color: Colors.blueGrey, 
                     onDelete: () => _confirmGeneralDelete(context, 'حذف فصل دراسي', 'هل أنت متأكد من حذف هذا الفصل الدراسي؟', () => _ds.deleteSemester(snap.data!.docs[i].id))
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class TAsManagementView extends StatefulWidget {
+  const TAsManagementView({super.key});
+  @override
+  State<TAsManagementView> createState() => _TAsManagementViewState();
+}
+
+class _TAsManagementViewState extends State<TAsManagementView> {
+  final DataService _ds = DataService();
+  String _searchQuery = "";
+
+  void _showTAForm({DocumentSnapshot? doc}) async {
+    final data = doc?.data() as Map<String, dynamic>?;
+    final nameC = TextEditingController(text: data?['name']);
+    final idC = TextEditingController(text: data?['id']);
+    final passC = TextEditingController();
+    List<String> selectedLvls = List<String>.from(data?['teachingLevels'] ?? []);
+    var lvlsSnap = await _ds.commerceLevelsColl.get();
+
+    _showStyledBS(
+      context: context,
+      isDarkMode: _ds.isDarkMode,
+      title: doc == null ? 'إضافة معيد جديد' : 'تعديل بيانات المعيد',
+      icon: Icons.person_add_alt_1_rounded,
+      color: Colors.teal,
+      children: [
+        _buildInputField(_ds.isDarkMode, nameC, 'اسم المعيد', Icons.person_rounded),
+        _buildInputField(_ds.isDarkMode, idC, 'كود المعيد (ID)', Icons.badge_rounded, isNumber: true, enabled: doc == null),
+        if (doc == null) _buildInputField(_ds.isDarkMode, passC, 'كلمة المرور', Icons.lock_rounded, isPass: true),
+        const Padding(padding: EdgeInsets.symmetric(vertical: 10), child: Text('اختر الفرق التي يدرب فيها:', style: TextStyle(fontWeight: FontWeight.bold))),
+        StatefulBuilder(builder: (ctx, setS) => Column(children: [
+          Wrap(
+            spacing: 8,
+            children: lvlsSnap.docs.map((l) {
+              bool isSel = selectedLvls.contains(l.id);
+              return FilterChip(
+                label: Text(l['name'], style: GoogleFonts.cairo(fontSize: 12)),
+                selected: isSel,
+                selectedColor: Colors.teal.withAlpha(50),
+                onSelected: (v) => setS(() => v ? selectedLvls.add(l.id) : selectedLvls.remove(l.id)),
+              );
+            }).toList(),
+          ),
+        ])),
+      ],
+      onSave: () async {
+        if (idC.text.isNotEmpty && nameC.text.isNotEmpty) {
+          if (doc == null) {
+            await _ds.addTA(idC.text, nameC.text, "", selectedLvls, [], passC.text.isEmpty ? '123456' : passC.text);
+          } else {
+            await doc.reference.update({
+              'name': nameC.text,
+              'teachingLevels': selectedLvls,
+            });
+          }
+          if (mounted) Navigator.pop(context);
+        }
+      },
+    );
+  }
+
+  Future<void> _pickAndUploadTAsExcel() async {
+    List<List<String>> rows = await ExcelHelper.pickAndParseExcel();
+    if (rows.isNotEmpty) {
+      int count = 0;
+      for (var row in rows) {
+        if (row.length < 2) continue;
+        
+        String dId = row[0];
+        if (dId.contains('(')) dId = dId.split('(').last.split(')').first;
+
+        String dName = row[1];
+        String dPass = (row.length > 2) ? row[2] : '123456';
+        
+        List<String> teachingLevels = [];
+        for (int j = 3; j < row.length; j++) {
+          String lvlText = row[j];
+          if (lvlText.isNotEmpty) {
+             String lvlNum = _ds.normalizeLevel(lvlText);
+             teachingLevels.add('level_$lvlNum');
+          }
+        }
+        if (dId.isNotEmpty) { 
+          try {
+            await _ds.addTA(dId, dName, "", teachingLevels, [], dPass); 
+            count++; 
+            await Future.delayed(const Duration(milliseconds: 300));
+          } catch(e) { debugPrint("Error adding TA $dId: $e"); }
+        }
+      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تم رفع $count معيد بنجاح', style: GoogleFonts.cairo()), backgroundColor: Colors.green));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _buildActionHeader(
+          context: context,
+          isDarkMode: _ds.isDarkMode, 
+          onAddManual: () => _showTAForm(), 
+          onAddExcel: _pickAndUploadTAsExcel, 
+          onSearch: (v) => setState(() => _searchQuery = v),
+          type: 'doctor',
+          ds: _ds,
+        ),
+        Expanded(
+          child: StreamBuilder<QuerySnapshot>(
+            stream: _ds.commerceTasColl.snapshots(),
+            builder: (ctx, snap) {
+              if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+              var docs = snap.data!.docs.where((d) => (d.data() as Map)['name'].toString().toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+              return ListView.builder(
+                padding: const EdgeInsets.all(15),
+                itemCount: docs.length,
+                itemBuilder: (ctx, i) {
+                  var d = docs[i].data() as Map<String, dynamic>;
+                  return _buildListItem(
+                    isDarkMode: _ds.isDarkMode,
+                    title: d['name'] ?? 'بدون اسم',
+                    subtitle: 'كود: ${d['id']}\nيدرب لفرق: ${List.from(d['teachingLevels'] ?? []).join(', ')}',
+                    icon: Icons.person_outline_rounded,
+                    color: Colors.teal,
+                    onDelete: () => _confirmGeneralDelete(context, 'حذف معيد', 'هل أنت متأكد من حذف هذا المعيد؟', () => _ds.deleteTA(docs[i].id)),
+                    onEdit: () => _showTAForm(doc: docs[i]),
                   );
                 },
               );

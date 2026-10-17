@@ -90,6 +90,13 @@ class _StudentHomeScreenState extends State<_StudentHomeScreenContent> {
 
   @override
   Widget build(BuildContext context) {
+    if (_ds.userRole != 'student' || _ds.currentStudent == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) Navigator.pushNamedAndRemoveUntil(context, '/start', (r) => false);
+      });
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     return ListenableBuilder(
       listenable: _ds,
       builder: (context, _) {

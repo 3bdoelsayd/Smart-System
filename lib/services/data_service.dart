@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:flutter/material.dart';
@@ -166,7 +167,7 @@ class DataService extends ChangeNotifier {
   }
 
   Future<bool> loginStudent(String code, String pass) async { try { String? role = await unifiedLogin(code, pass); return role == 'student'; } catch(_) { return false; } }
-  Future<bool> loginDoctor(String code, String pass) async { try { String? role = await unifiedLogin(code, pass); return role == 'doctor'; } catch(_) { return false; } }
+  Future<bool> loginDoctor(String code, String pass) async { try { String? role = await unifiedLogin(code, pass); return role == 'doctor' || role == 'ta'; } catch(_) { return false; } }
   Future<bool> loginAdmin(String code, String pass) async { try { String? role = await unifiedLogin(code, pass); return role == 'super_admin' || role == 'manager'; } catch(_) { return false; } }
 
   Future<String?> unifiedLogin(String loginInput, String password) async {
@@ -176,15 +177,63 @@ class DataService extends ChangeNotifier {
       }
 
       String input = loginInput.trim().toLowerCase();
-      String email = input.contains('@') ? input : _formatEmail(input);
-      debugPrint("Login Attempt: $email");
+      String cleanCode = input
+          .replaceAll('std_', '')
+          .replaceAll('doc_', '')
+          .replaceAll('.college@smart.com', '')
+          .replaceAll('@smart.edu', '')
+          .replaceAll('@smart.com', '')
+          .trim();
 
-      UserCredential userCredential = await _auth.signInWithEmailAndPassword(
-          email: email,
-          password: password.trim()
-      );
+      String email = input.contains('@') && !input.endsWith('@smart.edu') ? input : _formatEmail(cleanCode);
+      debugPrint("Login Attempt: Code=$cleanCode | Email=$email");
 
-      String uid = userCredential.user!.uid;
+      UserCredential? userCredential;
+      try {
+        userCredential = await _auth.signInWithEmailAndPassword(
+            email: email,
+            password: password.trim()
+        );
+      } catch (authError) {
+        debugPrint("Auth sign-in error: $authError. Attempting Firestore fallback...");
+        String hashedPass = hashPassword(password.trim());
+        var collegeRef = _firestore.collection('colleges').doc(selectedInstituteId!);
+
+        var studentQuery = await collegeRef.collection('students')
+            .where('id', isEqualTo: cleanCode)
+            .get();
+
+        if (studentQuery.docs.isEmpty) {
+          studentQuery = await collegeRef.collection('students')
+              .where('email', isEqualTo: email)
+              .get();
+        }
+
+        if (studentQuery.docs.isNotEmpty) {
+          var studData = studentQuery.docs.first.data();
+          String docPass = studData['password']?.toString() ?? '';
+          if (docPass == hashedPass || docPass == password.trim()) {
+            // Firestore password matches! Try creating or updating Auth user
+            try {
+              userCredential = await _auth.signInWithEmailAndPassword(email: email, password: password.trim());
+            } catch (_) {
+              try {
+                await _secureCreateUser(email, password.trim());
+                userCredential = await _auth.signInWithEmailAndPassword(email: email, password: password.trim());
+              } catch (_) {
+                // Ignore if auth creation fails due to existing user with different pass
+              }
+            }
+          } else {
+            throw isArabic ? "كلمة المرور غير صحيحة" : "Incorrect password";
+          }
+        } else {
+          rethrow;
+        }
+      }
+
+      String uid = userCredential?.user?.uid ?? "STD_$cleanCode";
+      String? userEmail = userCredential?.user?.email ?? email;
       
       // --- نظام الأمان المحسن: بصمة داتئمة للهاتف/المتصفح نفسه ---
       final prefs = await SharedPreferences.getInstance();
@@ -195,15 +244,27 @@ class DataService extends ChangeNotifier {
       }
       // --------------------------------------------------------
 
-      String? role = await _findAndLoadUser(uid);
+      String? role = await _findAndLoadUser(uid, userEmail: userEmail);
+
+      if (role == null) {
+        // Search by clean code directly
+        role = await _checkUserInCollege(selectedInstituteId!, cleanCode, userEmail: userEmail);
+      }
 
       if (role != null) {
         // التحقق من ربط الجهاز للطلاب فقط لزيادة الأمان ومنع تبادل الحسابات
         if (role == 'student' && currentStudent != null) {
           String? storedDeviceId = currentStudent!['deviceId'];
+          String firestoreDocId = currentStudent!['uid'] ?? uid;
           if (storedDeviceId == null || storedDeviceId.isEmpty) {
             // ربط الجهاز لأول مرة بهذا الهاتف
-            await studentsColl.doc(uid).update({'deviceId': localDeviceId});
+            try {
+              await studentsColl.doc(firestoreDocId).update({'deviceId': localDeviceId});
+            } catch (_) {
+              try {
+                await getCommerceStudentsColl('level_' + (currentStudent!['level'] ?? '1')).doc(firestoreDocId).update({'deviceId': localDeviceId});
+              } catch (_) {}
+            }
             currentStudent!['deviceId'] = localDeviceId;
           } else if (storedDeviceId != localDeviceId) {
             await _auth.signOut();
@@ -228,17 +289,17 @@ class DataService extends ChangeNotifier {
     }
   }
 
-  Future<String?> _findAndLoadUser(String uid) async {
-    debugPrint("🕵️ Checking user UID: $uid in current college: $selectedInstituteId");
+  Future<String?> _findAndLoadUser(String uid, {String? userEmail}) async {
+    debugPrint("🕵️ Checking user UID: $uid (Email: $userEmail) in current college: $selectedInstituteId");
 
-    String? role = await _checkUserInCollege(selectedInstituteId!, uid);
+    String? role = await _checkUserInCollege(selectedInstituteId!, uid, userEmail: userEmail);
     if (role != null) return role;
 
     try {
       var colleges = await _firestore.collection('colleges').get();
       for (var colDoc in colleges.docs) {
         if (colDoc.id == selectedInstituteId) continue;
-        role = await _checkUserInCollege(colDoc.id, uid);
+        role = await _checkUserInCollege(colDoc.id, uid, userEmail: userEmail);
         if (role != null) {
           await setInstitute(colDoc.id);
           return role;
@@ -251,15 +312,35 @@ class DataService extends ChangeNotifier {
     return null;
   }
 
-  Future<String?> _checkUserInCollege(String collegeId, String uid) async {
+  Future<String?> _checkUserInCollege(String collegeId, String uid, {String? userEmail}) async {
     var collegeRef = _firestore.collection('colleges').doc(collegeId);
+    String cleanCode = uid
+        .replaceAll('doc_', '')
+        .replaceAll('DOC_', '')
+        .replaceAll('std_', '')
+        .replaceAll('STD_', '')
+        .replaceAll('.college@smart.com', '')
+        .replaceAll('@smart.edu', '')
+        .replaceAll('@smart.com', '')
+        .trim();
 
     // 1. فحص الطلاب أولاً لسرعة البرق (95% من مستخدمي النظام طلاب)
     try {
       var doc = await collegeRef.collection('students').doc(uid).get();
+      if (!doc.exists) doc = await collegeRef.collection('students').doc("STD_$cleanCode").get();
+      if (!doc.exists) doc = await collegeRef.collection('students').doc(cleanCode).get();
+      if (!doc.exists && userEmail != null) {
+        var q = await collegeRef.collection('students').where('email', isEqualTo: userEmail).get();
+        if (q.docs.isNotEmpty) doc = q.docs.first;
+      }
+      if (!doc.exists && cleanCode.isNotEmpty) {
+        var qId = await collegeRef.collection('students').where('id', isEqualTo: cleanCode).get();
+        if (qId.docs.isNotEmpty) doc = qId.docs.first;
+      }
+
       if (doc.exists && doc.data() != null) {
         currentStudent = Map<String, dynamic>.from(doc.data() as Map);
-        currentStudent!['uid'] = uid;
+        currentStudent!['uid'] = doc.id;
         userRole = 'student';
         String studentLvl = normalizeLevel(currentStudent!['level']?.toString() ?? '1');
         await fetchSubjectsForLevel(studentLvl, currentStudent!['division']?.toString() ?? 'ALL');
@@ -269,9 +350,20 @@ class DataService extends ChangeNotifier {
       var lvls = await collegeRef.collection('levels').get();
       for (var l in lvls.docs) {
         var sDoc = await l.reference.collection('students').doc(uid).get();
+        if (!sDoc.exists) sDoc = await l.reference.collection('students').doc("STD_$cleanCode").get();
+        if (!sDoc.exists) sDoc = await l.reference.collection('students').doc(cleanCode).get();
+        if (!sDoc.exists && userEmail != null) {
+          var q = await l.reference.collection('students').where('email', isEqualTo: userEmail).get();
+          if (q.docs.isNotEmpty) sDoc = q.docs.first;
+        }
+        if (!sDoc.exists && cleanCode.isNotEmpty) {
+          var qId = await l.reference.collection('students').where('id', isEqualTo: cleanCode).get();
+          if (qId.docs.isNotEmpty) sDoc = qId.docs.first;
+        }
+
         if (sDoc.exists && sDoc.data() != null) {
           currentStudent = Map<String, dynamic>.from(sDoc.data() as Map);
-          currentStudent!['uid'] = uid;
+          currentStudent!['uid'] = sDoc.id;
           userRole = 'student';
           String studentLvl = normalizeLevel(currentStudent!['level']?.toString() ?? l.id.replaceAll('level_', ''));
           await fetchSubjectsForLevel(studentLvl, currentStudent!['division']?.toString() ?? 'ALL');
@@ -282,12 +374,43 @@ class DataService extends ChangeNotifier {
 
     // 2. فحص الدكاترة
     try {
+      String code = uid.replaceAll('doc_', '').replaceAll('std_', '').replaceAll('.college@smart.com', '').trim();
       var doc = await collegeRef.collection('doctors').doc(uid).get();
+      if (!doc.exists) doc = await collegeRef.collection('doctors').doc("DOC_$code").get();
+      if (!doc.exists && userEmail != null) {
+        var q = await collegeRef.collection('doctors').where('email', isEqualTo: userEmail).get();
+        if (q.docs.isNotEmpty) doc = q.docs.first;
+      }
+      if (!doc.exists) {
+        var q2 = await collegeRef.collection('doctors').where('id', isEqualTo: code).get();
+        if (q2.docs.isNotEmpty) doc = q2.docs.first;
+      }
       if (doc.exists && doc.data() != null) {
         currentDoctor = Map<String, dynamic>.from(doc.data() as Map);
-        currentDoctor!['uid'] = uid;
+        currentDoctor!['uid'] = doc.id;
         userRole = 'doctor';
         return 'doctor';
+      }
+    } catch (_) {}
+
+    // 2.5. فحص المعيدين
+    try {
+      String code = uid.replaceAll('ta_', '').replaceAll('TA_', '').replaceAll('doc_', '').replaceAll('std_', '').replaceAll('.college@smart.com', '').trim();
+      var doc = await collegeRef.collection('tas').doc(uid).get();
+      if (!doc.exists) doc = await collegeRef.collection('tas').doc("TA_$code").get();
+      if (!doc.exists && userEmail != null) {
+        var q = await collegeRef.collection('tas').where('email', isEqualTo: userEmail).get();
+        if (q.docs.isNotEmpty) doc = q.docs.first;
+      }
+      if (!doc.exists && code.isNotEmpty) {
+        var q2 = await collegeRef.collection('tas').where('id', isEqualTo: code).get();
+        if (q2.docs.isNotEmpty) doc = q2.docs.first;
+      }
+      if (doc.exists && doc.data() != null) {
+        currentDoctor = Map<String, dynamic>.from(doc.data() as Map);
+        currentDoctor!['uid'] = doc.id;
+        userRole = 'ta';
+        return 'ta';
       }
     } catch (_) {}
 
@@ -296,10 +419,14 @@ class DataService extends ChangeNotifier {
     for (var c in adminColls) {
       try {
         var doc = await collegeRef.collection(c).doc(uid).get();
+        if (!doc.exists && userEmail != null) {
+          var q = await collegeRef.collection(c).where('email', isEqualTo: userEmail).get();
+          if (q.docs.isNotEmpty) doc = q.docs.first;
+        }
         if (doc.exists && doc.data() != null) {
           var data = Map<String, dynamic>.from(doc.data() as Map);
           currentAdmin = data;
-          currentAdmin!['uid'] = uid;
+          currentAdmin!['uid'] = doc.id;
           userRole = data['role'] ?? (c.contains('manager') ? 'manager' : 'super_admin');
           return userRole;
         }
@@ -325,6 +452,7 @@ class DataService extends ChangeNotifier {
   CollectionReference get notificationsColl => _firestore.collection('notifications');
 
   CollectionReference get commerceDoctorsColl => instituteRef.collection('doctors');
+  CollectionReference get commerceTasColl => instituteRef.collection('tas');
   CollectionReference get commerceManagersColl => instituteRef.collection('managers');
   CollectionReference get commerceSuperAdminsColl => instituteRef.collection('super_admins');
   CollectionReference get commerceLevelsColl => instituteRef.collection('levels');
@@ -339,16 +467,16 @@ class DataService extends ChangeNotifier {
   Future<void> deleteLevel(String id) async { await commerceLevelsColl.doc(id).delete(); notifyListeners(); }
   Future<void> addSection(String levelId, String name) async { String sid = _firestore.collection('tmp').doc().id; await getCommerceSectionsColl(levelId).doc(sid).set({'id': sid, 'name': name, 'isActive': true, 'createdAt': FieldValue.serverTimestamp()}); notifyListeners(); }
 
-  Future<void> addStudentManual(String levelId, String studentCode, String name, String emailInput, String division, String password) async {
+  Future<void> addStudentManual(String levelId, String studentCode, String name, String emailInput, String division, String password, {bool notify = true}) async {
     try {
       if (selectedInstituteId == null) throw "Please select institute first";
 
       String email = _formatEmail(studentCode);
       String finalPass = password.trim().isEmpty ? "123456" : password.trim();
-      String uid = await _secureCreateUser(email, finalPass);
+      String uid = "STD_${studentCode.trim()}";
 
       Map<String, dynamic> studentData = {
-        'uid': uid, 'name': name, 'id': studentCode, 'email': email,
+        'uid': uid, 'name': name, 'id': studentCode.trim(), 'email': email,
         'level': levelId.replaceAll('level_', ''), 'division': division,
         'password': hashPassword(finalPass), 'createdAt': FieldValue.serverTimestamp(),
         'instituteId': selectedInstituteId
@@ -357,7 +485,7 @@ class DataService extends ChangeNotifier {
       await studentsColl.doc(uid).set(studentData);
       await getCommerceStudentsColl(levelId).doc(uid).set(studentData);
 
-      notifyListeners();
+      if (notify) notifyListeners();
     } catch (e) {
       debugPrint("Add student error: $e");
       rethrow;
@@ -371,6 +499,13 @@ class DataService extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> addTA(String id, String name, String emailInput, List<String> teachingLevels, List<String> subjects, [String? password]) async {
+    String email = _formatEmail(id);
+    String uid = await _secureCreateUser(email, password ?? "123456");
+    await commerceTasColl.doc(uid).set({'uid': uid, 'id': id, 'name': name, 'email': email, 'teachingLevels': teachingLevels, 'subjects': subjects, 'isActive': true, 'role': 'ta', 'password': hashPassword(password ?? "123456"), 'instituteId': selectedInstituteId});
+    notifyListeners();
+  }
+
   Future<void> addManager(String name, String emailInput, String password, {List<String> managedLevels = const []}) async {
     String email = _formatEmail(emailInput);
     String uid = await _secureCreateUser(email, password);
@@ -378,7 +513,7 @@ class DataService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> addCourseToLevel(String levelId, String name, String division, String semesterId, String doctorId, {int lecturesCount = 12}) async {
+  Future<void> addCourseToLevel(String levelId, String name, String division, String semesterId, String doctorId, {int lecturesCount = 12, String? taId}) async {
     String cid = _firestore.collection('tmp').doc().id;
     await getCommerceCoursesColl(levelId).doc(cid).set({
       'id': cid,
@@ -386,6 +521,7 @@ class DataService extends ChangeNotifier {
       'division': division,
       'semester_id': semesterId,
       'doctor_id': doctorId,
+      'ta_id': taId,
       'level_id': levelId,
       'lecturesCount': lecturesCount,
       'createdAt': FieldValue.serverTimestamp(),
@@ -424,7 +560,49 @@ class DataService extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> deleteAllStudents() async {
+    try {
+      var groupSnap = await _firestore.collectionGroup('students').get();
+      var batch = _firestore.batch();
+      int count = 0;
+      for (var doc in groupSnap.docs) {
+        batch.delete(doc.reference);
+        count++;
+        if (count % 400 == 0) {
+          await batch.commit();
+          batch = _firestore.batch();
+        }
+      }
+      await batch.commit();
+
+      var colleges = await _firestore.collection('colleges').get();
+      for (var colDoc in colleges.docs) {
+        var rootSnap = await colDoc.reference.collection('students').get();
+        var b2 = _firestore.batch();
+        for (var rd in rootSnap.docs) {
+          b2.delete(rd.reference);
+        }
+        await b2.commit();
+
+        var levels = await colDoc.reference.collection('levels').get();
+        for (var lvl in levels.docs) {
+          var lvlSnap = await lvl.reference.collection('students').get();
+          var b3 = _firestore.batch();
+          for (var ld in lvlSnap.docs) {
+            b3.delete(ld.reference);
+          }
+          await b3.commit();
+        }
+      }
+      notifyListeners();
+    } catch (e) {
+      debugPrint("Delete all students error: $e");
+      rethrow;
+    }
+  }
+
   Future<void> deleteDoctor(String uid) async { await commerceDoctorsColl.doc(uid).delete(); notifyListeners(); }
+  Future<void> deleteTA(String uid) async { await commerceTasColl.doc(uid).delete(); notifyListeners(); }
   Future<void> deleteManager(String uid) async { await commerceManagersColl.doc(uid).delete(); notifyListeners(); }
 
   Future<void> clearAllNotifications(String type) async {
@@ -443,9 +621,29 @@ class DataService extends ChangeNotifier {
     required int lectureNumber,
     required String division,
     String? studentLocation,
+    String sessionType = 'lecture',
   }) async {
     if (currentStudent == null) throw "يجب تسجيل الدخول كطالب أولاً";
     String sId = currentStudent!['id'].toString();
+
+    // 1. تحديد تلقائي لنوع الجلسة (محاضرة أم سكشن) بناءً على إسناد المادة في الكلية
+    String resolvedSessionType = sessionType;
+    try {
+      String cleanLvl = level.replaceAll('level_', '');
+      var coursesSnap = await getCommerceCoursesColl("level_$cleanLvl")
+          .where('name', isEqualTo: subject.trim())
+          .get();
+      if (coursesSnap.docs.isNotEmpty) {
+        var courseData = coursesSnap.docs.first.data() as Map<String, dynamic>;
+        if (courseData['ta_id'] != null && courseData['ta_id'].toString().isNotEmpty) {
+          resolvedSessionType = 'section';
+        } else {
+          resolvedSessionType = 'lecture';
+        }
+      }
+    } catch (e) {
+      debugPrint("Error resolving sessionType from course: $e");
+    }
 
     var existing = await attendanceColl
         .where('studentId', isEqualTo: sId)
@@ -453,8 +651,16 @@ class DataService extends ChangeNotifier {
         .where('lectureNumber', isEqualTo: lectureNumber.toString())
         .get();
 
-    if (existing.docs.isNotEmpty) {
-      throw translate('already_recorded');
+    var docs = existing.docs.where((d) {
+      var data = d.data() as Map<String, dynamic>;
+      String st = data['sessionType']?.toString() ?? 'lecture';
+      return st == resolvedSessionType;
+    }).toList();
+
+    if (docs.isNotEmpty) {
+      throw resolvedSessionType == 'section'
+          ? (isArabic ? "لقد قمت بتسجيل الحضور مسبقاً لهذا السكشن" : "You have already recorded attendance for this section")
+          : translate('already_recorded');
     }
 
     await attendanceColl.add({
@@ -464,13 +670,21 @@ class DataService extends ChangeNotifier {
       'level': level.trim(),
       'division': division,
       'lectureNumber': lectureNumber.toString(),
+      'sessionType': resolvedSessionType,
       'time': FieldValue.serverTimestamp(),
       'gps': studentLocation,
       'instituteId': selectedInstituteId
     });
   }
 
-  Future<void> manualRecordAttendance({required String studentId, required String studentName, required String subject, required String level, required String lectureNumber}) async {
+  Future<void> manualRecordAttendance({
+    required String studentId, 
+    required String studentName, 
+    required String subject, 
+    required String level, 
+    required String lectureNumber,
+    String sessionType = 'lecture',
+  }) async {
     // تنظيف البيانات قبل الحفظ لضمان النجاح
     String cleanSub = subject.trim();
     String cleanLvl = level.replaceAll('level_', '').trim();
@@ -480,6 +694,7 @@ class DataService extends ChangeNotifier {
       'studentName': studentName.trim(), 
       'subject': cleanSub, 
       'lectureNumber': lectureNumber.trim(), 
+      'sessionType': sessionType,
       'level': cleanLvl, 
       'time': FieldValue.serverTimestamp(), 
       'instituteId': selectedInstituteId, 
@@ -487,19 +702,36 @@ class DataService extends ChangeNotifier {
     });
   }
 
-  Future<void> deleteAttendanceRecord(String sub, String sId, String lNum) async {
+  Future<void> deleteAttendanceRecord(String sub, String sId, String lNum, {String sessionType = 'lecture'}) async {
     var q = await attendanceColl.where('subject', isEqualTo: sub.trim()).where('studentId', isEqualTo: sId.trim()).where('lectureNumber', isEqualTo: lNum.trim()).get();
-    for (var d in q.docs) { await d.reference.delete(); }
+    for (var d in q.docs) {
+      var data = d.data() as Map<String, dynamic>;
+      String st = data['sessionType']?.toString() ?? 'lecture';
+      if (st == sessionType) {
+        await d.reference.delete();
+      }
+    }
   }
 
   Future<void> uploadResearchToRemote({required String subject, required PlatformFile file, String title = ''}) async {
     if (currentStudent == null) throw "Action not allowed";
     String studentId = currentStudent!['id'].toString();
     String studentName = currentStudent!['name'] ?? '';
-    
+
+    String? doctorId;
+    try {
+      String studentLvl = currentStudent?['level']?.toString() ?? '1';
+      var coursesSnap = await getCommerceCoursesColl("level_$studentLvl")
+          .where('name', isEqualTo: subject.trim())
+          .get();
+      if (coursesSnap.docs.isNotEmpty) {
+        doctorId = (coursesSnap.docs.first.data() as Map<String, dynamic>)['doctor_id']?.toString();
+      }
+    } catch (_) {}
+
     try {
       String fileName = 'research_${studentId}_${DateTime.now().millisecondsSinceEpoch}.pdf';
-      
+
       if (kIsWeb) {
         await supabase.storage.from('research-pdfs').uploadBinary(fileName, file.bytes!);
       } else {
@@ -512,6 +744,7 @@ class DataService extends ChangeNotifier {
         'studentId': studentId, 
         'studentName': studentName, 
         'subject': subject, 
+        'doctorId': doctorId,
         'fileName': file.name, 
         'fileUrl': publicUrl, 
         'title': title, 
@@ -527,12 +760,13 @@ class DataService extends ChangeNotifier {
         'title': isArabic ? 'بحث جديد مرفوع' : 'New Research Uploaded',
         'body': isArabic ? 'قام الطالب $studentName برفع بحث في مادة $subject' : 'Student $studentName uploaded a research in $subject',
         'targetType': 'doctor',
+        'targetDoctorId': doctorId,
         'subject': subject,
         'timestamp': FieldValue.serverTimestamp(),
         'instituteId': selectedInstituteId,
         'isRead': false,
       });
-      
+
       debugPrint("✅ Research uploaded & Doctor notified");
     } catch (e) {
       debugPrint("❌ Error uploading research: $e");
@@ -865,12 +1099,12 @@ class DataService extends ChangeNotifier {
   }
 
   String normalizeLevel(String lvl) {
-    String n = normalize(lvl);
+    String n = normalize(lvl.toLowerCase().replaceAll('level_', ''));
     if (n.contains('اول') || n == '1') return '1';
-    if (n.contains('ثاني') || n == '2') return '2';
+    if (n.contains('ثان') || n == '2') return '2';
     if (n.contains('ثالث') || n == '3') return '3';
     if (n.contains('رابع') || n == '4') return '4';
-    return lvl;
+    return n;
   }
 
   List<String> get allSubjects => studentSubjects;
@@ -996,6 +1230,7 @@ class DataService extends ChangeNotifier {
     }
 
     currentDoctor!.addAll(updateData);
+    if (photoUrl == "") currentDoctor!['photoUrl'] = "";
     notifyListeners();
   }
 
@@ -1016,6 +1251,7 @@ class DataService extends ChangeNotifier {
     }
 
     currentStudent!.addAll(updateData);
+    if (photoUrl == "") currentStudent!['photoUrl'] = "";
 
     try {
       String sId = (currentStudent!['id'] ?? '').toString().trim();
@@ -1064,72 +1300,57 @@ class DataService extends ChangeNotifier {
 
   Future<String?> uploadAvatarFile(PlatformFile file) async {
     try {
-      if (kIsWeb && file.bytes != null) {
-        bool isIOSWeb = false;
-        try {
-          final ua = html.window.navigator.userAgent.toLowerCase();
-          if (ua.contains('iphone') || ua.contains('ipad') || ua.contains('ipod') || (ua.contains('macintosh') && (html.window.navigator.maxTouchPoints ?? 0) > 0)) {
-            isIOSWeb = true;
-          }
-        } catch (_) {}
+      Uint8List? bytes = file.bytes;
+      if (bytes == null && file.path != null) {
+        io.File f = io.File(file.path!);
+        bytes = await f.readAsBytes();
+      }
+      if (bytes == null) return null;
 
-        if (!isIOSWeb) {
-          try {
-            final blob = html.Blob([file.bytes!]);
-            final url = html.Url.createObjectUrlFromBlob(blob);
-            final img = html.ImageElement();
-            final completer = Completer<void>();
+      final codec = await ui.instantiateImageCodec(bytes, targetWidth: 300, targetHeight: 300);
+      final frame = await codec.getNextFrame();
+      final image = frame.image;
 
-            img.onLoad.listen((_) {
-              if (!completer.isCompleted) completer.complete();
-            });
-            img.onError.listen((_) {
-              if (!completer.isCompleted) completer.complete();
-            });
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder);
+      final paint = Paint()..isAntiAlias = true;
 
-            img.src = url;
-            if ((img.complete == true) && !completer.isCompleted) {
-              completer.complete();
-            }
+      double size = 300.0;
+      double imgW = image.width.toDouble();
+      double imgH = image.height.toDouble();
 
-            await completer.future.timeout(const Duration(milliseconds: 800), onTimeout: () {});
-            html.Url.revokeObjectUrl(url);
-
-            if ((img.naturalWidth ?? 0) > 0 && (img.naturalHeight ?? 0) > 0) {
-              final canvas = html.CanvasElement(width: 200, height: 200);
-              final ctx = canvas.context2D;
-              ctx.drawImageScaled(img, 0, 0, 200, 200);
-              final dataUrl = canvas.toDataUrl('image/jpeg', 0.7);
-              if (dataUrl.length > 50) {
-                return dataUrl;
-              }
-            }
-          } catch (e) {
-            debugPrint("Web fast compress error: $e");
-          }
-        }
-
-        String base64Str = base64Encode(file.bytes!);
-        String ext = file.extension?.toLowerCase() ?? 'jpeg';
-        if (ext == 'jpg') ext = 'jpeg';
-        return 'data:image/$ext;base64,$base64Str';
+      Rect srcRect;
+      if (imgW > imgH) {
+        double diff = (imgW - imgH) / 2;
+        srcRect = Rect.fromLTWH(diff, 0, imgH, imgH);
+      } else if (imgH > imgW) {
+        double diff = (imgH - imgW) / 2;
+        srcRect = Rect.fromLTWH(0, diff, imgW, imgW);
       } else {
-        if (file.bytes != null) {
-          String base64Str = base64Encode(file.bytes!);
-          String ext = file.extension?.toLowerCase() ?? 'jpeg';
-          if (ext == 'jpg') ext = 'jpeg';
-          return 'data:image/$ext;base64,$base64Str';
-        } else if (file.path != null) {
-          io.File f = io.File(file.path!);
-          List<int> bytes = await f.readAsBytes();
-          String base64Str = base64Encode(bytes);
-          return 'data:image/jpeg;base64,$base64Str';
-        }
+        srcRect = Rect.fromLTWH(0, 0, imgW, imgH);
       }
 
-      return null;
+      Rect dstRect = Rect.fromLTWH(0, 0, size, size);
+      canvas.drawImageRect(image, srcRect, dstRect, paint);
+
+      final picture = recorder.endRecording();
+      final img = await picture.toImage(size.toInt(), size.toInt());
+      final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
+      
+      if (byteData != null) {
+        final pngBytes = byteData.buffer.asUint8List();
+        String base64Str = base64Encode(pngBytes);
+        return 'data:image/png;base64,$base64Str';
+      }
+
+      String ext = file.extension?.toLowerCase() ?? 'jpeg';
+      if (ext == 'jpg') ext = 'jpeg';
+      return 'data:image/$ext;base64,${base64Encode(bytes)}';
     } catch (e) {
       debugPrint("Convert avatar error: $e");
+      if (file.bytes != null) {
+        return 'data:image/jpeg;base64,${base64Encode(file.bytes!)}';
+      }
       return null;
     }
   }

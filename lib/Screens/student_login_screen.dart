@@ -298,9 +298,7 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
             await prefs.setBool('saved_remember_me', false);
           }
 
-          String email = "$studentId@smart.edu";
-
-          bool success = await _ds.loginStudent(email, password);
+          bool success = await _ds.loginStudent(studentId, password);
           if (mounted) {
             setState(() => _isLoading = false);
             if (success) {

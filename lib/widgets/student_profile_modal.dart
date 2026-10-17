@@ -27,37 +27,47 @@ void showRichStudentProfileModal({
     );
 
     try {
-      var docSnap = await ds.studentsColl.doc(studentIdOrUid.trim()).get();
-      if (docSnap.exists && docSnap.data() != null) {
-        studentData = docSnap.data() as Map<String, dynamic>;
-      }
+      String cleanId = studentIdOrUid.trim();
+      Map<String, dynamic> mergedData = {};
 
-      if (studentData == null) {
-        var snap = await ds.studentsColl.where('id', isEqualTo: studentIdOrUid.trim()).get();
-        if (snap.docs.isEmpty && int.tryParse(studentIdOrUid.trim()) != null) {
-          snap = await ds.studentsColl.where('id', isEqualTo: int.tryParse(studentIdOrUid.trim())).get();
+      try {
+        var doc = await ds.studentsColl.doc(cleanId).get();
+        if (doc.exists && doc.data() != null) {
+          mergedData.addAll(doc.data() as Map<String, dynamic>);
         }
-        if (snap.docs.isEmpty) {
-          snap = await ds.studentsColl.where('uid', isEqualTo: studentIdOrUid.trim()).get();
-        }
-        if (snap.docs.isNotEmpty) {
-          studentData = snap.docs.first.data() as Map<String, dynamic>;
-        }
-      }
+      } catch (_) {}
 
-      if (studentData == null) {
-        var allSnap = await ds.studentsColl.get();
-        for (var d in allSnap.docs) {
-          var data = d.data() as Map<String, dynamic>;
-          String sId = (data['id'] ?? '').toString().trim();
-          String sUid = (data['uid'] ?? '').toString().trim();
-          String sName = (data['name'] ?? '').toString().trim();
+      try {
+        var doc2 = await ds.studentsColl.doc("STD_$cleanId").get();
+        if (doc2.exists && doc2.data() != null) {
+          mergedData.addAll(doc2.data() as Map<String, dynamic>);
+        }
+      } catch (_) {}
 
-          if (sId == studentIdOrUid.trim() || sUid == studentIdOrUid.trim() || (studentName != null && sName == studentName.trim())) {
-            studentData = data;
-            break;
+      try {
+        var q = await FirebaseFirestore.instance.collectionGroup('students').where('uid', isEqualTo: cleanId).get();
+        if (q.docs.isEmpty) {
+          q = await FirebaseFirestore.instance.collectionGroup('students').where('id', isEqualTo: cleanId).get();
+        }
+        if (q.docs.isEmpty && int.tryParse(cleanId) != null) {
+          q = await FirebaseFirestore.instance.collectionGroup('students').where('id', isEqualTo: int.tryParse(cleanId)).get();
+        }
+        for (var doc in q.docs) {
+          mergedData.addAll(doc.data() as Map<String, dynamic>);
+        }
+      } catch (_) {}
+
+      if (mergedData.isEmpty && studentName != null) {
+        try {
+          var q = await FirebaseFirestore.instance.collectionGroup('students').where('name', isEqualTo: studentName.trim()).get();
+          for (var doc in q.docs) {
+            mergedData.addAll(doc.data() as Map<String, dynamic>);
           }
-        }
+        } catch (_) {}
+      }
+
+      if (mergedData.isNotEmpty) {
+        studentData = mergedData;
       }
     } catch (e) {
       debugPrint("Fetch student error: $e");
@@ -121,11 +131,31 @@ void showRichStudentProfileModal({
               const SizedBox(height: 20),
 
               // الصورة والاسم
-              CircleAvatar(
-                radius: 45,
-                backgroundColor: primaryColor.withAlpha(30),
-                backgroundImage: ds.getAvatarImageProvider(photoUrl),
-                child: (photoUrl ?? '').toString().isEmpty ? Icon(Icons.person, size: 50, color: primaryColor) : null,
+              GestureDetector(
+                onTap: () => showFullScreenImageViewer(context, photoUrl, name),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    CircleAvatar(
+                      radius: 50,
+                      backgroundColor: primaryColor.withAlpha(30),
+                      backgroundImage: ds.getAvatarImageProvider(photoUrl),
+                      child: (photoUrl ?? '').toString().isEmpty
+                          ? Text(name.isNotEmpty ? name[0] : 'ط', style: TextStyle(fontWeight: FontWeight.bold, color: primaryColor, fontSize: 32))
+                          : null,
+                    ),
+                    if ((photoUrl ?? '').toString().isNotEmpty)
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: CircleAvatar(
+                          radius: 15,
+                          backgroundColor: primaryColor,
+                          child: const Icon(Icons.zoom_in_rounded, size: 16, color: Colors.white),
+                        ),
+                      ),
+                  ],
+                ),
               ),
               const SizedBox(height: 15),
               Text(name, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87), textAlign: TextAlign.center),
@@ -178,6 +208,7 @@ void showRichStudentProfileModal({
                               otherUserId: uid,
                               otherUserName: name,
                               otherUserRole: 'student',
+                              otherUserPhotoUrl: photoUrl,
                             ),
                           ),
                         );
@@ -207,6 +238,56 @@ Widget _detailRow(IconData icon, String label, String value, bool isDark) {
         const Spacer(),
         Text(value, style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87)),
       ],
+    ),
+  );
+}
+
+void showFullScreenImageViewer(BuildContext context, String? photoUrl, String title) {
+  if (photoUrl == null || photoUrl.isEmpty) return;
+  final ds = DataService();
+
+  showDialog(
+    context: context,
+    builder: (ctx) => Dialog(
+      backgroundColor: Colors.black,
+      insetPadding: EdgeInsets.zero,
+      child: Stack(
+        children: [
+          Center(
+            child: InteractiveViewer(
+              boundaryMargin: const EdgeInsets.all(40),
+              minScale: 0.5,
+              maxScale: 6.0,
+              child: Image(
+                image: ds.getAvatarImageProvider(photoUrl) ?? const NetworkImage(''),
+                fit: BoxFit.contain,
+              ),
+            ),
+          ),
+          Positioned(
+            top: 40,
+            left: 20,
+            child: IconButton(
+              icon: const Icon(Icons.close_rounded, color: Colors.white, size: 30),
+              onPressed: () => Navigator.pop(ctx),
+            ),
+          ),
+          Positioned(
+            bottom: 30,
+            left: 0,
+            right: 0,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              color: Colors.black54,
+              child: Text(
+                title,
+                style: GoogleFonts.cairo(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+        ],
+      ),
     ),
   );
 }

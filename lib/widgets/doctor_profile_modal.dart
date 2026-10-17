@@ -8,6 +8,7 @@ void showRichDoctorProfileModal({
   required BuildContext context,
   required String doctorUidOrEmail,
   String? doctorName,
+  Map<String, dynamic>? initialDoctorData,
 }) async {
   final ds = DataService();
   bool isAr = ds.isArabic;
@@ -15,47 +16,50 @@ void showRichDoctorProfileModal({
   Color primaryColor = isDark ? const Color(0xFF03DAC6) : const Color(0xFF673AB7);
   bool isStudentViewer = ds.userRole == 'student';
 
-  // Show loading indicator
-  showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (ctx) => const Center(child: CircularProgressIndicator()),
-  );
+  Map<String, dynamic>? doctorData = initialDoctorData;
 
-  Map<String, dynamic>? doctorData;
-  try {
-    var docSnap = await ds.commerceDoctorsColl.doc(doctorUidOrEmail.trim()).get();
-    if (docSnap.exists && docSnap.data() != null) {
-      doctorData = docSnap.data() as Map<String, dynamic>;
-    }
+  if (doctorData == null) {
+    // Show loading indicator
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(child: CircularProgressIndicator()),
+    );
 
-    if (doctorData == null) {
-      var snap = await ds.commerceDoctorsColl.where('email', isEqualTo: doctorUidOrEmail.trim()).get();
-      if (snap.docs.isEmpty) {
-        snap = await ds.commerceDoctorsColl.where('uid', isEqualTo: doctorUidOrEmail.trim()).get();
+    try {
+      var docSnap = await ds.commerceDoctorsColl.doc(doctorUidOrEmail.trim()).get();
+      if (docSnap.exists && docSnap.data() != null) {
+        doctorData = docSnap.data() as Map<String, dynamic>;
       }
-      if (snap.docs.isNotEmpty) {
-        doctorData = snap.docs.first.data() as Map<String, dynamic>;
-      }
-    }
 
-    if (doctorData == null) {
-      var allSnap = await ds.commerceDoctorsColl.get();
-      for (var d in allSnap.docs) {
-        var data = d.data() as Map<String, dynamic>;
-        String dName = (data['name'] ?? '').toString().trim();
-        if (doctorName != null && dName == doctorName.trim()) {
-          doctorData = data;
-          break;
+      if (doctorData == null) {
+        var snap = await ds.commerceDoctorsColl.where('email', isEqualTo: doctorUidOrEmail.trim()).get();
+        if (snap.docs.isEmpty) {
+          snap = await ds.commerceDoctorsColl.where('uid', isEqualTo: doctorUidOrEmail.trim()).get();
+        }
+        if (snap.docs.isNotEmpty) {
+          doctorData = snap.docs.first.data() as Map<String, dynamic>;
         }
       }
-    }
-  } catch (e) {
-    debugPrint("Fetch doctor error: $e");
-  }
 
-  if (context.mounted) {
-    Navigator.pop(context); // Close loading dialog
+      if (doctorData == null) {
+        var allSnap = await ds.commerceDoctorsColl.get();
+        for (var d in allSnap.docs) {
+          var data = d.data() as Map<String, dynamic>;
+          String dName = (data['name'] ?? '').toString().trim();
+          if (doctorName != null && dName == doctorName.trim()) {
+            doctorData = data;
+            break;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Fetch doctor error: $e");
+    }
+
+    if (context.mounted) {
+      Navigator.pop(context); // Close loading dialog
+    }
   }
 
   if (doctorData == null) {

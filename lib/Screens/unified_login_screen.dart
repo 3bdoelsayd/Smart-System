@@ -93,7 +93,8 @@ class _UnifiedLoginScreenState extends State<UnifiedLoginScreen> with SingleTick
       switch (role) {
         case 'super_admin': Navigator.pushReplacementNamed(context, '/super-admin/dashboard'); break;
         case 'manager': Navigator.pushReplacementNamed(context, '/manager/dashboard'); break;
-        case 'doctor': Navigator.pushReplacementNamed(context, '/doctor/home'); break;
+        case 'doctor': 
+        case 'ta': Navigator.pushReplacementNamed(context, '/doctor/home'); break;
         case 'student': Navigator.pushReplacementNamed(context, '/student/home'); break;
         default: _showSnackBar(_ds.isArabic ? 'لم يتم العثور على المستخدم' : 'User not found', isError: true);
       }

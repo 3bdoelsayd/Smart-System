@@ -1,18 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../services/data_service.dart';
+import '../widgets/doctor_profile_modal.dart';
+import '../widgets/student_profile_modal.dart';
 
 class PrivateChatScreen extends StatefulWidget {
   final String otherUserId;
   final String otherUserName;
   final String otherUserRole;
+  final String? otherUserPhotoUrl;
 
   const PrivateChatScreen({
     super.key,
     required this.otherUserId,
     required this.otherUserName,
     required this.otherUserRole,
+    this.otherUserPhotoUrl,
   });
 
   @override
@@ -28,16 +31,24 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
   String get _currentUserId {
     if (_ds.userRole == 'student') {
       return _ds.currentStudent?['uid'] ?? _ds.currentStudent?['id'] ?? '';
-    } else {
+    } else if (_ds.userRole == 'doctor') {
       return _ds.currentDoctor?['uid'] ?? _ds.currentDoctor?['id'] ?? '';
+    } else if (_ds.userRole == 'manager' || _ds.userRole == 'super_admin') {
+      return _ds.currentAdmin?['uid'] ?? _ds.currentAdmin?['id'] ?? 'ADMIN';
+    } else {
+      return _ds.currentStudent?['uid'] ?? _ds.currentDoctor?['uid'] ?? '';
     }
   }
 
   String get _currentUserName {
     if (_ds.userRole == 'student') {
       return _ds.currentStudent?['name'] ?? 'طالب';
-    } else {
+    } else if (_ds.userRole == 'doctor') {
       return _ds.currentDoctor?['name'] ?? 'دكتور';
+    } else if (_ds.userRole == 'manager' || _ds.userRole == 'super_admin') {
+      return _ds.currentAdmin?['name'] ?? 'إدارة الكلية';
+    } else {
+      return 'مستخدم';
     }
   }
 
@@ -97,21 +108,54 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
       child: Scaffold(
         backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF8F9FE),
         appBar: AppBar(
-          title: Row(
-            children: [
-              CircleAvatar(
-                backgroundColor: Colors.white24,
-                child: Text(widget.otherUserName.isNotEmpty ? widget.otherUserName[0] : 'U', style: const TextStyle(color: Colors.white)),
-              ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          title: InkWell(
+            onTap: () {
+              if (widget.otherUserRole == 'doctor') {
+                showRichDoctorProfileModal(
+                  context: context,
+                  doctorUidOrEmail: widget.otherUserId,
+                  doctorName: widget.otherUserName,
+                  initialDoctorData: widget.otherUserPhotoUrl != null ? {'photoUrl': widget.otherUserPhotoUrl} : null,
+                );
+              } else {
+                showRichStudentProfileModal(
+                  context: context,
+                  studentIdOrUid: widget.otherUserId,
+                  studentName: widget.otherUserName,
+                  initialStudentData: widget.otherUserPhotoUrl != null ? {'photoUrl': widget.otherUserPhotoUrl} : null,
+                );
+              }
+            },
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+              child: Row(
                 children: [
-                  Text(widget.otherUserName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                  Text(widget.otherUserRole == 'student' ? (isAr ? 'طالب' : 'Student') : (isAr ? 'عضو هيئة تدريس' : 'Doctor'), style: const TextStyle(fontSize: 11, color: Colors.white70)),
+                  GestureDetector(
+                    onTap: () {
+                      if ((widget.otherUserPhotoUrl ?? '').isNotEmpty) {
+                        showFullScreenImageViewer(context, widget.otherUserPhotoUrl, widget.otherUserName);
+                      }
+                    },
+                    child: CircleAvatar(
+                      backgroundColor: Colors.white24,
+                      backgroundImage: _ds.getAvatarImageProvider(widget.otherUserPhotoUrl),
+                      child: (widget.otherUserPhotoUrl ?? '').toString().isEmpty
+                          ? Text(widget.otherUserName.isNotEmpty ? widget.otherUserName[0] : 'U', style: const TextStyle(color: Colors.white))
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(widget.otherUserName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      Text(widget.otherUserRole == 'student' ? (isAr ? 'طالب' : 'Student') : (isAr ? 'عضو هيئة تدريس' : 'Doctor'), style: const TextStyle(fontSize: 11, color: Colors.white70)),
+                    ],
+                  ),
                 ],
               ),
-            ],
+            ),
           ),
           backgroundColor: isDark ? const Color(0xFF1A1A1A) : primaryColor,
           foregroundColor: Colors.white,

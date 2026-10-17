@@ -108,8 +108,10 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
   }
 
   Widget _buildSubjectSelection(Color color, bool isDark) {
-    final doctorId = _ds.currentDoctor?['uid'] ?? '';
-    final teachingLevels = List<String>.from(_ds.currentDoctor?['teachingLevels'] ?? []);
+    final doctorUid = _ds.currentDoctor?['uid'] ?? '';
+    final doctorId = _ds.currentDoctor?['id'] ?? '';
+    final doctorSubjects = List<String>.from(_ds.currentDoctor?['subjects'] ?? []);
+    final teachingLevels = List<String>.from(_ds.currentDoctor?['teachingLevels'] ?? ['level_1', 'level_2', 'level_3', 'level_4']);
 
     if (teachingLevels.isEmpty) {
       return Center(child: Padding(padding: const EdgeInsets.all(40), child: Text(_ds.isArabic ? "لم يتم إسناد فرق دراسية لك بعد" : "No levels assigned")));
@@ -118,13 +120,22 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
     return StreamBuilder<List<QuerySnapshot>>(
       stream: Stream.fromFuture(Future.wait(
         teachingLevels.map((lvlId) => 
-          _ds.getCommerceCoursesColl(lvlId).where('doctor_id', isEqualTo: doctorId).get()
+          _ds.getCommerceCoursesColl(lvlId.startsWith('level_') ? lvlId : 'level_$lvlId').get()
         )
       )),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
         
-        final allDocs = snapshot.data?.expand((qs) => qs.docs).toList() ?? [];
+        final allDocs = snapshot.data?.expand((qs) => qs.docs).where((doc) {
+          final d = doc.data() as Map<String, dynamic>;
+          final docDoctorId = d['doctor_id']?.toString() ?? '';
+          final docName = d['name']?.toString().trim() ?? '';
+          
+          bool isMyDoctorId = (docDoctorId.isNotEmpty && (docDoctorId == doctorUid || docDoctorId == doctorId));
+          bool isMySubject = doctorSubjects.any((s) => s.trim().toLowerCase() == docName.toLowerCase());
+          
+          return isMyDoctorId || isMySubject;
+        }).toList() ?? [];
         
         if (allDocs.isEmpty) {
           return Center(child: Padding(padding: const EdgeInsets.all(40), child: Text(_ds.translate('no_subjects_assigned'))));
@@ -196,6 +207,9 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
 
   Widget _buildSubmissionsList(String subject, Color color, bool isDark) {
     bool isAr = _ds.isArabic;
+    final doctorUid = _ds.currentDoctor?['uid'] ?? '';
+    final doctorId = _ds.currentDoctor?['id'] ?? '';
+
     return StreamBuilder<QuerySnapshot>(
       stream: _ds.submissionsColl
           .where('subject', isEqualTo: subject)
@@ -204,9 +218,18 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
         var docs = snapshot.data!.docs;
         
-        if (docs.isEmpty) return Center(child: Text(isAr ? 'لا توجد أبحاث مرفوعة لهذه المادة' : 'No submissions', style: TextStyle(color: isDark ? Colors.white38 : Colors.grey)));
+        var filteredSubmissions = docs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          final docDocId = data['doctorId']?.toString();
+          if (docDocId != null && docDocId.isNotEmpty) {
+            return docDocId == doctorUid || docDocId == doctorId;
+          }
+          return true;
+        }).toList();
 
-        List<QueryDocumentSnapshot> submissions = docs;
+        if (filteredSubmissions.isEmpty) return Center(child: Text(isAr ? 'لا توجد أبحاث مرفوعة لهذه المادة' : 'No submissions', style: TextStyle(color: isDark ? Colors.white38 : Colors.grey)));
+
+        List<QueryDocumentSnapshot> submissions = filteredSubmissions;
 
         if (_searchQuery.isNotEmpty) {
           String q = _normalizeArabic(_searchQuery);

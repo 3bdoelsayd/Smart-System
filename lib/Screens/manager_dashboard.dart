@@ -4,6 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../services/data_service.dart';
 import '../utils/excel_helper.dart';
 import '../widgets/app_drawer.dart';
+import '../widgets/doctor_profile_modal.dart';
+import '../widgets/student_profile_modal.dart';
 
 class ManagerDashboard extends StatefulWidget {
   const ManagerDashboard({super.key});
@@ -28,7 +30,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
     super.initState();
     _managedLevels = List<String>.from(_ds.currentAdmin?['managedLevels'] ?? []);
     _selectedLevel = _managedLevels.isNotEmpty ? _managedLevels.first : null;
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 6, vsync: this);
     _tabController.addListener(() {
       if (_tabController.indexIsChanging) {
         setState(() {
@@ -42,6 +44,13 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
 
   @override
   Widget build(BuildContext context) {
+    if (_ds.userRole != 'manager' || _ds.currentAdmin == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.pushNamedAndRemoveUntil(context, '/start', (r) => false);
+      });
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     return ListenableBuilder(
       listenable: _ds,
       builder: (context, _) {
@@ -118,6 +127,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
                     Tab(text: 'الطلاب'),
                     Tab(text: 'المواد'),
                     Tab(text: 'الدكاترة'),
+                    Tab(text: 'المعيدين'),
                     Tab(text: 'الحضور'),
                     Tab(text: 'الفصول'),
                   ],
@@ -131,6 +141,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
               _buildStudentsTab(),
               _buildCoursesTab(),
               _buildDoctorsTab(),
+              _buildTAsTab(),
               _buildAttendanceTab(),
               _buildSemestersTab(),
             ],
@@ -169,6 +180,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
     if (_tabController.index == 0) { return _buildStudentFAB(); }
     else if (_tabController.index == 1) { label = "مادة"; action = _showAddCourseBS; }
     else if (_tabController.index == 2) { label = "دكتور"; action = _showAddDoctorBS; }
+    else if (_tabController.index == 3) { label = "معيد"; action = _showAddTABs; }
     else { return null; }
 
     return FloatingActionButton.extended(
@@ -303,21 +315,26 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
   void _showAddCourseBS() async {
     final nameC = TextEditingController(); 
     final lecturesC = TextEditingController(text: "12");
-    String? selDiv; String? selSem; String? selDoc;
+    String? selDiv; String? selSem; String? selDoc; String? selTa;
     var semSnap = await _ds.commerceSemestersColl.where('isActive', isEqualTo: true).get(); 
     var docSnap = await _ds.commerceDoctorsColl.get();
+    var taSnap = await _ds.commerceTasColl.get();
 
-    _showStyledBS(title: 'إضافة مادة ودكتور', icon: Icons.book, color: Colors.deepPurple, children: [
+    _showStyledBS(title: 'إضافة مادة ودكتور ومعيد', icon: Icons.book, color: Colors.deepPurple, children: [
       _buildInputField(nameC, 'اسم المادة', Icons.book_outlined),
-      _buildInputField(lecturesC, 'عدد المحاضرات', Icons.format_list_numbered, isNumber: true),
+      _buildInputField(lecturesC, 'عدد المحاضرات / السكاشن', Icons.format_list_numbered, isNumber: true),
       _buildDropdown('الشعبة', Icons.groups, [const DropdownMenuItem(value: 'all', child: Text('الكل')), const DropdownMenuItem(value: 'محاسبه', child: Text('محاسبه')), const DropdownMenuItem(value: 'نظم معلومات الاعمال', child: Text('نظم معلومات الاعمال'))], (v) => selDiv = v),
       _buildDropdown('الفصل الدراسي (النشط حالياً)', Icons.calendar_today, semSnap.docs.map((d) => DropdownMenuItem(value: d.id, child: Text((d.data() as Map)['name'] ?? ''))).toList(), (v) => selSem = v),
       _buildDropdown('الدكتور المسؤول', Icons.person_search, docSnap.docs.map((d) => DropdownMenuItem(value: d.id, child: Text((d.data() as Map)['name'] ?? ''))).toList(), (v) => selDoc = v),
+      _buildDropdown('المعيد المسؤول (السيكشن)', Icons.badge_outlined, [
+        const DropdownMenuItem(value: null, child: Text('بدون معيد')),
+        ...taSnap.docs.map((d) => DropdownMenuItem(value: d.id, child: Text((d.data() as Map)['name'] ?? '')))
+      ], (v) => selTa = v, value: selTa),
     ], onSave: () async {
       if (selSem != null && selDoc != null && nameC.text.isNotEmpty) {
         int count = int.tryParse(lecturesC.text) ?? 12;
-        await _ds.addCourseToLevel(_selectedLevel!, nameC.text, selDiv ?? 'all', selSem!, selDoc!, lecturesCount: count);
-        Navigator.pop(context);
+        await _ds.addCourseToLevel(_selectedLevel!, nameC.text, selDiv ?? 'all', selSem!, selDoc!, lecturesCount: count, taId: selTa);
+        if (mounted) Navigator.pop(context);
       }
     });
   }
@@ -328,8 +345,10 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
     final lecturesC = TextEditingController(text: (data['lecturesCount'] ?? 12).toString());
     String? selDiv = data['division'];
     String? selDoc = data['doctor_id'];
+    String? selTa = data['ta_id'];
     
     var docSnap = await _ds.commerceDoctorsColl.get();
+    var taSnap = await _ds.commerceTasColl.get();
 
     _showStyledBS(
       title: 'تعديل بيانات المادة', 
@@ -337,13 +356,17 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
       color: Colors.blue, 
       children: [
         _buildInputField(nameC, 'اسم المادة', Icons.book_outlined),
-        _buildInputField(lecturesC, 'عدد المحاضرات', Icons.format_list_numbered, isNumber: true),
+        _buildInputField(lecturesC, 'عدد المحاضرات / السكاشن', Icons.format_list_numbered, isNumber: true),
         _buildDropdown('الشعبة', Icons.groups, [
           const DropdownMenuItem(value: 'all', child: Text('الكل')), 
           const DropdownMenuItem(value: 'محاسبه', child: Text('محاسبه')), 
           const DropdownMenuItem(value: 'نظم معلومات الاعمال', child: Text('نظم معلومات الاعمال'))
         ], (v) => selDiv = v, value: selDiv),
         _buildDropdown('الدكتور المسؤول', Icons.person_search, docSnap.docs.map((d) => DropdownMenuItem(value: d.id, child: Text((d.data() as Map)['name'] ?? ''))).toList(), (v) => selDoc = v, value: selDoc),
+        _buildDropdown('المعيد المسؤول (السيكشن)', Icons.badge_outlined, [
+          const DropdownMenuItem(value: null, child: Text('بدون معيد')),
+          ...taSnap.docs.map((d) => DropdownMenuItem(value: d.id, child: Text((d.data() as Map)['name'] ?? '')))
+        ], (v) => selTa = v, value: selTa),
       ], 
       onSave: () async {
         if (nameC.text.isNotEmpty && selDoc != null) {
@@ -353,8 +376,9 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
             'lecturesCount': count,
             'division': selDiv ?? 'all',
             'doctor_id': selDoc,
+            'ta_id': selTa,
           });
-          Navigator.pop(context);
+          if (mounted) Navigator.pop(context);
         }
       }
     );
@@ -369,7 +393,21 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
     ], onSave: () async {
       if (idC.text.isNotEmpty && nameC.text.isNotEmpty) {
         await _ds.addDoctor(idC.text, nameC.text, "", [_selectedLevel!], [], passC.text.isEmpty ? "123456" : passC.text);
-        Navigator.pop(context);
+        if (mounted) Navigator.pop(context);
+      }
+    });
+  }
+
+  void _showAddTABs() {
+    final nameC = TextEditingController(); final idC = TextEditingController(); final passC = TextEditingController();
+    _showStyledBS(title: 'إضافة معيد جديد', icon: Icons.person_add_alt_1, color: Colors.teal, children: [
+      _buildInputField(nameC, 'اسم المعيد', Icons.person),
+      _buildInputField(idC, 'كود المعيد (ID)', Icons.badge, isNumber: true),
+      _buildInputField(passC, 'كلمة المرور', Icons.lock, isPass: true),
+    ], onSave: () async {
+      if (idC.text.isNotEmpty && nameC.text.isNotEmpty) {
+        await _ds.addTA(idC.text, nameC.text, "", [_selectedLevel!], [], passC.text.isEmpty ? "123456" : passC.text);
+        if (mounted) Navigator.pop(context);
       }
     });
   }
@@ -412,6 +450,13 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
                   subtitle: 'ID: ${d['id']} | ${d['division']}', 
                   icon: Icons.school, 
                   color: Colors.green, 
+                  photoUrl: d['photoUrl'],
+                  onTap: () => showRichStudentProfileModal(
+                    context: context,
+                    studentIdOrUid: docs[i].id,
+                    studentName: d['name'],
+                    initialStudentData: d,
+                  ),
                   onResetDevice: () => _confirmResetDevice(context, docs[i].id, d['name']),
                   onDelete: () => _ds.deleteStudent(docs[i].id, _selectedLevel!.replaceAll('level_', ''))
                 );
@@ -508,7 +553,48 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
         if (docs.isEmpty) return _buildEmptyState(Icons.person_off_outlined, 'لا يوجد دكاترة');
         return ListView.builder(padding: const EdgeInsets.all(15), itemCount: docs.length, itemBuilder: (ctx, i) {
           var d = docs[i].data() as Map<String, dynamic>;
-          return _buildListItem(title: d['name'] ?? '', subtitle: d['email'] ?? '', icon: Icons.person, color: Colors.pink, onDelete: () => _ds.deleteDoctor(docs[i].id));
+          return _buildListItem(
+            title: d['name'] ?? '', 
+            subtitle: d['email'] ?? '', 
+            icon: Icons.person, 
+            color: Colors.pink, 
+            photoUrl: d['photoUrl'],
+            onTap: () => showRichDoctorProfileModal(
+              context: context,
+              doctorUidOrEmail: docs[i].id,
+              doctorName: d['name'],
+              initialDoctorData: d,
+            ),
+            onDelete: () => _ds.deleteDoctor(docs[i].id)
+          );
+        });
+      },
+    );
+  }
+
+  Widget _buildTAsTab() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _ds.commerceTasColl.where('teachingLevels', arrayContains: _selectedLevel).snapshots(),
+      builder: (ctx, snap) {
+        if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+        var docs = snap.data!.docs;
+        if (docs.isEmpty) return _buildEmptyState(Icons.person_off_outlined, 'لا يوجد معيدين مسجلين لهذه الفرقة');
+        return ListView.builder(padding: const EdgeInsets.all(15), itemCount: docs.length, itemBuilder: (ctx, i) {
+          var d = docs[i].data() as Map<String, dynamic>;
+          return _buildListItem(
+            title: d['name'] ?? '', 
+            subtitle: 'كود: ${d['id'] ?? ''} | ${d['email'] ?? ''}', 
+            icon: Icons.person_outline_rounded, 
+            color: Colors.teal, 
+            photoUrl: d['photoUrl'],
+            onTap: () => showRichDoctorProfileModal(
+              context: context,
+              doctorUidOrEmail: docs[i].id,
+              doctorName: d['name'],
+              initialDoctorData: d,
+            ),
+            onDelete: () => _ds.deleteTA(docs[i].id)
+          );
         });
       },
     );
@@ -661,7 +747,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
     );
   }
 
-  Widget _buildListItem({required String title, required String subtitle, required IconData icon, required Color color, required VoidCallback onDelete, VoidCallback? onEdit, VoidCallback? onResetDevice}) {
+  Widget _buildListItem({required String title, required String subtitle, required IconData icon, required Color color, String? photoUrl, VoidCallback? onTap, required VoidCallback onDelete, VoidCallback? onEdit, VoidCallback? onResetDevice}) {
     final isDark = _ds.isDarkMode;
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -680,15 +766,21 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
       child: Column(
         children: [
           ListTile(
+            onTap: onTap,
             contentPadding: const EdgeInsets.fromLTRB(15, 12, 15, 0),
-            leading: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(15),
-              ),
-              child: Icon(icon, color: color, size: 24),
-            ),
+            leading: (photoUrl != null && photoUrl.isNotEmpty)
+              ? CircleAvatar(
+                  radius: 24,
+                  backgroundImage: _ds.getAvatarImageProvider(photoUrl),
+                )
+              : Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  child: Icon(icon, color: color, size: 24),
+                ),
             title: Text(title, style: GoogleFonts.cairo(fontWeight: FontWeight.w900, fontSize: 15, height: 1.2)),
             subtitle: Text(subtitle, style: GoogleFonts.cairo(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.bold)),
           ),
@@ -767,14 +859,110 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
 
   Future<void> _exportAttendanceForManager() async {
     if (_selectedAttCourseData == null || _selectedAttLecture == null) return;
+    
+    bool isAr = _ds.isArabic;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: _ds.isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+        title: Text(
+          isAr ? "خيارات تصدير الإكسيل" : "Export Excel Options",
+          textAlign: TextAlign.center,
+          style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 18),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              isAr ? "اختر الفئة المراد تصديرها من القائمة:" : "Select category to export:",
+              style: GoogleFonts.cairo(fontSize: 13, color: Colors.grey),
+            ),
+            const SizedBox(height: 20),
+            _managerExportTile(
+              icon: Icons.groups_rounded,
+              color: const Color(0xFF673AB7),
+              title: isAr ? "جميع الطلاب (حاضرين وغائبين)" : "All Students (Present & Absent)",
+              onTap: () {
+                Navigator.pop(ctx);
+                _processManagerExport(filterType: 'all');
+              },
+            ),
+            const SizedBox(height: 10),
+            _managerExportTile(
+              icon: Icons.check_circle_rounded,
+              color: Colors.green,
+              title: isAr ? "الطلاب الحاضرين فقط" : "Present Students Only",
+              onTap: () {
+                Navigator.pop(ctx);
+                _processManagerExport(filterType: 'present');
+              },
+            ),
+            const SizedBox(height: 10),
+            _managerExportTile(
+              icon: Icons.cancel_rounded,
+              color: Colors.redAccent,
+              title: isAr ? "الطلاب الغائبين فقط" : "Absent Students Only",
+              onTap: () {
+                Navigator.pop(ctx);
+                _processManagerExport(filterType: 'absent');
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _managerExportTile({required IconData icon, required Color color, required String title, required VoidCallback onTap}) {
+    return Container(
+      decoration: BoxDecoration(
+        color: _ds.isDarkMode ? Colors.black26 : color.withAlpha(15),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: color.withAlpha(50)),
+      ),
+      child: ListTile(
+        leading: Icon(icon, color: color),
+        title: Text(title, style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 14)),
+        trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey),
+        onTap: onTap,
+      ),
+    );
+  }
+
+  Future<void> _processManagerExport({required String filterType}) async {
+    final levelStr = _selectedLevel!.replaceAll('level_', '').trim();
+    final subjectStr = _selectedAttCourseData!['name'].toString().trim();
+    final lectureStr = _selectedAttLecture.toString().trim();
+
     var snap = await _ds.attendanceColl
-        .where('subject', isEqualTo: _selectedAttCourseData!['name'])
-        .where('level', isEqualTo: _selectedLevel!.replaceAll('level_', ''))
-        .where('lectureNumber', isEqualTo: _selectedAttLecture.toString())
+        .where('subject', isEqualTo: subjectStr)
+        .where('level', isEqualTo: levelStr)
+        .where('lectureNumber', isEqualTo: lectureStr)
         .get();
     
-    List<Map<String, dynamic>> data = snap.docs.map((d) => d.data() as Map<String, dynamic>).toList();
-    await ExcelHelper.exportAttendance(data, "${_selectedAttCourseData!['name']}_Lec$_selectedAttLecture");
+    Set<String> presentIds = snap.docs
+        .map((d) => (d.data() as Map<String, dynamic>)['studentId']?.toString().trim() ?? '')
+        .toSet();
+
+    var studentsSnap = await _ds.studentsColl.get();
+    var students = studentsSnap.docs.where((doc) {
+      final d = doc.data() as Map<String, dynamic>;
+      return d['level'].toString().trim() == levelStr;
+    }).map((e) => e.data() as Map<String, dynamic>).toList();
+
+    students.sort((a, b) => (a['name'] ?? '').toString().compareTo((b['name'] ?? '').toString()));
+
+    await ExcelHelper.exportAttendanceToExcel(
+      subject: subjectStr,
+      level: levelStr,
+      division: 'all',
+      lectureNumber: lectureStr,
+      students: students,
+      presentIds: presentIds,
+      filterType: filterType,
+      isArabic: _ds.isArabic,
+    );
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تصدير ملف الاكسيل بنجاح')));
   }
 }

@@ -20,7 +20,7 @@ class AppDrawer extends StatelessWidget {
           bool isAr = ds.isArabic;
           bool isDark = ds.isDarkMode;
 
-          bool isDoctor = ds.userRole == 'doctor';
+          bool isDoctor = ds.userRole == 'doctor' || ds.userRole == 'ta';
           bool isSuperAdmin = ds.userRole == 'super_admin';
           bool isManager = ds.userRole == 'manager';
 
@@ -46,10 +46,13 @@ class AppDrawer extends StatelessWidget {
                     ),
                     child: CircleAvatar(
                       backgroundColor: Colors.white.withOpacity(0.2),
-                      child: Text(
-                          name.isNotEmpty ? name[0] : 'U',
-                          style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)
-                      ),
+                      backgroundImage: ds.getAvatarImageProvider(ds.currentStudent?['photoUrl'] ?? ds.currentDoctor?['photoUrl'] ?? ds.currentAdmin?['photoUrl']),
+                      child: (ds.currentStudent?['photoUrl'] ?? ds.currentDoctor?['photoUrl'] ?? ds.currentAdmin?['photoUrl'] ?? '').toString().isEmpty
+                          ? Text(
+                              name.isNotEmpty ? name[0] : 'U',
+                              style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)
+                          )
+                          : null,
                     ),
                   ),
                   decoration: BoxDecoration(
@@ -167,7 +170,7 @@ class AppDrawer extends StatelessWidget {
                         const Divider(indent: 20, endIndent: 20),
                         _buildDrawerItem(
                           icon: Icons.group_rounded,
-                          title: isAr ? 'إدارة الحضور' : 'Attendance Management',
+                          title: isAr ? (ds.userRole == 'ta' ? 'حضور السكاشن' : 'إدارة الحضور') : 'Attendance Management',
                           textColor: textColor, iconColor: iconColor,
                           onTap: () { Navigator.pop(context); Navigator.pushNamed(context, '/doctor/attendance'); },
                         ),
