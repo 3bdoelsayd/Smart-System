@@ -87,6 +87,22 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
         'participantNames': {_currentUserId: _currentUserName, widget.otherUserId: widget.otherUserName},
       }, SetOptions(merge: true));
 
+      String targetType = widget.otherUserRole == 'student' ? 'student' : 'doctor';
+      await FirebaseFirestore.instance
+          .collection('colleges')
+          .doc(_ds.selectedInstituteId ?? 'commerce')
+          .collection('notifications')
+          .add({
+        'title': _ds.isArabic ? 'رسالة جديدة من $_currentUserName' : 'New message from $_currentUserName',
+        'body': content,
+        'targetType': targetType,
+        'targetUserId': widget.otherUserId,
+        'targetDoctorId': widget.otherUserRole == 'doctor' ? widget.otherUserId : null,
+        'timestamp': FieldValue.serverTimestamp(),
+        'instituteId': _ds.selectedInstituteId ?? 'commerce',
+        'isRead': false,
+      });
+
       if (_scrollController.hasClients) {
         _scrollController.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
       }

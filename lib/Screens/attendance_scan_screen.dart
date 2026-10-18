@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../services/data_service.dart';
 
@@ -26,6 +28,32 @@ class _AttendanceScanScreenState extends State<AttendanceScanScreen> {
   void initState() {
     super.initState();
     _scannerController = MobileScannerController();
+    _initScannerAndSession();
+  }
+
+  Future<void> _initScannerAndSession() async {
+    try {
+      // 1. طلب صلاحية الكاميرا
+      var cameraStatus = await Permission.camera.request();
+      if (!cameraStatus.isGranted && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_ds.isArabic ? "يرجى السماح باستخدام الكاميرا لمسح الرمز" : "Camera permission is required"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+
+      // 2. التحقق من تحميل بيانات الطالب
+      if (_ds.currentStudent == null) {
+        final userId = FirebaseAuth.instance.currentUser?.uid;
+        if (userId != null) {
+          await _ds.loadUserData(userId, 'student');
+        }
+      }
+    } catch (e) {
+      debugPrint("Init scanner error: $e");
+    }
     _initLocationTracking();
   }
 
@@ -77,9 +105,18 @@ class _AttendanceScanScreenState extends State<AttendanceScanScreen> {
       
       if (qrData != null && qrData.contains('|')) {
         setState(() => _isProcessing = true);
-        _scannerController.stop(); 
+        try {
+          await _scannerController.stop();
+        } catch (_) {}
 
         try {
+          if (_ds.currentStudent == null) {
+            final userId = FirebaseAuth.instance.currentUser?.uid;
+            if (userId != null) {
+              await _ds.loadUserData(userId, 'student');
+            }
+          }
+
           List<String> parts = qrData.split('|');
           
           if (parts.length >= 7) {
@@ -108,11 +145,6 @@ class _AttendanceScanScreenState extends State<AttendanceScanScreen> {
               pos = _currentPosition;
             }
 
-            if (pos == null && enableLocationCheck) {
-              throw _ds.isArabic ? "فشل تحديد موقعك الحالي. تأكد من تشغيل الـ GPS." : "Could not determine location.";
-            }
-
-            // موقع افتراضي في حالة إيقاف الفحص للتجربة
             pos ??= Position(
               latitude: 0.0,
               longitude: 0.0,
@@ -126,7 +158,7 @@ class _AttendanceScanScreenState extends State<AttendanceScanScreen> {
               headingAccuracy: 0.0,
             );
 
-            // 3. حماية Fake GPS (مهمة جداً للتحقق من الغش)
+            // 3. حماية Fake GPS
             if (!kIsWeb && enableLocationCheck) {
               if (pos.isMocked) {
                 throw _ds.isArabic 
@@ -135,7 +167,7 @@ class _AttendanceScanScreenState extends State<AttendanceScanScreen> {
               }
             }
             
-            // 4. فحص المسافة (30 متر) - موقوف مؤقتاً للتجربة
+            // 4. فحص المسافة (30 متر)
             if (enableLocationCheck && hallLocStr != "0,0") {
               List<String> latLng = hallLocStr.split(',');
               if (latLng.length == 2) {
@@ -179,7 +211,9 @@ class _AttendanceScanScreenState extends State<AttendanceScanScreen> {
             ));
           }
           setState(() => _isProcessing = false); 
-          _scannerController.start(); 
+          try {
+            await _scannerController.start();
+          } catch (_) {}
         }
       }
     }
@@ -252,7 +286,7 @@ class _AttendanceScanScreenState extends State<AttendanceScanScreen> {
                   children: [
                     CircularProgressIndicator(color: Colors.white),
                     SizedBox(height: 15),
-                    Text("جاري التحقق من الموقع...", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    Text("جاري تسجيل الحضور...", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                   ],
                 ),
               ),

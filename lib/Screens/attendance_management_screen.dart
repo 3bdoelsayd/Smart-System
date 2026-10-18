@@ -928,124 +928,7 @@ class _QRExpireDialogContentState extends State<_QRExpireDialogContent> {
     showDialog(
       context: context,
       useSafeArea: false,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setFsState) {
-          int m = _remainingSeconds ~/ 60;
-          int s = _remainingSeconds % 60;
-          String tf = "${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}";
-          bool isAr = widget.ds.isArabic;
-
-          return Scaffold(
-            backgroundColor: Colors.white,
-            body: SafeArea(
-              child: Stack(
-                children: [
-                  Center(
-                    child: SingleChildScrollView(
-                      physics: const BouncingScrollPhysics(),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              widget.subjectName,
-                              textAlign: TextAlign.center,
-                              style: GoogleFonts.cairo(
-                                fontSize: 32,
-                                fontWeight: FontWeight.w900,
-                                color: const Color(0xFF2D3142),
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              widget.subtitle,
-                              style: GoogleFonts.cairo(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.grey.shade700,
-                              ),
-                            ),
-                            const SizedBox(height: 25),
-                            InteractiveViewer(
-                              minScale: 0.2,
-                              maxScale: 6.0,
-                              child: Container(
-                                padding: const EdgeInsets.all(20),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(30),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withAlpha(25),
-                                      blurRadius: 30,
-                                      offset: const Offset(0, 10),
-                                    )
-                                  ],
-                                  border: Border.all(color: Colors.grey.shade200, width: 2),
-                                ),
-                                child: SizedBox(
-                                  width: 220,
-                                  height: 220,
-                                  child: QrImageView(data: widget.qrData),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 25),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                              decoration: BoxDecoration(
-                                color: _remainingSeconds > 0 ? Colors.orange.shade50 : Colors.red.shade50,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: _remainingSeconds > 0 ? Colors.orange.shade200 : Colors.red.shade200,
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.timer_rounded,
-                                    color: _remainingSeconds > 0 ? Colors.orange.shade800 : Colors.red,
-                                    size: 28,
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Text(
-                                    _remainingSeconds > 0
-                                      ? (isAr ? "الوقت المتبقي: $tf" : "Time remaining: $tf")
-                                      : (isAr ? "انتهت صلاحية الرمز ❌" : "QR Expired ❌"),
-                                    style: GoogleFonts.cairo(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold,
-                                      color: _remainingSeconds > 0 ? Colors.orange.shade900 : Colors.red,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    top: 20,
-                    right: 20,
-                    child: CircleAvatar(
-                      radius: 25,
-                      backgroundColor: Colors.black12,
-                      child: IconButton(
-                        icon: const Icon(Icons.close_rounded, color: Colors.black, size: 28),
-                        onPressed: () => Navigator.pop(ctx),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
+      builder: (ctx) => _FullScreenQRDialog(qrData: widget.qrData),
     );
   }
 
@@ -1113,6 +996,56 @@ class _QRExpireDialogContentState extends State<_QRExpireDialogContent> {
           child: Text(widget.ds.translate('cancel'), style: TextStyle(color: widget.ds.isDarkMode ? const Color(0xFF03DAC6) : const Color(0xFF673AB7)))
         )
       ],
+    );
+  }
+}
+
+class _FullScreenQRDialog extends StatelessWidget {
+  final String qrData;
+
+  const _FullScreenQRDialog({required this.qrData});
+
+  @override
+  Widget build(BuildContext context) {
+    double screenWidth = MediaQuery.of(context).size.width;
+    double screenHeight = MediaQuery.of(context).size.height;
+    double qrInitialSize = (screenWidth < screenHeight ? screenWidth : screenHeight) * 0.85;
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            Center(
+              child: InteractiveViewer(
+                minScale: 0.1,
+                maxScale: 35.0,
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  color: Colors.white,
+                  child: SizedBox(
+                    width: qrInitialSize,
+                    height: qrInitialSize,
+                    child: QrImageView(data: qrData),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 25,
+              right: 25,
+              child: CircleAvatar(
+                radius: 28,
+                backgroundColor: Colors.black.withAlpha(20),
+                child: IconButton(
+                  icon: const Icon(Icons.close_rounded, color: Colors.black, size: 32),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -41,7 +41,31 @@ class NotificationsScreen extends StatelessWidget {
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
             
-            final docs = snapshot.data?.docs ?? [];
+            final allDocs = snapshot.data?.docs ?? [];
+            final currentUser = ds.currentDoctor ?? ds.currentAdmin;
+            final currentStudent = ds.currentStudent;
+            String currentUid = currentUser?['uid'] ?? currentUser?['id'] ?? currentStudent?['uid'] ?? currentStudent?['id'] ?? '';
+            String currentCode = currentStudent?['id']?.toString() ?? currentUser?['id']?.toString() ?? '';
+
+            final docs = allDocs.where((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              final targetDocId = data['targetDoctorId']?.toString();
+              final targetUserId = data['targetUserId']?.toString();
+
+              if (userType == 'doctor') {
+                if (targetDocId != null && targetDocId.isNotEmpty) {
+                  return targetDocId == currentUid || targetDocId == currentCode;
+                }
+                return true; // General announcements
+              } else if (userType == 'student') {
+                if (targetUserId != null && targetUserId.isNotEmpty) {
+                  return targetUserId == currentUid || targetUserId == currentCode;
+                }
+                return true; // General announcements
+              }
+              return true;
+            }).toList();
+
             if (docs.isEmpty) {
               return Center(
                 child: Column(
