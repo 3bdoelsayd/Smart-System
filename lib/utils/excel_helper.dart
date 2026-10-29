@@ -229,10 +229,23 @@ class ExcelHelper {
       if (kIsWeb) {
         _downloadWebFile(fileBytes, fileName);
       } else {
-        final directory = await getTemporaryDirectory();
-        final file = io.File('${directory.path}/$fileName.xlsx');
-        await file.writeAsBytes(fileBytes);
-        await Share.shareXFiles([XFile(file.path)], text: 'Exported Data');
+        try {
+          String? outputFile = await FilePicker.platform.saveFile(
+            dialogTitle: 'حفظ ملف الإكسيل',
+            fileName: '$fileName.xlsx',
+            allowedExtensions: ['xlsx'],
+            type: FileType.custom,
+          );
+          if (outputFile != null) {
+            String finalPath = outputFile.endsWith('.xlsx') ? outputFile : '$outputFile.xlsx';
+            final file = io.File(finalPath);
+            await file.writeAsBytes(fileBytes);
+          }
+        } catch (e) {
+          final directory = await getApplicationDocumentsDirectory();
+          final file = io.File('${directory.path}/$fileName.xlsx');
+          await file.writeAsBytes(fileBytes);
+        }
       }
     }
   }
@@ -240,7 +253,7 @@ class ExcelHelper {
   static void _downloadWebFile(List<int> bytes, String fileName) {
     final blob = html.Blob([bytes], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     final url = html.Url.createObjectUrlFromBlob(blob);
-    final anchor = html.AnchorElement(href: url)
+    html.AnchorElement(href: url)
       ..setAttribute("download", "$fileName.xlsx")
       ..click();
     html.Url.revokeObjectUrl(url);

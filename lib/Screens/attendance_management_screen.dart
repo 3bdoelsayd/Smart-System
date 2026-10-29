@@ -843,27 +843,35 @@ class _AttendanceManagementScreenState extends State<AttendanceManagementScreen>
     );
   }
 
-  Widget _profileDetailRow(IconData icon, String label, String value) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
-      decoration: BoxDecoration(color: _ds.isDarkMode ? Colors.black26 : const Color(0xFFF8F9FE), borderRadius: BorderRadius.circular(15)),
-      child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        Row(children: [Icon(icon, size: 20, color: _ds.isDarkMode ? const Color(0xFF03DAC6) : const Color(0xFF673AB7)), const SizedBox(width: 10), Text(label, style: TextStyle(fontWeight: FontWeight.w600, color: _ds.isDarkMode ? Colors.white70 : Colors.black87))]),
-        Text(value, style: TextStyle(fontWeight: FontWeight.w900, color: _ds.isDarkMode ? Colors.white : const Color(0xFF2D3142)))
-      ]),
-    );
-  }
+
 
   void _showQR() async {
     Position? position;
     try {
-      position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 15),
+      );
     } catch (e) {
       debugPrint("Error getting location: $e");
     }
 
-    String locationData = position != null ? "${position.latitude},${position.longitude}" : "0,0";
+    if (position == null) {
+      position = Position(
+        latitude: 0.0,
+        longitude: 0.0,
+        timestamp: DateTime.now(),
+        accuracy: 0.0,
+        altitude: 0.0,
+        heading: 0.0,
+        speed: 0.0,
+        speedAccuracy: 0.0,
+        altitudeAccuracy: 0.0,
+        headingAccuracy: 0.0,
+      );
+    }
+
+    String locationData = "${position.latitude},${position.longitude}";
     String sessionType = _ds.userRole == 'ta' ? 'section' : 'lecture';
     String data = "${_selectedSubject!.trim()}|$_selectedLevel|$_selectedDivision|$_selectedLecture|$locationData|${DateTime.now().millisecondsSinceEpoch}|$_qrValidityMinutes|$sessionType";
 

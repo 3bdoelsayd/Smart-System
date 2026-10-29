@@ -270,8 +270,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
         bool isDark = _ds.isDarkMode;
         Color primaryColor = isDark ? const Color(0xFF03DAC6) : const Color(0xFF673AB7);
         
-        // التحقق مما إذا كان المستخدم أدمن
-        bool isAdmin = _ds.currentAdmin != null;
+        bool isStaff = _ds.userRole == 'doctor' || _ds.userRole == 'ta';
+        bool isAdmin = _ds.currentAdmin != null || _ds.userRole == 'super_admin' || _ds.userRole == 'manager';
+        
+        String? profilePhoto;
+        String? profileName;
+        String? profileSub;
+
+        if (isAdmin) {
+          profilePhoto = _ds.currentAdmin?['photoUrl'];
+          profileName = _ds.currentAdmin?['name'] ?? 'Admin';
+          profileSub = 'Admin';
+        } else if (isStaff) {
+          profilePhoto = _ds.currentDoctor?['photoUrl'];
+          profileName = _ds.currentDoctor?['name'] ?? (_ds.isArabic ? 'عضو هيئة تدريس' : 'Staff Member');
+          profileSub = _ds.currentDoctor?['email'] ?? '';
+        } else {
+          profilePhoto = _ds.currentStudent?['photoUrl'];
+          profileName = _ds.currentStudent?['name'] ?? (_ds.isArabic ? 'طالب' : 'Student');
+          profileSub = 'ID: ${_ds.currentStudent?['id'] ?? ''}';
+        }
 
         return Directionality(
           textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
@@ -302,8 +320,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             CircleAvatar(
                               radius: 30,
                               backgroundColor: primaryColor.withAlpha(30),
-                              backgroundImage: _ds.getAvatarImageProvider(_ds.currentStudent?['photoUrl'] ?? _ds.currentDoctor?['photoUrl'] ?? _ds.currentAdmin?['photoUrl']),
-                              child: (_ds.currentStudent?['photoUrl'] ?? _ds.currentDoctor?['photoUrl'] ?? _ds.currentAdmin?['photoUrl'] ?? '').toString().isEmpty 
+                              backgroundImage: _ds.getAvatarImageProvider(profilePhoto),
+                              child: (profilePhoto ?? '').toString().isEmpty 
                                 ? Icon(Icons.person, size: 30, color: primaryColor) 
                                 : null,
                             ),
@@ -313,12 +331,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    _ds.currentStudent?['name'] ?? _ds.currentDoctor?['name'] ?? _ds.currentAdmin?['name'] ?? 'مستخدم',
+                                    profileName ?? 'مستخدم',
                                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87),
                                   ),
                                   const SizedBox(height: 3),
                                   Text(
-                                    _ds.currentStudent != null ? ('ID: ${_ds.currentStudent?['id']}') : (_ds.currentDoctor != null ? (_ds.currentDoctor?['email'] ?? '') : 'Admin'),
+                                    profileSub ?? '',
                                     style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.grey),
                                   ),
                                 ],

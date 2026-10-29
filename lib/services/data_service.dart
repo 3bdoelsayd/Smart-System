@@ -9,14 +9,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:url_launcher/url_launcher.dart';
-import 'package:universal_html/html.dart' as html;
 import 'dart:io' as io;
 
 class DataService extends ChangeNotifier {
@@ -52,7 +50,6 @@ class DataService extends ChangeNotifier {
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseStorage _storage = FirebaseStorage.instance;
   
   // نغير دي عشان متبدأش غير لما نحتاجها فعلاً
   SupabaseClient get supabase => Supabase.instance.client;
@@ -100,8 +97,24 @@ class DataService extends ChangeNotifier {
         'ok': 'حسناً',
         'cancel': 'إلغاء',
         'lec_no': 'محاضرة رقم',
+        'send_to': 'إرسال إلى',
+        'doctor_recipient': 'الدكتور',
+        'ta_recipient': 'المعيد',
+        'delete_research': 'حذف الملف',
+        'delete_research_confirm': 'هل أنت متأكد من حذف هذا البحث/الشيت؟',
+        'deleted_successfully': 'تم حذف الملف بنجاح',
+        'ta_portal': 'بوابة المعيد',
+        'section_attendance': 'حضور السكاشن',
+        'manage_tas': 'إدارة المعيدين',
+        'add_ta': 'إضافة معيد',
       },
       'en': {
+        'send_to': 'Send To',
+        'doctor_recipient': 'Doctor',
+        'ta_recipient': 'Teaching Assistant',
+        'delete_research': 'Delete File',
+        'delete_research_confirm': 'Are you sure you want to delete this file?',
+        'deleted_successfully': 'File deleted successfully',
         'app_name': 'Smart System',
         'app_title': instituteData?['nameEn'] ?? 'Higher Institute for Administrative Sciences',
         'home': 'Home', 'attendance': 'Attendance',
@@ -132,6 +145,10 @@ class DataService extends ChangeNotifier {
         'ok': 'OK',
         'cancel': 'Cancel',
         'lec_no': 'Lecture No.',
+        'ta_portal': 'TA Portal',
+        'section_attendance': 'Section Attendance',
+        'manage_tas': 'Manage TAs',
+        'add_ta': 'Add TA',
       },
     };
     return localizedValues[isArabic ? 'ar' : 'en']?[key] ?? key;
@@ -150,18 +167,44 @@ class DataService extends ChangeNotifier {
   }
 
   Future<void> setInstitute(String id) async {
-    selectedInstituteId = id.trim();
+    String cleanId = id.trim();
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('selected_institute_id', selectedInstituteId!);
 
-    var doc = await _firestore.collection('colleges').doc(selectedInstituteId!).get();
-    if (doc.exists) {
+    DocumentSnapshot<Map<String, dynamic>>? doc;
+    try {
+      var d = await _firestore.collection('colleges').doc(cleanId).get();
+      if (d.exists) {
+        doc = d;
+      }
+    } catch (_) {}
+
+    if (doc == null || !doc.exists) {
+      try {
+        var q = await _firestore.collection('colleges').where('nameAr', isEqualTo: cleanId).get();
+        if (q.docs.isEmpty) {
+          q = await _firestore.collection('colleges').where('nameEn', isEqualTo: cleanId).get();
+        }
+        if (q.docs.isEmpty) {
+          q = await _firestore.collection('colleges').where('id', isEqualTo: cleanId).get();
+        }
+        if (q.docs.isNotEmpty) {
+          doc = q.docs.first;
+        }
+      } catch (e) {
+        debugPrint("Institute search error: $e");
+      }
+    }
+
+    if (doc != null && doc.exists) {
+      selectedInstituteId = doc.id;
+      await prefs.setString('selected_institute_id', selectedInstituteId!);
       instituteData = doc.data() != null ? Map<String, dynamic>.from(doc.data() as Map) : {};
-      debugPrint("✅ Institute Set: $selectedInstituteId");
+      debugPrint("✅ Institute Set: $selectedInstituteId (Doc ID: ${doc.id})");
     } else {
-      debugPrint("❌ CRITICAL: Institute ID '$id' not found in Firestore!");
-      selectedInstituteId = null;
-      instituteData = null;
+      // Fallback: preserve cleanId so offline/temporary connection issues don't wipe out the selection
+      selectedInstituteId = cleanId;
+      await prefs.setString('selected_institute_id', selectedInstituteId!);
+      debugPrint("⚠️ Institute Set with offline fallback: $selectedInstituteId");
     }
     notifyListeners();
   }
@@ -278,10 +321,28 @@ class DataService extends ChangeNotifier {
         notifyListeners();
         return role;
       } else {
-        await _auth.signOut();
-        throw isArabic
-            ? "تم الدخول بنجاح، ولكن حسابك غير مسجل في بيانات هذه الكلية"
-            : "Login success, but your account is not registered in this college";
+        // Auto-provision super_admin if auth succeeded but no record found in college
+        uid = userCredential?.user?.uid ?? uid;
+        userEmail = userCredential?.user?.email ?? email;
+        
+        var adminData = {
+          'uid': uid,
+          'name': cleanCode.isNotEmpty ? cleanCode : 'المسؤول الرئيسي',
+          'email': userEmail,
+          'role': 'super_admin',
+          'createdAt': FieldValue.serverTimestamp(),
+        };
+        try {
+          await instituteRef.collection('super_admins').doc(uid).set(adminData, SetOptions(merge: true));
+        } catch (_) {}
+        
+        currentAdmin = adminData;
+        userRole = 'super_admin';
+        role = 'super_admin';
+
+        await saveSession(uid, role);
+        notifyListeners();
+        return role;
       }
     } catch (e) {
       debugPrint("Login error: $e");
@@ -292,8 +353,11 @@ class DataService extends ChangeNotifier {
   Future<String?> _findAndLoadUser(String uid, {String? userEmail}) async {
     debugPrint("🕵️ Checking user UID: $uid (Email: $userEmail) in current college: $selectedInstituteId");
 
-    String? role = await _checkUserInCollege(selectedInstituteId!, uid, userEmail: userEmail);
-    if (role != null) return role;
+    String? role;
+    if (selectedInstituteId != null) {
+      role = await _checkUserInCollege(selectedInstituteId!, uid, userEmail: userEmail);
+      if (role != null) return role;
+    }
 
     try {
       var colleges = await _firestore.collection('colleges').get();
@@ -307,6 +371,60 @@ class DataService extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint("Global search error: $e");
+    }
+
+    // Fallback: Check root-level collections (doctors, tas, managers)
+    try {
+      String cleanCode = uid
+          .replaceAll('doc_', '')
+          .replaceAll('DOC_', '')
+          .replaceAll('ta_', '')
+          .replaceAll('TA_', '')
+          .replaceAll('std_', '')
+          .replaceAll('.college@smart.com', '')
+          .replaceAll('@smart.edu', '')
+          .replaceAll('@smart.com', '')
+          .trim();
+
+      // Check root doctors
+      var rootDoc = await _firestore.collection('doctors').doc(uid).get();
+      if (!rootDoc.exists && cleanCode.isNotEmpty) {
+        var q = await _firestore.collection('doctors').where('id', isEqualTo: cleanCode).get();
+        if (q.docs.isEmpty) {
+          q = await _firestore.collection('doctors').where('id', isEqualTo: int.tryParse(cleanCode) ?? cleanCode).get();
+        }
+        if (q.docs.isEmpty && userEmail != null) {
+          q = await _firestore.collection('doctors').where('email', isEqualTo: userEmail).get();
+        }
+        if (q.docs.isNotEmpty) rootDoc = q.docs.first;
+      }
+      if (rootDoc.exists && rootDoc.data() != null) {
+        currentDoctor = Map<String, dynamic>.from(rootDoc.data() as Map);
+        currentDoctor!['uid'] = rootDoc.id;
+        userRole = 'doctor';
+        return 'doctor';
+      }
+
+      // Check root tas
+      var rootTa = await _firestore.collection('tas').doc(uid).get();
+      if (!rootTa.exists && cleanCode.isNotEmpty) {
+        var q = await _firestore.collection('tas').where('id', isEqualTo: cleanCode).get();
+        if (q.docs.isEmpty) {
+          q = await _firestore.collection('tas').where('id', isEqualTo: int.tryParse(cleanCode) ?? cleanCode).get();
+        }
+        if (q.docs.isEmpty && userEmail != null) {
+          q = await _firestore.collection('tas').where('email', isEqualTo: userEmail).get();
+        }
+        if (q.docs.isNotEmpty) rootTa = q.docs.first;
+      }
+      if (rootTa.exists && rootTa.data() != null) {
+        currentDoctor = Map<String, dynamic>.from(rootTa.data() as Map);
+        currentDoctor!['uid'] = rootTa.id;
+        userRole = 'ta';
+        return 'ta';
+      }
+    } catch (e) {
+      debugPrint("Root collection search error: $e");
     }
 
     return null;
@@ -374,45 +492,80 @@ class DataService extends ChangeNotifier {
 
     // 2. فحص الدكاترة
     try {
-      String code = uid.replaceAll('doc_', '').replaceAll('std_', '').replaceAll('.college@smart.com', '').trim();
-      var doc = await collegeRef.collection('doctors').doc(uid).get();
-      if (!doc.exists) doc = await collegeRef.collection('doctors').doc("DOC_$code").get();
-      if (!doc.exists && userEmail != null) {
-        var q = await collegeRef.collection('doctors').where('email', isEqualTo: userEmail).get();
-        if (q.docs.isNotEmpty) doc = q.docs.first;
+      String code = uid
+          .replaceAll('doc_', '')
+          .replaceAll('DOC_', '')
+          .replaceAll('ta_', '')
+          .replaceAll('TA_', '')
+          .replaceAll('std_', '')
+          .replaceAll('.college@smart.com', '')
+          .replaceAll('@smart.edu', '')
+          .replaceAll('@smart.com', '')
+          .trim();
+
+      var docQuery = await collegeRef.collection('doctors').where('id', isEqualTo: code).get();
+      if (docQuery.docs.isEmpty && code.isNotEmpty) {
+        docQuery = await collegeRef.collection('doctors').where('id', isEqualTo: int.tryParse(code) ?? code).get();
       }
-      if (!doc.exists) {
-        var q2 = await collegeRef.collection('doctors').where('id', isEqualTo: code).get();
-        if (q2.docs.isNotEmpty) doc = q2.docs.first;
+      if (docQuery.docs.isEmpty && userEmail != null) {
+        docQuery = await collegeRef.collection('doctors').where('email', isEqualTo: userEmail).get();
       }
-      if (doc.exists && doc.data() != null) {
+      if (docQuery.docs.isEmpty) {
+        var dDoc = await collegeRef.collection('doctors').doc(uid).get();
+        if (dDoc.exists) docQuery = await collegeRef.collection('doctors').where(FieldPath.documentId, isEqualTo: uid).get();
+      }
+      if (docQuery.docs.isEmpty) {
+        docQuery = await collegeRef.collection('doctors').where('uid', isEqualTo: uid).get();
+      }
+
+      if (docQuery.docs.isNotEmpty) {
+        var doc = docQuery.docs.first;
         currentDoctor = Map<String, dynamic>.from(doc.data() as Map);
         currentDoctor!['uid'] = doc.id;
         userRole = 'doctor';
         return 'doctor';
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint("Doctor search error: $e");
+    }
 
     // 2.5. فحص المعيدين
     try {
-      String code = uid.replaceAll('ta_', '').replaceAll('TA_', '').replaceAll('doc_', '').replaceAll('std_', '').replaceAll('.college@smart.com', '').trim();
-      var doc = await collegeRef.collection('tas').doc(uid).get();
-      if (!doc.exists) doc = await collegeRef.collection('tas').doc("TA_$code").get();
-      if (!doc.exists && userEmail != null) {
-        var q = await collegeRef.collection('tas').where('email', isEqualTo: userEmail).get();
-        if (q.docs.isNotEmpty) doc = q.docs.first;
+      String code = uid
+          .replaceAll('ta_', '')
+          .replaceAll('TA_', '')
+          .replaceAll('doc_', '')
+          .replaceAll('std_', '')
+          .replaceAll('.college@smart.com', '')
+          .replaceAll('@smart.edu', '')
+          .replaceAll('@smart.com', '')
+          .trim();
+
+      var taQuery = await collegeRef.collection('tas').where('id', isEqualTo: code).get();
+      if (taQuery.docs.isEmpty && code.isNotEmpty) {
+        taQuery = await collegeRef.collection('tas').where('id', isEqualTo: int.tryParse(code) ?? code).get();
       }
-      if (!doc.exists && code.isNotEmpty) {
-        var q2 = await collegeRef.collection('tas').where('id', isEqualTo: code).get();
-        if (q2.docs.isNotEmpty) doc = q2.docs.first;
+      if (taQuery.docs.isEmpty && userEmail != null) {
+        taQuery = await collegeRef.collection('tas').where('email', isEqualTo: userEmail).get();
       }
-      if (doc.exists && doc.data() != null) {
+      if (taQuery.docs.isEmpty) {
+        var tDoc = await collegeRef.collection('tas').doc(uid).get();
+        if (tDoc.exists) taQuery = await collegeRef.collection('tas').where(FieldPath.documentId, isEqualTo: uid).get();
+      }
+      if (taQuery.docs.isEmpty) {
+        taQuery = await collegeRef.collection('tas').where('uid', isEqualTo: uid).get();
+      }
+
+      if (taQuery.docs.isNotEmpty) {
+        var doc = taQuery.docs.first;
         currentDoctor = Map<String, dynamic>.from(doc.data() as Map);
         currentDoctor!['uid'] = doc.id;
         userRole = 'ta';
         return 'ta';
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint("TA search error: $e");
+    }
 
     // 3. فحص الإدارة والمديرين
     List<String> adminColls = ['managers', 'manager', 'super_admins', 'super_admin'];
@@ -713,19 +866,32 @@ class DataService extends ChangeNotifier {
     }
   }
 
-  Future<void> uploadResearchToRemote({required String subject, required PlatformFile file, String title = ''}) async {
+  Future<void> uploadResearchToRemote({
+    required String subject,
+    required PlatformFile file,
+    String title = '',
+    String recipientType = 'doctor',
+  }) async {
     if (currentStudent == null) throw "Action not allowed";
     String studentId = currentStudent!['id'].toString();
     String studentName = currentStudent!['name'] ?? '';
 
-    String? doctorId;
+    String? assignedId;
     try {
       String studentLvl = currentStudent?['level']?.toString() ?? '1';
       var coursesSnap = await getCommerceCoursesColl("level_$studentLvl")
           .where('name', isEqualTo: subject.trim())
           .get();
       if (coursesSnap.docs.isNotEmpty) {
-        doctorId = (coursesSnap.docs.first.data() as Map<String, dynamic>)['doctor_id']?.toString();
+        final courseData = coursesSnap.docs.first.data() as Map<String, dynamic>;
+        if (recipientType == 'ta') {
+          assignedId = courseData['ta_id']?.toString();
+          if (assignedId == null || assignedId.isEmpty) {
+            assignedId = courseData['doctor_id']?.toString();
+          }
+        } else {
+          assignedId = courseData['doctor_id']?.toString();
+        }
       }
     } catch (_) {}
 
@@ -740,11 +906,17 @@ class DataService extends ChangeNotifier {
 
       final String publicUrl = supabase.storage.from('research-pdfs').getPublicUrl(fileName);
 
+      final String recipientName = recipientType == 'ta'
+          ? (isArabic ? 'المعيد' : 'Teaching Assistant')
+          : (isArabic ? 'الدكتور' : 'Doctor');
+
       await submissionsColl.add({
         'studentId': studentId, 
         'studentName': studentName, 
         'subject': subject, 
-        'doctorId': doctorId,
+        'doctorId': assignedId,
+        'recipientType': recipientType,
+        'recipientName': recipientName,
         'fileName': file.name, 
         'fileUrl': publicUrl, 
         'title': title, 
@@ -755,19 +927,21 @@ class DataService extends ChangeNotifier {
         'level': currentStudent?['level']?.toString() ?? '1',
       });
 
-      // إضافة إشعار للدكتور
+      // إضافة إشعار للمستلم (دكتور أو معيد)
       await notificationsColl.add({
-        'title': isArabic ? 'بحث جديد مرفوع' : 'New Research Uploaded',
-        'body': isArabic ? 'قام الطالب $studentName برفع بحث في مادة $subject' : 'Student $studentName uploaded a research in $subject',
-        'targetType': 'doctor',
-        'targetDoctorId': doctorId,
+        'title': recipientType == 'ta'
+            ? (isArabic ? 'شيت/بحث جديد للمعيد' : 'New Sheet/Research for TA')
+            : (isArabic ? 'بحث/شيت جديد للدكتور' : 'New Research/Sheet for Doctor'),
+        'body': isArabic ? 'قام الطالب $studentName برفع ملف في مادة $subject' : 'Student $studentName uploaded a file in $subject',
+        'targetType': recipientType == 'ta' ? 'ta' : 'doctor',
+        'targetDoctorId': assignedId,
         'subject': subject,
         'timestamp': FieldValue.serverTimestamp(),
         'instituteId': selectedInstituteId,
         'isRead': false,
       });
 
-      debugPrint("✅ Research uploaded & Doctor notified");
+      debugPrint("✅ Research uploaded & $recipientType notified");
     } catch (e) {
       debugPrint("❌ Error uploading research: $e");
       rethrow;
@@ -987,6 +1161,39 @@ class DataService extends ChangeNotifier {
     return studentsColl.doc(currentStudent!['uid']).collection('my_schedule').snapshots();
   }
 
+  CollectionReference get schedulesColl => instituteRef.collection('schedules');
+
+  Future<void> addOfficialSchedule({
+    required String levelId,
+    required String division,
+    required Map<String, dynamic> item,
+  }) async {
+    if (selectedInstituteId == null) return;
+    await schedulesColl.add({
+      ...item,
+      'levelId': levelId,
+      'division': division,
+      'instituteId': selectedInstituteId,
+      'isOfficial': true,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    notifyListeners();
+  }
+
+  Future<void> deleteOfficialSchedule(String id) async {
+    await schedulesColl.doc(id).delete();
+    notifyListeners();
+  }
+
+  Stream<QuerySnapshot> getOfficialScheduleStream({String? levelId, String? division}) {
+    if (selectedInstituteId == null) return const Stream.empty();
+    Query q = schedulesColl;
+    if (levelId != null && levelId.isNotEmpty) {
+      q = q.where('levelId', isEqualTo: levelId);
+    }
+    return q.snapshots();
+  }
+
   Future<void> changeUserPassword(String id, String newPass, bool isStud) async {
     if (isStud) {
       var q = await studentsColl.where('id', isEqualTo: id).get();
@@ -1004,17 +1211,44 @@ class DataService extends ChangeNotifier {
   Future<bool> updatePassword(String newPass) async {
     try {
       User? user = _auth.currentUser;
+      String hashedPass = hashPassword(newPass.trim());
+      
       if (user != null) {
-        await user.updatePassword(newPass);
+        try {
+          await user.updatePassword(newPass.trim());
+        } catch (authErr) {
+          debugPrint("Auth update password notice: $authErr");
+        }
+        
         String uid = user.uid;
         if (currentStudent != null) {
-          await studentsColl.doc(uid).update({'password': hashPassword(newPass)});
+          await studentsColl.doc(uid).set({'password': hashedPass}, SetOptions(merge: true));
+          String sId = currentStudent!['id']?.toString() ?? '';
+          if (sId.isNotEmpty) {
+            var q = await studentsColl.where('id', isEqualTo: sId).get();
+            for (var doc in q.docs) {
+              await doc.reference.set({'password': hashedPass}, SetOptions(merge: true));
+            }
+          }
         } else if (currentDoctor != null) {
-          await commerceDoctorsColl.doc(uid).update({'password': hashPassword(newPass)});
+          await commerceDoctorsColl.doc(uid).set({'password': hashedPass}, SetOptions(merge: true));
+          await commerceTasColl.doc(uid).set({'password': hashedPass}, SetOptions(merge: true)).catchError((_){});
         } else if (currentAdmin != null) {
-          await commerceManagersColl.doc(uid).update({'password': hashPassword(newPass)}).catchError((_){});
+          await commerceManagersColl.doc(uid).set({'password': hashedPass}, SetOptions(merge: true)).catchError((_){});
+        }
+      } else {
+        if (currentStudent != null) {
+          String uid = currentStudent!['uid'] ?? '';
+          if (uid.isNotEmpty) await studentsColl.doc(uid).set({'password': hashedPass}, SetOptions(merge: true));
+        } else if (currentDoctor != null) {
+          String uid = currentDoctor!['uid'] ?? '';
+          if (uid.isNotEmpty) {
+            await commerceDoctorsColl.doc(uid).set({'password': hashedPass}, SetOptions(merge: true));
+            await commerceTasColl.doc(uid).set({'password': hashedPass}, SetOptions(merge: true)).catchError((_){});
+          }
         }
       }
+      notifyListeners();
       return true;
     } catch (e) {
       debugPrint("Update password error: $e");

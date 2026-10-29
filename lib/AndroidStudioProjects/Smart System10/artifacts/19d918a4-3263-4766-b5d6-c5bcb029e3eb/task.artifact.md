@@ -1,0 +1,7 @@
+- `[x]` Task 1: Create core utilities (`debouncer.dart` and `cached_avatar.dart`)
+- `[x]` Task 2: Optimize Student & Doctor Directory Screens (`doctor_students_list_screen.dart`, `student_doctors_list_screen.dart`)
+- `[x]` Task 3: Optimize Dashboards (`manager_dashboard.dart`, `super_admin_dashboard.dart`)
+- `[x]` Task 4: Optimize Academic & Attendance Screens (`attendance_management_screen.dart`, `grades_management_screen.dart`, `exam_results_management_screen.dart`, `student_results_screen.dart`)
+- `[x]` Task 5: Optimize Social & Communication Screens (`discussion_forum_screen.dart`, `private_chat_screen.dart`, `notifications_screen.dart`)
+- `[x]` Task 6: Optimize Research & Auxiliary Screens (`research_submissions_screen.dart`, `research_list_screen.dart`, `student_home_screen.dart`, `college_selection_screen.dart`, `course_details_screen.dart`, `password_management_screen.dart`, `app_drawer.dart`)
+- `[x]` Task 7: Verify with static analysis and tests

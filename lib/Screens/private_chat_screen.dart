@@ -153,12 +153,26 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                         showFullScreenImageViewer(context, widget.otherUserPhotoUrl, widget.otherUserName);
                       }
                     },
-                    child: CircleAvatar(
-                      backgroundColor: Colors.white24,
-                      backgroundImage: _ds.getAvatarImageProvider(widget.otherUserPhotoUrl),
-                      child: (widget.otherUserPhotoUrl ?? '').toString().isEmpty
-                          ? Text(widget.otherUserName.isNotEmpty ? widget.otherUserName[0] : 'U', style: const TextStyle(color: Colors.white))
-                          : null,
+                    child: FutureBuilder<DocumentSnapshot>(
+                      future: FirebaseFirestore.instance
+                          .collection('colleges')
+                          .doc(_ds.selectedInstituteId ?? 'commerce')
+                          .collection(widget.otherUserRole == 'student' ? 'students' : (widget.otherUserRole == 'ta' ? 'tas' : 'doctors'))
+                          .doc(widget.otherUserId)
+                          .get(),
+                      builder: (context, snap) {
+                        String? photo = widget.otherUserPhotoUrl;
+                        if ((photo ?? '').isEmpty && snap.hasData && snap.data!.exists) {
+                          photo = (snap.data!.data() as Map<String, dynamic>?)?['photoUrl'];
+                        }
+                        return CircleAvatar(
+                          backgroundColor: Colors.white24,
+                          backgroundImage: _ds.getAvatarImageProvider(photo),
+                          child: (photo ?? '').toString().isEmpty
+                              ? Text(widget.otherUserName.isNotEmpty ? widget.otherUserName[0] : 'U', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))
+                              : null,
+                        );
+                      },
                     ),
                   ),
                   const SizedBox(width: 12),

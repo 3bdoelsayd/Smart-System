@@ -24,6 +24,18 @@ class AppDrawer extends StatelessWidget {
           bool isSuperAdmin = ds.userRole == 'super_admin';
           bool isManager = ds.userRole == 'manager';
 
+          bool isStaff = ds.userRole == 'doctor' || ds.userRole == 'ta';
+          bool isAdmin = ds.userRole == 'manager' || ds.userRole == 'super_admin';
+          
+          String? profilePhoto;
+          if (isAdmin) {
+            profilePhoto = ds.currentAdmin?['photoUrl']?.toString();
+          } else if (isStaff) {
+            profilePhoto = ds.currentDoctor?['photoUrl']?.toString();
+          } else {
+            profilePhoto = ds.currentStudent?['photoUrl']?.toString();
+          }
+
           // Modernized Colors for Drawer
           Color primaryColor = Theme.of(context).primaryColor;
           
@@ -46,8 +58,8 @@ class AppDrawer extends StatelessWidget {
                     ),
                     child: CircleAvatar(
                       backgroundColor: Colors.white.withOpacity(0.2),
-                      backgroundImage: ds.getAvatarImageProvider(ds.currentStudent?['photoUrl'] ?? ds.currentDoctor?['photoUrl'] ?? ds.currentAdmin?['photoUrl']),
-                      child: (ds.currentStudent?['photoUrl'] ?? ds.currentDoctor?['photoUrl'] ?? ds.currentAdmin?['photoUrl'] ?? '').toString().isEmpty
+                      backgroundImage: ds.getAvatarImageProvider(profilePhoto),
+                      child: (profilePhoto ?? '').toString().isEmpty
                           ? Text(
                               name.isNotEmpty ? name[0] : 'U',
                               style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)

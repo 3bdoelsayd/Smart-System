@@ -129,12 +129,14 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
         final allDocs = snapshot.data?.expand((qs) => qs.docs).where((doc) {
           final d = doc.data() as Map<String, dynamic>;
           final docDoctorId = d['doctor_id']?.toString() ?? '';
+          final docTaId = d['ta_id']?.toString() ?? '';
           final docName = d['name']?.toString().trim() ?? '';
           
           bool isMyDoctorId = (docDoctorId.isNotEmpty && (docDoctorId == doctorUid || docDoctorId == doctorId));
+          bool isMyTaId = (docTaId.isNotEmpty && (docTaId == doctorUid || docTaId == doctorId));
           bool isMySubject = doctorSubjects.any((s) => s.trim().toLowerCase() == docName.toLowerCase());
           
-          return isMyDoctorId || isMySubject;
+          return isMyDoctorId || isMyTaId || isMySubject;
         }).toList() ?? [];
         
         if (allDocs.isEmpty) {
@@ -221,8 +223,13 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
         var filteredSubmissions = docs.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
           final docDocId = data['doctorId']?.toString();
+          final recType = data['recipientType']?.toString();
+
           if (docDocId != null && docDocId.isNotEmpty) {
-            return docDocId == doctorUid || docDocId == doctorId;
+            if (docDocId == doctorUid || docDocId == doctorId) return true;
+          }
+          if (recType != null && recType.isNotEmpty) {
+            return recType == _ds.userRole;
           }
           return true;
         }).toList();
@@ -302,7 +309,13 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
                                 children: [
                                   const SizedBox(height: 4),
                                   Text(r['fileName'] ?? 'file', style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.grey.shade600), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                  Text(isAr ? "تم الرفع: ${r['subject']}" : "Uploaded for: ${r['subject']}", style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    isAr 
+                                        ? "المادة: ${r['subject']} (${r['recipientName'] ?? (r['recipientType'] == 'ta' ? 'المعيد' : 'الدكتور')})" 
+                                        : "Course: ${r['subject']} (${r['recipientName'] ?? (r['recipientType'] == 'ta' ? 'TA' : 'Doctor')})", 
+                                    style: const TextStyle(fontSize: 10, color: Colors.grey)
+                                  ),
                                 ],
                               ),
                               trailing: Row(

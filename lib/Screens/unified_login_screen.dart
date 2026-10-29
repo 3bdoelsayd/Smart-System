@@ -315,10 +315,10 @@ class _UnifiedLoginScreenState extends State<UnifiedLoginScreen> with SingleTick
             const SizedBox(height: 25),
             _buildTextField(
                 controller: _emailController,
-                hint: isAr ? "البريد الإلكتروني" : "Email",
-                icon: Icons.alternate_email_rounded,
+                hint: isAr ? "الكود" : "Code",
+                icon: Icons.badge_rounded,
                 isDark: isDark, color: color,
-                autofillHints: const [AutofillHints.email, AutofillHints.username],
+                autofillHints: const [AutofillHints.username],
                 textInputAction: TextInputAction.next,
             ),
             const SizedBox(height: 18),

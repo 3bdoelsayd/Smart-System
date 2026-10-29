@@ -14,13 +14,14 @@ class _SendResearchScreenState extends State<SendResearchScreen> {
   String? _selectedSubject;
   String? _selectedFileName;
   PlatformFile? _pickedFile;
+  String _recipientType = 'doctor'; // 'doctor' or 'ta'
   bool _isLoading = false;
 
   Future<void> _pickFile() async {
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['pdf', 'docx'],
+        allowedExtensions: ['pdf', 'docx', 'doc'],
         withData: true,
       );
 
@@ -34,7 +35,7 @@ class _SendResearchScreenState extends State<SendResearchScreen> {
     } catch (e) {
       debugPrint("File picker error: $e");
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('خطأ في اختيار الملف')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_dataService.isArabic ? 'خطأ في اختيار الملف' : 'Error picking file')));
       }
     }
   }
@@ -54,12 +55,13 @@ class _SendResearchScreenState extends State<SendResearchScreen> {
         subject: _selectedSubject!,
         file: _pickedFile!,
         title: '',
+        recipientType: _recipientType,
       );
 
       if (!mounted) return;
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(isAr ? 'تم إرسال البحث بنجاح' : 'Research sent successfully'),
+        content: Text(isAr ? 'تم إرسال الملف بنجاح' : 'File sent successfully'),
         backgroundColor: Colors.green,
       ));
       Navigator.pop(context);
@@ -89,7 +91,7 @@ class _SendResearchScreenState extends State<SendResearchScreen> {
       child: Scaffold(
         backgroundColor: bgColor,
         appBar: AppBar(
-          title: Text(isAr ? 'إرسال للمراجعة' : 'Submit Research'),
+          title: Text(isAr ? 'إرسال للمراجعة' : 'Submit File'),
           backgroundColor: isDark ? const Color(0xFF1A1A1A) : primaryColor,
           foregroundColor: Colors.white,
           elevation: 0,
@@ -125,8 +127,62 @@ class _SendResearchScreenState extends State<SendResearchScreen> {
                   onChanged: (val) => setState(() => _selectedSubject = val),
                 ),
               ),
-              const SizedBox(height: 35),
-              _sectionHeader(isAr ? 'رفع ملف البحث' : 'Pick File', labelColor),
+              const SizedBox(height: 25),
+              _sectionHeader(isAr ? 'إرسال إلى' : 'Send To', labelColor),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: ChoiceChip(
+                      label: Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Text(
+                            isAr ? 'الدكتور' : 'Doctor',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: _recipientType == 'doctor' ? (isDark ? Colors.black : Colors.white) : labelColor,
+                            ),
+                          ),
+                        ),
+                      ),
+                      selected: _recipientType == 'doctor',
+                      selectedColor: primaryColor,
+                      backgroundColor: surfaceColor,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                      onSelected: (sel) {
+                        if (sel) setState(() => _recipientType = 'doctor');
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 15),
+                  Expanded(
+                    child: ChoiceChip(
+                      label: Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Text(
+                            isAr ? 'المعيد' : 'Teaching Assistant',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: _recipientType == 'ta' ? (isDark ? Colors.black : Colors.white) : labelColor,
+                            ),
+                          ),
+                        ),
+                      ),
+                      selected: _recipientType == 'ta',
+                      selectedColor: primaryColor,
+                      backgroundColor: surfaceColor,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                      onSelected: (sel) {
+                        if (sel) setState(() => _recipientType = 'ta');
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 25),
+              _sectionHeader(isAr ? 'رفع ملف البحث/الشيت' : 'Pick File', labelColor),
               const SizedBox(height: 12),
               GestureDetector(
                 onTap: _pickFile,
@@ -178,7 +234,7 @@ class _SendResearchScreenState extends State<SendResearchScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 50),
+              const SizedBox(height: 40),
               SizedBox(
                 width: double.infinity,
                 height: 65,
@@ -197,7 +253,7 @@ class _SendResearchScreenState extends State<SendResearchScreen> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              isAr ? 'إرسال للمراجعة الآن' : 'Submit Now', 
+                              isAr ? 'إرسال الآن' : 'Submit Now', 
                               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)
                             ),
                             const SizedBox(width: 10),

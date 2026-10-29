@@ -5,9 +5,14 @@ import 'package:google_fonts/google_fonts.dart';
 import '../services/data_service.dart';
 import '../utils/excel_helper.dart';
 import '../utils/fourth_year_bis_students_data.dart';
+import '../utils/fourth_year_general_students_data.dart';
+import '../utils/first_year_nuzum_students_data.dart';
+import '../utils/first_year_general_students_data.dart';
+import '../utils/second_year_nuzum_students_data.dart';
+import '../utils/second_year_general_students_data.dart';
+import '../utils/third_year_nuzum_students_data.dart';
+import '../utils/third_year_general_students_data.dart';
 import '../widgets/app_drawer.dart';
-import '../widgets/dashboard_card.dart';
-import '../widgets/doctor_profile_modal.dart';
 import '../widgets/student_profile_modal.dart';
 import '../widgets/sub_page_wrapper.dart';
 import 'attendance_management_screen.dart';
@@ -46,6 +51,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           {'icon': Icons.badge_rounded, 'title': isAr ? 'إدارة المعيدين' : 'Manage TAs', 'widget': const TAsManagementView(), 'color': Colors.teal, 'subtitle': isAr ? 'معيدو السكاشن والهيئة' : 'Teaching assistants'},
           {'icon': Icons.admin_panel_settings_rounded, 'title': _ds.translate('manage_managers'), 'widget': const ManagersManagementView(), 'color': const Color(0xFFFF9800), 'subtitle': isAr ? 'صلاحيات المديرين' : 'Managers roles'},
           {'icon': Icons.calendar_month_rounded, 'title': _ds.translate('semesters'), 'widget': const SemestersManagementView(), 'color': const Color(0xFF607D8B), 'subtitle': isAr ? 'الفصول والتقويم' : 'Academic calendar'},
+          {'icon': Icons.calendar_today_rounded, 'title': isAr ? 'إدارة الجدول الدراسي' : 'Timetable Management', 'widget': const ScheduleManagementView(), 'color': Colors.indigo, 'subtitle': isAr ? 'جداول المحاضرات الرسمية' : 'Official lecture timetables'},
         ];
 
         return Directionality(
@@ -289,61 +295,7 @@ void _confirmGeneralDelete(BuildContext context, String title, String content, V
   );
 }
 
-void _confirmResetDevice(BuildContext context, String uid, String? name) {
-  showDialog(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-      title: Column(
-        children: [
-          const Icon(Icons.phonelink_erase_rounded, color: Colors.orange, size: 50),
-          const SizedBox(height: 10),
-          Text("إعادة ضبط الجهاز", style: GoogleFonts.cairo(fontWeight: FontWeight.w900, color: Colors.orange.shade900)),
-        ],
-      ),
-      content: Text(
-        "هل أنت متأكد من فك ربط حساب الطالب ($name) من جهازه الحالي؟ هذا سيسمح له بالدخول من جهاز جديد.",
-        textAlign: TextAlign.center,
-        style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 14),
-      ),
-      actions: [
-        Row(
-          children: [
-            Expanded(
-              child: TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: Text('إلغاء', style: GoogleFonts.cairo(color: Colors.grey, fontWeight: FontWeight.bold)),
-              ),
-            ),
-            Expanded(
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                  elevation: 0,
-                ),
-                onPressed: () async {
-                  await DataService().resetStudentDevice(uid);
-                  if (context.mounted) {
-                    Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('تمت إعادة ضبط الجهاز بنجاح', style: GoogleFonts.cairo()),
-                        backgroundColor: Colors.orangeAccent,
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                  }
-                },
-                child: Text('تأكيد الضبط', style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold)),
-              ),
-            ),
-          ],
-        )
-      ],
-    ),
-  );
-}
+
 
 Widget _buildListItem({required bool isDarkMode, required String title, required String subtitle, required IconData icon, required Color color, String? photoUrl, VoidCallback? onTap, VoidCallback? onDelete, VoidCallback? onEdit, VoidCallback? onAttendance, VoidCallback? onResetDevice}) {
   return Container(
@@ -504,108 +456,687 @@ void _showExcelOptions(BuildContext context, bool isDark, String type, VoidCallb
   showModalBottomSheet(
     context: context,
     backgroundColor: Colors.transparent,
-    builder: (ctx) => Container(
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(35)),
-      ),
-      padding: const EdgeInsets.all(25),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.withAlpha(50), borderRadius: BorderRadius.circular(10))),
-          const SizedBox(height: 25),
-          Text('خيارات الإكسيل والرفع السريع', style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 25),
-          ListTile(
-            leading: const CircleAvatar(backgroundColor: Colors.green, child: Icon(Icons.file_upload_rounded, color: Colors.white)),
-            title: Text('رفع ملف إكسيل', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
-            subtitle: Text('اختر ملف إكسيل من جهازك لرفعه مباشرة', style: GoogleFonts.cairo(fontSize: 11)),
-            onTap: () {
-              Navigator.pop(ctx);
-              onUpload();
-            },
-          ),
-          if (onAutoUpload != null) ...[
-            const Divider(),
+    isScrollControlled: true,
+    builder: (ctx) => DraggableScrollableSheet(
+      initialChildSize: 0.8,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (context, scrollController) => Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(35)),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 15),
+        child: ListView(
+          controller: scrollController,
+          children: [
+            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.withAlpha(50), borderRadius: BorderRadius.circular(10)))),
+            const SizedBox(height: 20),
+            Center(child: Text('خيارات الإكسيل والرفع السريع', style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.bold))),
+            const SizedBox(height: 20),
             ListTile(
-              leading: const CircleAvatar(backgroundColor: Color(0xFF673AB7), child: Icon(Icons.flash_on_rounded, color: Colors.white)),
-              title: Text('رفع طلاب وهميين بنقرة واحدة ⚡', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: const Color(0xFF673AB7))),
-              subtitle: Text('رفع دفعة طلاب تجريبية تلقائياً لكل الفرق والشعب دون ملف إكسيل', style: GoogleFonts.cairo(fontSize: 11)),
+              leading: const CircleAvatar(backgroundColor: Colors.green, child: Icon(Icons.file_upload_rounded, color: Colors.white)),
+              title: Text('رفع ملف إكسيل', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+              subtitle: Text('اختر ملف إكسيل من جهازك لرفعه مباشرة', style: GoogleFonts.cairo(fontSize: 11)),
               onTap: () {
                 Navigator.pop(ctx);
-                onAutoUpload();
+                onUpload();
               },
             ),
-          ],
-          const Divider(),
-          ListTile(
-            leading: const CircleAvatar(backgroundColor: Colors.blue, child: Icon(Icons.file_download_rounded, color: Colors.white)),
-            title: Text('تحميل نموذج الإكسيل', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
-            subtitle: Text('حمل النموذج واعرف الترتيب الصحيح للأعمدة لتجنب الأخطاء', style: GoogleFonts.cairo(fontSize: 11)),
-            onTap: () async {
-              Navigator.pop(ctx);
-              if (type == 'student') {
-                await ExcelHelper.downloadStudentTemplate(ds.isArabic);
-              } else if (type == 'doctor') {
-                await ExcelHelper.downloadDoctorTemplate(ds.isArabic);
-              }
-            },
-          ),
-          if (type == 'student') ...[
+            if (onAutoUpload != null) ...[
+              const Divider(),
+              ListTile(
+                leading: const CircleAvatar(backgroundColor: Color(0xFF673AB7), child: Icon(Icons.flash_on_rounded, color: Colors.white)),
+                title: Text('رفع طلاب وهميين بنقرة واحدة ⚡', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: const Color(0xFF673AB7))),
+                subtitle: Text('رفع دفعة طلاب تجريبية تلقائياً لكل الفرق والشعب دون ملف إكسيل', style: GoogleFonts.cairo(fontSize: 11)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  onAutoUpload();
+                },
+              ),
+            ],
             const Divider(),
             ListTile(
-              leading: const CircleAvatar(backgroundColor: Color(0xFF673AB7), child: Icon(Icons.cloud_upload_rounded, color: Colors.white)),
-              title: Text('رفع طلاب الفرقة الرابعة (نظم معلومات) تلقائياً ⚡', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: const Color(0xFF673AB7))),
-              subtitle: Text('رفع 249 طالباً للفرقة الرابعة بكلمة مرور 123456 بضغطة زر واحدة', style: GoogleFonts.cairo(fontSize: 11)),
-              onTap: () {
-                Navigator.pop(ctx);
-                _autoUploadFourthYearStudents(context, ds);
-              },
-            ),
-            const Divider(),
-            ListTile(
-              leading: const CircleAvatar(backgroundColor: Colors.red, child: Icon(Icons.delete_sweep_rounded, color: Colors.white)),
-              title: Text('حذف جميع الطلاب نهائياً 🗑️', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: Colors.red)),
-              subtitle: Text('مسح كل بيانات الطلاب من قاعدة البيانات لإضافة بيانات حقيقية', style: GoogleFonts.cairo(fontSize: 11)),
+              leading: const CircleAvatar(backgroundColor: Colors.blue, child: Icon(Icons.file_download_rounded, color: Colors.white)),
+              title: Text('تحميل نموذج الإكسيل', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+              subtitle: Text('حمل النموذج واعرف الترتيب الصحيح للأعمدة لتجنب الأخطاء', style: GoogleFonts.cairo(fontSize: 11)),
               onTap: () async {
                 Navigator.pop(ctx);
-                bool? confirm = await showDialog<bool>(
-                  context: context,
-                  builder: (dialogCtx) => AlertDialog(
-                    title: Text('تحذير خطير', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: Colors.red)),
-                    content: Text('هل أنت متأكد من حذف جميع الطلاب من قاعدة البيانات؟ لا يمكن التراجع عن هذا الإجراء.', style: GoogleFonts.cairo()),
-                    actions: [
-                      TextButton(onPressed: () => Navigator.pop(dialogCtx, false), child: Text('إلغاء')),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                        onPressed: () => Navigator.pop(dialogCtx, true),
-                        child: Text('تأكيد الحذف', style: TextStyle(color: Colors.white)),
-                      ),
-                    ],
-                  ),
-                );
-
-                if (confirm == true) {
-                  try {
-                    await ds.deleteAllStudents();
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حذف جميع الطلاب نهائياً من فايربيس بنجاح 🗑️'), backgroundColor: Colors.green));
-                    }
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل الحذف: $e'), backgroundColor: Colors.red));
-                    }
-                  }
+                if (type == 'student') {
+                  await ExcelHelper.downloadStudentTemplate(ds.isArabic);
+                } else if (type == 'doctor') {
+                  await ExcelHelper.downloadDoctorTemplate(ds.isArabic);
                 }
               },
             ),
+            if (type == 'student') ...[
+              const Divider(),
+              ListTile(
+                leading: const CircleAvatar(backgroundColor: Color(0xFF673AB7), child: Icon(Icons.cloud_upload_rounded, color: Colors.white)),
+                title: Text('رفع طلاب الفرقة الأولى (نظم معلومات) تلقائياً ⚡', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: const Color(0xFF673AB7))),
+                subtitle: Text('رفع 605 طالباً للفرقة الأولى (نظم) بكلمة مرور 123456', style: GoogleFonts.cairo(fontSize: 11)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _autoUploadFirstYearNuzumStudents(context, ds);
+                },
+              ),
+              const Divider(),
+              ListTile(
+                leading: const CircleAvatar(backgroundColor: Color(0xFF3F51B5), child: Icon(Icons.cloud_upload_rounded, color: Colors.white)),
+                title: Text('رفع طلاب الفرقة الأولى (محاسبة ومراجعة) تلقائياً ⚡', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: const Color(0xFF3F51B5))),
+                subtitle: Text('رفع 812 طالباً للفرقة الأولى (عام) بكلمة مرور 123456', style: GoogleFonts.cairo(fontSize: 11)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _autoUploadFirstYearGeneralStudents(context, ds);
+                },
+              ),
+              const Divider(),
+              ListTile(
+                leading: const CircleAvatar(backgroundColor: Color(0xFF009688), child: Icon(Icons.cloud_upload_rounded, color: Colors.white)),
+                title: Text('رفع طلاب الفرقة الثانية (نظم معلومات) تلقائياً ⚡', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: const Color(0xFF009688))),
+                subtitle: Text('رفع 582 طالباً للفرقة الثانية (نظم) بكلمة مرور 123456', style: GoogleFonts.cairo(fontSize: 11)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _autoUploadSecondYearNuzumStudents(context, ds);
+                },
+              ),
+              const Divider(),
+              ListTile(
+                leading: const CircleAvatar(backgroundColor: Color(0xFF00BCD4), child: Icon(Icons.cloud_upload_rounded, color: Colors.white)),
+                title: Text('رفع طلاب الفرقة الثانية (محاسبة ومراجعة) تلقائياً ⚡', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: const Color(0xFF00BCD4))),
+                subtitle: Text('رفع 412 طالباً للفرقة الثانية (عام) بكلمة مرور 123456', style: GoogleFonts.cairo(fontSize: 11)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _autoUploadSecondYearGeneralStudents(context, ds);
+                },
+              ),
+              const Divider(),
+              ListTile(
+                leading: const CircleAvatar(backgroundColor: Color(0xFFFF9800), child: Icon(Icons.cloud_upload_rounded, color: Colors.white)),
+                title: Text('رفع طلاب الفرقة الثالثة (نظم معلومات) تلقائياً ⚡', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: const Color(0xFFFF9800))),
+                subtitle: Text('رفع 292 طالباً للفرقة الثالثة (نظم) بكلمة مرور 123456', style: GoogleFonts.cairo(fontSize: 11)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _autoUploadThirdYearNuzumStudents(context, ds);
+                },
+              ),
+              const Divider(),
+              ListTile(
+                leading: const CircleAvatar(backgroundColor: Color(0xFFE91E63), child: Icon(Icons.cloud_upload_rounded, color: Colors.white)),
+                title: Text('رفع طلاب الفرقة الثالثة (محاسبة ومراجعة) تلقائياً ⚡', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: const Color(0xFFE91E63))),
+                subtitle: Text('رفع 350 طالباً للفرقة الثالثة (عام) بكلمة مرور 123456', style: GoogleFonts.cairo(fontSize: 11)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _autoUploadThirdYearGeneralStudents(context, ds);
+                },
+              ),
+              const Divider(),
+              ListTile(
+                leading: const CircleAvatar(backgroundColor: Color(0xFF673AB7), child: Icon(Icons.cloud_upload_rounded, color: Colors.white)),
+                title: Text('رفع طلاب الفرقة الرابعة (نظم معلومات) تلقائياً ⚡', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: const Color(0xFF673AB7))),
+                subtitle: Text('رفع 249 طالباً للفرقة الرابعة بكلمة مرور 123456 بضغطة زر واحدة', style: GoogleFonts.cairo(fontSize: 11)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _autoUploadFourthYearStudents(context, ds);
+                },
+              ),
+              const Divider(),
+              ListTile(
+                leading: const CircleAvatar(backgroundColor: Color(0xFF9C27B0), child: Icon(Icons.cloud_upload_rounded, color: Colors.white)),
+                title: Text('رفع طلاب الفرقة الرابعة (محاسبة ومراجعة) تلقائياً ⚡', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: const Color(0xFF9C27B0))),
+                subtitle: Text('رفع 334 طالباً للفرقة الرابعة (عام) بكلمة مرور 123456', style: GoogleFonts.cairo(fontSize: 11)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _autoUploadFourthYearGeneralStudents(context, ds);
+                },
+              ),
+              const Divider(),
+              ListTile(
+                leading: const CircleAvatar(backgroundColor: Colors.red, child: Icon(Icons.delete_sweep_rounded, color: Colors.white)),
+                title: Text('حذف جميع الطلاب نهائياً 🗑️', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: Colors.red)),
+                subtitle: Text('مسح كل بيانات الطلاب من قاعدة البيانات لإضافة بيانات حقيقية', style: GoogleFonts.cairo(fontSize: 11)),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  bool? confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (dialogCtx) => AlertDialog(
+                      title: Text('تحذير خطير', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: Colors.red)),
+                      content: Text('هل أنت متأكد من حذف جميع الطلاب من قاعدة البيانات؟ لا يمكن التراجع عن هذا الإجراء.', style: GoogleFonts.cairo()),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(dialogCtx, false), child: Text('إلغاء')),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                          onPressed: () => Navigator.pop(dialogCtx, true),
+                          child: Text('تأكيد الحذف', style: TextStyle(color: Colors.white)),
+                        ),
+                      ],
+                    ),
+                  );
+
+                  if (confirm == true) {
+                    try {
+                      await ds.deleteAllStudents();
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حذف جميع الطلاب نهائياً من فايربيس بنجاح 🗑️'), backgroundColor: Colors.green));
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل الحذف: $e'), backgroundColor: Colors.red));
+                      }
+                    }
+                  }
+                },
+              ),
+            ],
+            const SizedBox(height: 30),
           ],
-          const SizedBox(height: 30),
-        ],
+        ),
       ),
     ),
   );
+}
+
+void _autoUploadFirstYearNuzumStudents(BuildContext context, DataService ds) async {
+  if (ds.selectedInstituteId == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('يرجى اختيار الكلية أولاً من أعلى الشاشة', style: GoogleFonts.cairo()),
+        backgroundColor: Colors.orange,
+      ),
+    );
+    return;
+  }
+
+  final studentsList = FirstYearNuzumStudents.list;
+  int totalStudents = studentsList.length;
+  int progressCount = 0;
+  StateSetter? dialogSetState;
+
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) => StatefulBuilder(
+      builder: (context, setS) {
+        dialogSetState = setS;
+        return AlertDialog(
+          backgroundColor: ds.isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+          content: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(color: Color(0xFF673AB7)),
+                const SizedBox(height: 20),
+                Text(
+                  "جاري رفع $totalStudents طالباً للفرقة الأولى (نظم معلومات الأعمال)...",
+                  style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 15),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 15),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: LinearProgressIndicator(
+                    value: totalStudents > 0 ? progressCount / totalStudents : 0,
+                    minHeight: 8,
+                    backgroundColor: Colors.grey.withAlpha(40),
+                    color: const Color(0xFF673AB7),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text("$progressCount من $totalStudents", style: GoogleFonts.cairo(fontSize: 13, color: Colors.grey)),
+              ],
+            ),
+          ),
+        );
+      },
+    ),
+  );
+
+  for (var s in studentsList) {
+    String sId = s['id'] ?? '';
+    String sName = s['name'] ?? '';
+    String sDivision = s['division'] ?? 'نظم معلومات الأعمال';
+
+    if (sId.isNotEmpty && sName.isNotEmpty) {
+      try {
+        await ds.addStudentManual('level_1', sId, sName, "", sDivision, "123456", notify: false);
+        progressCount++;
+        if (dialogSetState != null) dialogSetState!(() {});
+        await Future.delayed(const Duration(milliseconds: 5));
+      } catch (e) {
+        debugPrint("Error uploading student $sId: $e");
+      }
+    }
+  }
+
+  if (context.mounted) {
+    Navigator.pop(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('✅ تم رفع جميع طلاب الفرقة الأولى (نظم) بنجاح ($progressCount طالب)', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 5),
+      ),
+    );
+  }
+}
+
+void _autoUploadFirstYearGeneralStudents(BuildContext context, DataService ds) async {
+  if (ds.selectedInstituteId == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('يرجى اختيار الكلية أولاً من أعلى الشاشة', style: GoogleFonts.cairo()),
+        backgroundColor: Colors.orange,
+      ),
+    );
+    return;
+  }
+
+  final studentsList = FirstYearGeneralStudents.list;
+  int totalStudents = studentsList.length;
+  int progressCount = 0;
+  StateSetter? dialogSetState;
+
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) => StatefulBuilder(
+      builder: (context, setS) {
+        dialogSetState = setS;
+        return AlertDialog(
+          backgroundColor: ds.isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+          content: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(color: Color(0xFF3F51B5)),
+                const SizedBox(height: 20),
+                Text(
+                  "جاري رفع $totalStudents طالباً للفرقة الأولى (المحاسبة والمراجعة)...",
+                  style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 15),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 15),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: LinearProgressIndicator(
+                    value: totalStudents > 0 ? progressCount / totalStudents : 0,
+                    minHeight: 8,
+                    backgroundColor: Colors.grey.withAlpha(40),
+                    color: const Color(0xFF3F51B5),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text("$progressCount من $totalStudents", style: GoogleFonts.cairo(fontSize: 13, color: Colors.grey)),
+              ],
+            ),
+          ),
+        );
+      },
+    ),
+  );
+
+  for (var s in studentsList) {
+    String sId = s['id'] ?? '';
+    String sName = s['name'] ?? '';
+    String sDivision = s['division'] ?? 'المحاسبة والمراجعة';
+
+    if (sId.isNotEmpty && sName.isNotEmpty) {
+      try {
+        await ds.addStudentManual('level_1', sId, sName, "", sDivision, "123456", notify: false);
+        progressCount++;
+        if (dialogSetState != null) dialogSetState!(() {});
+        await Future.delayed(const Duration(milliseconds: 5));
+      } catch (e) {
+        debugPrint("Error uploading student $sId: $e");
+      }
+    }
+  }
+
+  if (context.mounted) {
+    Navigator.pop(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('✅ تم رفع جميع طلاب الفرقة الأولى (عام) بنجاح ($progressCount طالب)', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 5),
+      ),
+    );
+  }
+}
+
+void _autoUploadSecondYearNuzumStudents(BuildContext context, DataService ds) async {
+  if (ds.selectedInstituteId == null) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('يرجى اختيار الكلية أولاً من أعلى الشاشة', style: GoogleFonts.cairo()), backgroundColor: Colors.orange));
+    return;
+  }
+  final studentsList = SecondYearNuzumStudents.list;
+  int totalStudents = studentsList.length;
+  int progressCount = 0;
+  StateSetter? dialogSetState;
+
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) => StatefulBuilder(
+      builder: (context, setS) {
+        dialogSetState = setS;
+        return AlertDialog(
+          backgroundColor: ds.isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+          content: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(color: Color(0xFF009688)),
+                const SizedBox(height: 20),
+                Text("جاري رفع $totalStudents طالباً للفرقة الثانية (نظم معلومات الأعمال)...", style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 15), textAlign: TextAlign.center),
+                const SizedBox(height: 15),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: LinearProgressIndicator(value: totalStudents > 0 ? progressCount / totalStudents : 0, minHeight: 8, backgroundColor: Colors.grey.withAlpha(40), color: const Color(0xFF009688)),
+                ),
+                const SizedBox(height: 12),
+                Text("$progressCount من $totalStudents", style: GoogleFonts.cairo(fontSize: 13, color: Colors.grey)),
+              ],
+            ),
+          ),
+        );
+      },
+    ),
+  );
+
+  for (var s in studentsList) {
+    String sId = s['id'] ?? '';
+    String sName = s['name'] ?? '';
+    String sDivision = s['division'] ?? 'نظم معلومات الأعمال';
+    if (sId.isNotEmpty && sName.isNotEmpty) {
+      try {
+        await ds.addStudentManual('level_2', sId, sName, "", sDivision, "123456", notify: false);
+        progressCount++;
+        if (dialogSetState != null) dialogSetState!(() {});
+        await Future.delayed(const Duration(milliseconds: 5));
+      } catch (e) {
+        debugPrint("Error uploading student $sId: $e");
+      }
+    }
+  }
+
+  if (context.mounted) {
+    Navigator.pop(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('✅ تم رفع جميع طلاب الفرقة الثانية (نظم) بنجاح ($progressCount طالب)', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)), backgroundColor: Colors.green, duration: const Duration(seconds: 5)),
+    );
+  }
+}
+
+void _autoUploadSecondYearGeneralStudents(BuildContext context, DataService ds) async {
+  if (ds.selectedInstituteId == null) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('يرجى اختيار الكلية أولاً من أعلى الشاشة', style: GoogleFonts.cairo()), backgroundColor: Colors.orange));
+    return;
+  }
+  final studentsList = SecondYearGeneralStudents.list;
+  int totalStudents = studentsList.length;
+  int progressCount = 0;
+  StateSetter? dialogSetState;
+
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) => StatefulBuilder(
+      builder: (context, setS) {
+        dialogSetState = setS;
+        return AlertDialog(
+          backgroundColor: ds.isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+          content: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(color: Color(0xFF00BCD4)),
+                const SizedBox(height: 20),
+                Text("جاري رفع $totalStudents طالباً للفرقة الثانية (المحاسبة والمراجعة)...", style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 15), textAlign: TextAlign.center),
+                const SizedBox(height: 15),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: LinearProgressIndicator(value: totalStudents > 0 ? progressCount / totalStudents : 0, minHeight: 8, backgroundColor: Colors.grey.withAlpha(40), color: const Color(0xFF00BCD4)),
+                ),
+                const SizedBox(height: 12),
+                Text("$progressCount من $totalStudents", style: GoogleFonts.cairo(fontSize: 13, color: Colors.grey)),
+              ],
+            ),
+          ),
+        );
+      },
+    ),
+  );
+
+  for (var s in studentsList) {
+    String sId = s['id'] ?? '';
+    String sName = s['name'] ?? '';
+    String sDivision = s['division'] ?? 'المحاسبة والمراجعة';
+    if (sId.isNotEmpty && sName.isNotEmpty) {
+      try {
+        await ds.addStudentManual('level_2', sId, sName, "", sDivision, "123456", notify: false);
+        progressCount++;
+        if (dialogSetState != null) dialogSetState!(() {});
+        await Future.delayed(const Duration(milliseconds: 5));
+      } catch (e) {
+        debugPrint("Error uploading student $sId: $e");
+      }
+    }
+  }
+
+  if (context.mounted) {
+    Navigator.pop(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('✅ تم رفع جميع طلاب الفرقة الثانية (عام) بنجاح ($progressCount طالب)', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)), backgroundColor: Colors.green, duration: const Duration(seconds: 5)),
+    );
+  }
+}
+
+void _autoUploadThirdYearNuzumStudents(BuildContext context, DataService ds) async {
+  if (ds.selectedInstituteId == null) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('يرجى اختيار الكلية أولاً من أعلى الشاشة', style: GoogleFonts.cairo()), backgroundColor: Colors.orange));
+    return;
+  }
+  final studentsList = ThirdYearNuzumStudents.list;
+  int totalStudents = studentsList.length;
+  int progressCount = 0;
+  StateSetter? dialogSetState;
+
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) => StatefulBuilder(
+      builder: (context, setS) {
+        dialogSetState = setS;
+        return AlertDialog(
+          backgroundColor: ds.isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+          content: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(color: Color(0xFFFF9800)),
+                const SizedBox(height: 20),
+                Text("جاري رفع $totalStudents طالباً للفرقة الثالثة (نظم معلومات الأعمال)...", style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 15), textAlign: TextAlign.center),
+                const SizedBox(height: 15),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: LinearProgressIndicator(value: totalStudents > 0 ? progressCount / totalStudents : 0, minHeight: 8, backgroundColor: Colors.grey.withAlpha(40), color: const Color(0xFFFF9800)),
+                ),
+                const SizedBox(height: 12),
+                Text("$progressCount من $totalStudents", style: GoogleFonts.cairo(fontSize: 13, color: Colors.grey)),
+              ],
+            ),
+          ),
+        );
+      },
+    ),
+  );
+
+  for (var s in studentsList) {
+    String sId = s['id'] ?? '';
+    String sName = s['name'] ?? '';
+    String sDivision = s['division'] ?? 'نظم معلومات الأعمال';
+    if (sId.isNotEmpty && sName.isNotEmpty) {
+      try {
+        await ds.addStudentManual('level_3', sId, sName, "", sDivision, "123456", notify: false);
+        progressCount++;
+        if (dialogSetState != null) dialogSetState!(() {});
+        await Future.delayed(const Duration(milliseconds: 5));
+      } catch (e) {
+        debugPrint("Error uploading student $sId: $e");
+      }
+    }
+  }
+
+  if (context.mounted) {
+    Navigator.pop(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('✅ تم رفع جميع طلاب الفرقة الثالثة (نظم) بنجاح ($progressCount طالب)', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)), backgroundColor: Colors.green, duration: const Duration(seconds: 5)),
+    );
+  }
+}
+
+void _autoUploadThirdYearGeneralStudents(BuildContext context, DataService ds) async {
+  if (ds.selectedInstituteId == null) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('يرجى اختيار الكلية أولاً من أعلى الشاشة', style: GoogleFonts.cairo()), backgroundColor: Colors.orange));
+    return;
+  }
+  final studentsList = ThirdYearGeneralStudents.list;
+  int totalStudents = studentsList.length;
+  int progressCount = 0;
+  StateSetter? dialogSetState;
+
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) => StatefulBuilder(
+      builder: (context, setS) {
+        dialogSetState = setS;
+        return AlertDialog(
+          backgroundColor: ds.isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+          content: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(color: Color(0xFFE91E63)),
+                const SizedBox(height: 20),
+                Text("جاري رفع $totalStudents طالباً للفرقة الثالثة (المحاسبة والمراجعة)...", style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 15), textAlign: TextAlign.center),
+                const SizedBox(height: 15),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: LinearProgressIndicator(value: totalStudents > 0 ? progressCount / totalStudents : 0, minHeight: 8, backgroundColor: Colors.grey.withAlpha(40), color: const Color(0xFFE91E63)),
+                ),
+                const SizedBox(height: 12),
+                Text("$progressCount من $totalStudents", style: GoogleFonts.cairo(fontSize: 13, color: Colors.grey)),
+              ],
+            ),
+          ),
+        );
+      },
+    ),
+  );
+
+  for (var s in studentsList) {
+    String sId = s['id'] ?? '';
+    String sName = s['name'] ?? '';
+    String sDivision = s['division'] ?? 'المحاسبة والمراجعة';
+    if (sId.isNotEmpty && sName.isNotEmpty) {
+      try {
+        await ds.addStudentManual('level_3', sId, sName, "", sDivision, "123456", notify: false);
+        progressCount++;
+        if (dialogSetState != null) dialogSetState!(() {});
+        await Future.delayed(const Duration(milliseconds: 5));
+      } catch (e) {
+        debugPrint("Error uploading student $sId: $e");
+      }
+    }
+  }
+
+  if (context.mounted) {
+    Navigator.pop(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('✅ تم رفع جميع طلاب الفرقة الثالثة (عام) بنجاح ($progressCount طالب)', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)), backgroundColor: Colors.green, duration: const Duration(seconds: 5)),
+    );
+  }
+}
+
+void _autoUploadFourthYearGeneralStudents(BuildContext context, DataService ds) async {
+  if (ds.selectedInstituteId == null) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('يرجى اختيار الكلية أولاً من أعلى الشاشة', style: GoogleFonts.cairo()), backgroundColor: Colors.orange));
+    return;
+  }
+  final studentsList = FourthYearGeneralStudents.list;
+  int totalStudents = studentsList.length;
+  int progressCount = 0;
+  StateSetter? dialogSetState;
+
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) => StatefulBuilder(
+      builder: (context, setS) {
+        dialogSetState = setS;
+        return AlertDialog(
+          backgroundColor: ds.isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+          content: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(color: Color(0xFF9C27B0)),
+                const SizedBox(height: 20),
+                Text("جاري رفع $totalStudents طالباً للفرقة الرابعة (المحاسبة والمراجعة)...", style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 15), textAlign: TextAlign.center),
+                const SizedBox(height: 15),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: LinearProgressIndicator(value: totalStudents > 0 ? progressCount / totalStudents : 0, minHeight: 8, backgroundColor: Colors.grey.withAlpha(40), color: const Color(0xFF9C27B0)),
+                ),
+                const SizedBox(height: 12),
+                Text("$progressCount من $totalStudents", style: GoogleFonts.cairo(fontSize: 13, color: Colors.grey)),
+              ],
+            ),
+          ),
+        );
+      },
+    ),
+  );
+
+  for (var s in studentsList) {
+    String sId = s['id'] ?? '';
+    String sName = s['name'] ?? '';
+    String sDivision = s['division'] ?? 'المحاسبة والمراجعة';
+    if (sId.isNotEmpty && sName.isNotEmpty) {
+      try {
+        await ds.addStudentManual('level_4', sId, sName, "", sDivision, "123456", notify: false);
+        progressCount++;
+        if (dialogSetState != null) dialogSetState!(() {});
+        await Future.delayed(const Duration(milliseconds: 5));
+      } catch (e) {
+        debugPrint("Error uploading student $sId: $e");
+      }
+    }
+  }
+
+  if (context.mounted) {
+    Navigator.pop(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('✅ تم رفع جميع طلاب الفرقة الرابعة (عام) بنجاح ($progressCount طالب)', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)), backgroundColor: Colors.green, duration: const Duration(seconds: 5)),
+    );
+  }
 }
 
 void _autoUploadFourthYearStudents(BuildContext context, DataService ds) async {
@@ -864,14 +1395,18 @@ class _ManagersManagementViewState extends State<ManagersManagementView> {
                 padding: const EdgeInsets.all(15),
                 itemCount: docs.length,
                 itemBuilder: (ctx, i) {
-                  var d = docs[i].data() as Map<String, dynamic>;
-                  return _buildListItem(
-                    isDarkMode: _ds.isDarkMode, 
-                    title: d['name'] ?? 'بدون اسم', 
-                    subtitle: 'كود: ${d['email'].toString().split('@')[0]}\nيدير: ${List.from(d['managedLevels'] ?? []).join(', ')}', 
-                    icon: Icons.admin_panel_settings_rounded, 
-                    color: Colors.orange, 
-                    onDelete: () => _confirmGeneralDelete(context, 'حذف مدير', 'هل أنت متأكد من حذف هذا المدير؟', () => _ds.deleteManager(docs[i].id))
+                  var docItem = docs[i];
+                  var d = docItem.data() as Map<String, dynamic>;
+                  return RepaintBoundary(
+                    key: ValueKey<String>(docItem.id),
+                    child: _buildListItem(
+                      isDarkMode: _ds.isDarkMode, 
+                      title: d['name'] ?? 'بدون اسم', 
+                      subtitle: 'كود: ${d['email'].toString().split('@')[0]}\nيدير: ${List.from(d['managedLevels'] ?? []).join(', ')}', 
+                      icon: Icons.admin_panel_settings_rounded, 
+                      color: Colors.orange, 
+                      onDelete: () => _confirmGeneralDelete(context, 'حذف مدير', 'هل أنت متأكد من حذف هذا المدير؟', () => _ds.deleteManager(docItem.id))
+                    ),
                   );
                 },
               );
@@ -1021,14 +1556,17 @@ class _LevelsManagementViewState extends State<LevelsManagementView> {
                 itemCount: snap.data!.docs.length,
                 itemBuilder: (ctx, i) {
                   var d = snap.data!.docs[i];
-                  return _buildListItem(
-                    isDarkMode: _ds.isDarkMode,
-                    title: d['name'],
-                    subtitle: 'كود: ${d.id}',
-                    icon: Icons.layers_rounded,
-                    color: Colors.blue,
-                    onAttendance: () => Navigator.push(context, MaterialPageRoute(builder: (context) => AttendanceManagementScreen())), 
-                    onDelete: () => _confirmDelete(d.id, d['name']),
+                  return RepaintBoundary(
+                    key: ValueKey<String>(d.id),
+                    child: _buildListItem(
+                      isDarkMode: _ds.isDarkMode,
+                      title: d['name'],
+                      subtitle: 'كود: ${d.id}',
+                      icon: Icons.layers_rounded,
+                      color: Colors.blue,
+                      onAttendance: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const AttendanceManagementScreen())), 
+                      onDelete: () => _confirmDelete(d.id, d['name']),
+                    ),
                   );
                 },
               );
@@ -1126,6 +1664,187 @@ class _StudentsManagementViewState extends State<StudentsManagementView> {
   String? _selectedLevelId;
   String? _selectedLevelName;
   String? _selectedSection;
+
+  Widget _buildStudentContent(bool isDark) {
+    if (_selectedLevelId == null) {
+      return FutureBuilder<QuerySnapshot>(
+        future: _ds.commerceLevelsColl.get(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+          var levels = snapshot.data!.docs;
+          return ListView.builder(
+            padding: const EdgeInsets.all(20),
+            itemCount: levels.length,
+            itemBuilder: (context, index) {
+              var lvl = levels[index];
+              String lvlId = lvl.id;
+              String lvlName = lvl['name'] ?? lvlId;
+              return Container(
+                margin: const EdgeInsets.only(bottom: 15),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [BoxShadow(color: Colors.black.withAlpha(isDark ? 50 : 15), blurRadius: 10, offset: const Offset(0, 5))],
+                ),
+                child: ListTile(
+                  contentPadding: const EdgeInsets.all(20),
+                  leading: CircleAvatar(backgroundColor: const Color(0xFF4CAF50).withAlpha(30), child: const Icon(Icons.layers_rounded, color: Color(0xFF4CAF50))),
+                  title: Text(lvlName, style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.bold)),
+                  subtitle: Text('انقر لعرض الشعب والشصص التابعة لهذه الفرقة', style: GoogleFonts.cairo(fontSize: 12, color: Colors.grey)),
+                  trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                  onTap: () => setState(() {
+                    _selectedLevelId = lvlId;
+                    _selectedLevelName = lvlName;
+                    _selectedSection = null;
+                  }),
+                ),
+              );
+            },
+          );
+        },
+      );
+    } else if (_selectedSection == null) {
+      return StreamBuilder<QuerySnapshot>(
+        stream: _ds.getCommerceSectionsColl(_selectedLevelId!).snapshots(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+          var sections = snapshot.data!.docs;
+          List<String> divisions = sections.isNotEmpty 
+              ? sections.map((s) => s['name'].toString()).toList()
+              : ['نظم معلومات الأعمال', 'المحاسبة والمراجعة'];
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(20),
+            itemCount: divisions.length,
+            itemBuilder: (context, index) {
+              String divName = divisions[index];
+              return Container(
+                margin: const EdgeInsets.only(bottom: 15),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [BoxShadow(color: Colors.black.withAlpha(isDark ? 50 : 15), blurRadius: 10, offset: const Offset(0, 5))],
+                ),
+                child: ListTile(
+                  contentPadding: const EdgeInsets.all(20),
+                  leading: CircleAvatar(backgroundColor: Colors.blue.withAlpha(30), child: const Icon(Icons.grid_view_rounded, color: Colors.blue)),
+                  title: Text(divName, style: GoogleFonts.cairo(fontSize: 16, fontWeight: FontWeight.bold)),
+                  subtitle: Text('عرض طلاب شعبة $divName', style: GoogleFonts.cairo(fontSize: 12, color: Colors.grey)),
+                  trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                  onTap: () => setState(() => _selectedSection = divName),
+                ),
+              );
+            },
+          );
+        },
+      );
+    } else {
+      return StreamBuilder<QuerySnapshot>(
+        stream: _ds.studentsColl.snapshots(),
+        builder: (ctx, snap) {
+          if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+          
+          String cleanLevel = _selectedLevelId != null ? _ds.normalizeLevel(_selectedLevelId!) : '';
+
+          var docs = snap.data!.docs.where((d) {
+            var data = d.data() as Map<String, dynamic>;
+            String sLvl = _ds.normalizeLevel(data['level']?.toString() ?? '');
+            String sDiv = (data['division'] ?? '').toString().trim();
+            String targetDiv = (_selectedSection ?? '').trim();
+
+            bool levelMatch = _selectedLevelId == null ||
+                (sLvl == cleanLevel) ||
+                (data['level']?.toString() == _selectedLevelId || data['level']?.toString() == _selectedLevelId!.replaceAll('level_', ''));
+
+            String normSDiv = sDiv.replaceAll('أ', 'ا').replaceAll('إ', 'ا').replaceAll('آ', 'ا').replaceAll('ة', 'ه').toLowerCase();
+            String normTargetDiv = targetDiv.replaceAll('أ', 'ا').replaceAll('إ', 'ا').replaceAll('آ', 'ا').replaceAll('ة', 'ه').toLowerCase();
+
+            bool divMatch = targetDiv.isEmpty ||
+                normSDiv == normTargetDiv ||
+                normSDiv.contains(normTargetDiv) ||
+                normTargetDiv.contains(normSDiv);
+
+            String sName = (data['name'] ?? '').toString().toLowerCase();
+            String sId = (data['id'] ?? '').toString();
+            bool searchMatch = _searchQuery.isEmpty || sName.contains(_searchQuery.toLowerCase()) || sId.contains(_searchQuery);
+
+            return levelMatch && divMatch && searchMatch;
+          }).toList();
+
+          docs.sort((a, b) => (a.data() as Map<String, dynamic>)['name'].toString().compareTo((b.data() as Map<String, dynamic>)['name'].toString()));
+
+          return Column(
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text("إجمالي الطلاب للشعبة:", style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: Colors.grey)),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+                      decoration: BoxDecoration(color: Colors.green.withAlpha(30), borderRadius: BorderRadius.circular(20)),
+                      child: Text("${docs.length} طالب", style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: Colors.green)),
+                    ),
+                  ],
+                ),
+              ),
+              if (docs.isEmpty)
+                Expanded(
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.school_outlined, size: 80, color: Colors.grey.withAlpha(50)),
+                        const SizedBox(height: 10),
+                        Text('لا يوجد طلاب في هذه الشعبة حالياً', style: GoogleFonts.cairo(color: Colors.grey)),
+                      ],
+                    ),
+                  ),
+                )
+              else
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(15),
+                    itemCount: docs.length,
+                    itemBuilder: (ctx, i) {
+                      var d = docs[i].data() as Map<String, dynamic>;
+                      return _buildListItem(
+                        isDarkMode: isDark, 
+                        title: d['name'] ?? 'بدون اسم', 
+                        subtitle: 'ID: ${d['id']} | الفرقة ${d['level']} | ${d['division']}', 
+                        icon: Icons.school_rounded, 
+                        color: Colors.green, 
+                        photoUrl: d['photoUrl'],
+                        onTap: () => showRichStudentProfileModal(
+                          context: context,
+                          studentIdOrUid: docs[i].id,
+                          studentName: d['name'],
+                          initialStudentData: d,
+                        ),
+                        onResetDevice: () => _confirmGeneralDelete(
+                          context,
+                          'إعادة ضبط الجهاز',
+                          'هل أنت متأكد من فك ربط جهاز الطالب (${d['name']})؟',
+                          () => _ds.resetStudentDevice(docs[i].id),
+                        ),
+                        onDelete: () => _confirmGeneralDelete(
+                          context,
+                          'حذف طالب',
+                          'هل أنت متأكد من حذف هذا الطالب؟',
+                          () => _ds.deleteStudent(docs[i].id, d['level']?.toString() ?? '1'),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+            ],
+          );
+        },
+      );
+    }
+  }
 
   void _showAddStudentBS() async {
     final nameC = TextEditingController();
@@ -1364,11 +2083,12 @@ class _StudentsManagementViewState extends State<StudentsManagementView> {
 
   @override
   Widget build(BuildContext context) {
+    bool isDark = _ds.isDarkMode;
     return Column(
       children: [
         _buildActionHeader(
           context: context,
-          isDarkMode: _ds.isDarkMode, 
+          isDarkMode: isDark, 
           onAddManual: _showAddStudentBS, 
           onAddExcel: _pickAndUploadStudentsExcel, 
           onAutoUpload: _autoUploadFakeStudents,
@@ -1378,118 +2098,153 @@ class _StudentsManagementViewState extends State<StudentsManagementView> {
         ),
         _buildBreadcrumb(),
         Expanded(
+          child: _buildStudentContent(isDark),
+        ),
+      ],
+    );
+  }
+}
+
+class ScheduleManagementView extends StatefulWidget {
+  const ScheduleManagementView({super.key});
+  @override
+  State<ScheduleManagementView> createState() => _ScheduleManagementViewState();
+}
+
+class _ScheduleManagementViewState extends State<ScheduleManagementView> {
+  final DataService _ds = DataService();
+  String? _selectedLevelId = 'level_1';
+  String _selectedDivision = 'نظم معلومات الأعمال';
+
+  void _showAddScheduleModal(BuildContext context) {
+    final subjectC = TextEditingController();
+    final timeC = TextEditingController(text: '09:00 ص');
+    final hallC = TextEditingController();
+    final doctorC = TextEditingController();
+    String dayName = 'السبت';
+    String type = 'محاضرة';
+
+    _showStyledBS(
+      context: context,
+      isDarkMode: _ds.isDarkMode,
+      title: 'إضافة محاضرة رسمية',
+      icon: Icons.calendar_today_rounded,
+      color: Colors.indigo,
+      children: [
+        _buildDropdown(_ds.isDarkMode, 'اليوم', Icons.calendar_view_day_rounded, ['السبت', 'الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'].map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(), (v) => dayName = v ?? 'السبت', value: dayName),
+        const SizedBox(height: 15),
+        _buildDropdown(_ds.isDarkMode, 'النوع', Icons.category_rounded, ['محاضرة', 'سكشن'].map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(), (v) => type = v ?? 'محاضرة', value: type),
+        const SizedBox(height: 15),
+        _buildInputField(_ds.isDarkMode, subjectC, 'اسم المادة', Icons.book_rounded),
+        _buildInputField(_ds.isDarkMode, timeC, 'الوقت (مثال: 09:00 ص)', Icons.access_time_rounded),
+        _buildInputField(_ds.isDarkMode, hallC, 'القاعة / المكان', Icons.room_rounded),
+        _buildInputField(_ds.isDarkMode, doctorC, 'الدكتور / المحاضر', Icons.person_rounded),
+      ],
+      onSave: () async {
+        if (subjectC.text.isNotEmpty && _selectedLevelId != null) {
+          await _ds.addOfficialSchedule(
+            levelId: _selectedLevelId!,
+            division: _selectedDivision,
+            item: {
+              'subject': subjectC.text,
+              'dayName': dayName,
+              'time': timeC.text,
+              'type': type,
+              'hall': hallC.text,
+              'doctor': doctorC.text,
+              'isOfficial': true,
+            },
+          );
+          if (context.mounted) Navigator.pop(context);
+        }
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    bool isDark = _ds.isDarkMode;
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(15),
+          child: Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  value: _selectedLevelId,
+                  dropdownColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                  decoration: InputDecoration(labelText: 'الفرقة', border: OutlineInputBorder(borderRadius: BorderRadius.circular(15))),
+                  items: const [
+                    DropdownMenuItem(value: 'level_1', child: Text('الفرقة الأولى')),
+                    DropdownMenuItem(value: 'level_2', child: Text('الفرقة الثانية')),
+                    DropdownMenuItem(value: 'level_3', child: Text('الفرقة الثالثة')),
+                    DropdownMenuItem(value: 'level_4', child: Text('الفرقة الرابعة')),
+                  ],
+                  onChanged: (v) => setState(() => _selectedLevelId = v),
+                ),
+              ),
+              const SizedBox(width: 15),
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  value: _selectedDivision,
+                  dropdownColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                  decoration: InputDecoration(labelText: 'الشعبة', border: OutlineInputBorder(borderRadius: BorderRadius.circular(15))),
+                  items: const [
+                    DropdownMenuItem(value: 'نظم معلومات الأعمال', child: Text('نظم معلومات الأعمال')),
+                    DropdownMenuItem(value: 'المحاسبة والمراجعة', child: Text('المحاسبة والمراجعة')),
+                    DropdownMenuItem(value: 'الكل', child: Text('جميع الشعب')),
+                  ],
+                  onChanged: (v) => setState(() => _selectedDivision = v ?? 'الكل'),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 15),
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 50), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
+            icon: const Icon(Icons.add),
+            label: Text('إضافة محاضرة رسمية جديدة', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+            onPressed: () => _showAddScheduleModal(context),
+          ),
+        ),
+        Expanded(
           child: StreamBuilder<QuerySnapshot>(
-            stream: _ds.studentsColl.snapshots(),
+            stream: _ds.getOfficialScheduleStream(levelId: _selectedLevelId),
             builder: (ctx, snap) {
               if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-              
-              String cleanLevel = _selectedLevelId != null ? _ds.normalizeLevel(_selectedLevelId!) : '';
-
               var docs = snap.data!.docs.where((d) {
                 var data = d.data() as Map<String, dynamic>;
-                String sLvl = _ds.normalizeLevel(data['level']?.toString() ?? '');
-                String sDiv = (data['division'] ?? '').toString().trim();
-                String targetDiv = (_selectedSection ?? '').trim();
-
-                bool levelMatch = _selectedLevelId == null ||
-                    (sLvl == cleanLevel) ||
-                    (data['level']?.toString() == _selectedLevelId || data['level']?.toString() == _selectedLevelId!.replaceAll('level_', ''));
-
-                String normSDiv = sDiv.replaceAll('أ', 'ا').replaceAll('إ', 'ا').replaceAll('آ', 'ا').replaceAll('ة', 'ه').toLowerCase();
-                String normTargetDiv = targetDiv.replaceAll('أ', 'ا').replaceAll('إ', 'ا').replaceAll('آ', 'ا').replaceAll('ة', 'ه').toLowerCase();
-
-                bool divMatch = targetDiv.isEmpty ||
-                    normSDiv == normTargetDiv ||
-                    normSDiv.contains(normTargetDiv) ||
-                    normTargetDiv.contains(normSDiv);
-
-                String sName = (data['name'] ?? '').toString().toLowerCase();
-                String sId = (data['id'] ?? '').toString();
-                bool searchMatch = _searchQuery.isEmpty || sName.contains(_searchQuery.toLowerCase()) || sId.contains(_searchQuery);
-
-                return levelMatch && divMatch && searchMatch;
+                String div = (data['division'] ?? '').toString();
+                return _selectedDivision == 'الكل' || div == _selectedDivision || div.isEmpty;
               }).toList();
 
-              docs.sort((a, b) => (a.data() as Map<String, dynamic>)['name'].toString().compareTo((b.data() as Map<String, dynamic>)['name'].toString()));
+              if (docs.isEmpty) {
+                return Center(child: Text('لا توجد محاضرات مسجلة لهذه الفرقة والشعبة', style: GoogleFonts.cairo(color: Colors.grey)));
+              }
 
-              return Column(
-                children: [
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          _selectedSection != null
-                            ? "إجمالي الطلاب بالشعبة:"
-                            : (_selectedLevelId != null ? "إجمالي الطلاب بالفرقة:" : "إجمالي جميع الطلاب:"),
-                          style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: Colors.grey),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: Colors.green.withAlpha(30),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            "${docs.length} طالب",
-                            style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: Colors.green),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (docs.isEmpty)
-                    Expanded(
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.school_outlined, size: 80, color: Colors.grey.withAlpha(50)),
-                            const SizedBox(height: 10),
-                            Text('لا يوجد طلاب حالياً', style: GoogleFonts.cairo(color: Colors.grey)),
-                          ],
-                        ),
-                      ),
-                    )
-                  else
-                    Expanded(
-                      child: ListView.builder(
-                        padding: const EdgeInsets.all(15),
-                        itemCount: docs.length,
-                        itemBuilder: (ctx, i) {
-                          var d = docs[i].data() as Map<String, dynamic>;
-                          return _buildListItem(
-                            isDarkMode: _ds.isDarkMode, 
-                            title: d['name'] ?? 'بدون اسم', 
-                            subtitle: 'ID: ${d['id']} | الفرقة ${d['level']} | ${d['division']}', 
-                            icon: Icons.school_rounded, 
-                            color: Colors.green, 
-                            photoUrl: d['photoUrl'],
-                            onTap: () => showRichStudentProfileModal(
-                              context: context,
-                              studentIdOrUid: docs[i].id,
-                              studentName: d['name'],
-                              initialStudentData: d,
-                            ),
-                            onResetDevice: () => _confirmGeneralDelete(
-                              context,
-                              'إعادة ضبط الجهاز',
-                              'هل أنت متأكد من فك ربط جهاز الطالب (${d['name']})؟',
-                              () => _ds.resetStudentDevice(docs[i].id),
-                            ),
-                            onDelete: () => _confirmGeneralDelete(
-                              context,
-                              'حذف طالب',
-                              'هل أنت متأكد من حذف هذا الطالب؟',
-                              () => _ds.deleteStudent(docs[i].id, d['level']?.toString() ?? '1'),
-                            ),
-                          );
-                        },
+              return ListView.builder(
+                padding: const EdgeInsets.all(15),
+                itemCount: docs.length,
+                itemBuilder: (ctx, i) {
+                  var d = docs[i].data() as Map<String, dynamic>;
+                  return Card(
+                    color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                    child: ListTile(
+                      leading: const CircleAvatar(backgroundColor: Colors.indigo, child: Icon(Icons.menu_book_rounded, color: Colors.white)),
+                      title: Text(d['subject'] ?? '', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+                      subtitle: Text('${d['dayName']} - ${d['time']} | ${d['type']}\nالقاعة: ${d['hall'] ?? '--'} | د: ${d['doctor'] ?? '--'}', style: GoogleFonts.cairo(fontSize: 12)),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete_outline, color: Colors.red),
+                        onPressed: () => _ds.deleteOfficialSchedule(docs[i].id),
                       ),
                     ),
-                ],
+                  );
+                },
               );
             },
           ),

@@ -40,8 +40,11 @@ class _CollegeSelectionScreenState extends State<CollegeSelectionScreen> {
               colors: [Colors.white, Colors.grey.shade100],
             ),
           ) : null,
-          child: StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance.collection('colleges').snapshots(),
+          child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: FirebaseFirestore.instance.collection('colleges').withConverter<Map<String, dynamic>>(
+              fromFirestore: (snapshot, _) => snapshot.data() ?? {},
+              toFirestore: (model, _) => model,
+            ).snapshots(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator(color: Color(0xFF673AB7)));
@@ -74,7 +77,13 @@ class _CollegeSelectionScreenState extends State<CollegeSelectionScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 25),
                 itemCount: colleges.length,
                 itemBuilder: (context, index) {
-                  var college = colleges[index].data() as Map<String, dynamic>;
+                  Map<String, dynamic> college = {};
+                  try {
+                    final raw = colleges[index].data();
+                    if (raw is Map) {
+                      college = Map<String, dynamic>.from(raw);
+                    }
+                  } catch (_) {}
                   String id = colleges[index].id;
                   String name = isAr ? (college['nameAr'] ?? id) : (college['nameEn'] ?? id);
                   String? logo = college['logoUrl'];

@@ -13,14 +13,14 @@ class _ResearchUploadScreenState extends State<ResearchUploadScreen> {
   String? _selectedSubject;
   String? _selectedFileName;
   PlatformFile? _pickedFile;
+  String _recipientType = 'doctor'; // 'doctor' or 'ta'
   final DataService _ds = DataService();
   bool _isUploading = false;
 
   Future<void> _pickFile() async {
     try {
-      // تم تغيير طريقة اختيار الملف لتكون أكثر شمولاً
       FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: FileType.any, // السماح باختيار أي نوع في البداية لحل مشكلة الحظر
+        type: FileType.any,
         withData: true,
       );
 
@@ -28,7 +28,6 @@ class _ResearchUploadScreenState extends State<ResearchUploadScreen> {
         final file = result.files.single;
         final ext = file.extension?.toLowerCase();
         
-        // التحقق من الامتداد يدوياً
         if (ext == 'pdf' || ext == 'docx' || ext == 'doc') {
           setState(() {
             _pickedFile = file;
@@ -67,6 +66,7 @@ class _ResearchUploadScreenState extends State<ResearchUploadScreen> {
         subject: _selectedSubject!,
         file: _pickedFile!,
         title: '',
+        recipientType: _recipientType,
       );
       
       if (mounted) {
@@ -117,7 +117,7 @@ class _ResearchUploadScreenState extends State<ResearchUploadScreen> {
               backgroundColor: isDark ? const Color(0xFF1A1A1A) : primaryColor,
               foregroundColor: Colors.white,
             ),
-            body: Padding(
+            body: SingleChildScrollView(
               padding: const EdgeInsets.all(25.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -142,7 +142,64 @@ class _ResearchUploadScreenState extends State<ResearchUploadScreen> {
                     items: subjects.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
                     onChanged: (val) => setState(() => _selectedSubject = val),
                   ),
-                  const SizedBox(height: 30),
+                  const SizedBox(height: 25),
+                  Text(
+                    _ds.translate('send_to'), 
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: textColor)
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ChoiceChip(
+                          label: Center(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Text(
+                                _ds.translate('doctor_recipient'),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: _recipientType == 'doctor' ? (isDark ? Colors.black : Colors.white) : textColor,
+                                ),
+                              ),
+                            ),
+                          ),
+                          selected: _recipientType == 'doctor',
+                          selectedColor: primaryColor,
+                          backgroundColor: isDark ? Colors.white.withAlpha(15) : Colors.grey.shade100,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                          onSelected: (sel) {
+                            if (sel) setState(() => _recipientType = 'doctor');
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 15),
+                      Expanded(
+                        child: ChoiceChip(
+                          label: Center(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Text(
+                                _ds.translate('ta_recipient'),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: _recipientType == 'ta' ? (isDark ? Colors.black : Colors.white) : textColor,
+                                ),
+                              ),
+                            ),
+                          ),
+                          selected: _recipientType == 'ta',
+                          selectedColor: primaryColor,
+                          backgroundColor: isDark ? Colors.white.withAlpha(15) : Colors.grey.shade100,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                          onSelected: (sel) {
+                            if (sel) setState(() => _recipientType = 'ta');
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 25),
                   Text(
                     _ds.translate('pick_file'), 
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: textColor)
@@ -181,7 +238,7 @@ class _ResearchUploadScreenState extends State<ResearchUploadScreen> {
                       ),
                     ),
                   ),
-                  const Spacer(),
+                  const SizedBox(height: 40),
                   _isUploading 
                     ? const Center(child: CircularProgressIndicator())
                     : SizedBox(
@@ -196,7 +253,7 @@ class _ResearchUploadScreenState extends State<ResearchUploadScreen> {
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18))
                           ),
                           child: Text(
-                            isAr ? 'إرسال البحث' : 'Send Research',
+                            isAr ? 'إرسال الملف' : 'Send File',
                             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
                           ),
                         ),

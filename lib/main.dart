@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 import 'firebase_options.dart';
 import 'services/data_service.dart';
@@ -41,7 +40,7 @@ void main() async {
     try {
       await Supabase.initialize(
         url: 'https://dwkbyhyzkjzmynznilta.supabase.co',
-        anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR3a2J5aHl6a2p6bXluem5pbHRhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0NDc0MzEsImV4cCI6MjA5OTAyMzQzMX0.s_si7MkVvB9SuLWHQQMmoUbOOes5enaAW2Jq7oaTcNw',
+        publishableKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR3a2J5aHl6a2p6bXluem5pbHRhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0NDc0MzEsImV4cCI6MjA5OTAyMzQzMX0.s_si7MkVvB9SuLWHQQMmoUbOOes5enaAW2Jq7oaTcNw',
       );
     } catch (e) {
       debugPrint("Supabase Init Error: $e");
@@ -56,11 +55,17 @@ void main() async {
 
     if (currentUser != null && savedRole != null) {
       await ds.loadUserData(currentUser.uid, savedRole);
-      if (savedRole == 'student') initialRoute = '/student/home';
-      else if (savedRole == 'doctor' || savedRole == 'ta') initialRoute = '/doctor/home';
-      else if (savedRole == 'super_admin') initialRoute = '/super-admin/dashboard';
-      else if (savedRole == 'manager') initialRoute = '/manager/dashboard';
-      else initialRoute = '/start';
+      if (savedRole == 'student') {
+        initialRoute = '/student/home';
+      } else if (savedRole == 'doctor' || savedRole == 'ta') {
+        initialRoute = '/doctor/home';
+      } else if (savedRole == 'super_admin') {
+        initialRoute = '/super-admin/dashboard';
+      } else if (savedRole == 'manager') {
+        initialRoute = '/manager/dashboard';
+      } else {
+        initialRoute = '/start';
+      }
     } else {
       initialRoute = '/start';
     }

@@ -500,8 +500,10 @@ class _StudentResearchsPage extends StatelessWidget {
                   padding: const EdgeInsets.fromLTRB(15, 0, 15, 120),
                   itemCount: docs.length,
                   itemBuilder: (ctx, i) {
+                    final docId = docs[i].id;
                     final r = docs[i].data() as Map<String, dynamic>;
                     bool isSeen = r['isSeen'] == true;
+                    final recipientStr = r['recipientName'] ?? (r['recipientType'] == 'ta' ? (isAr ? 'المعيد' : 'TA') : (isAr ? 'الدكتور' : 'Doctor'));
 
                     return Container(
                       margin: const EdgeInsets.only(bottom: 12),
@@ -537,7 +539,33 @@ class _StudentResearchsPage extends StatelessWidget {
                                 subtitle: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const SizedBox(height: 10),
+                                    if ((r['fileName'] ?? '').toString().isNotEmpty)
+                                      Text(
+                                        r['fileName'] ?? '', 
+                                        style: TextStyle(fontSize: 12, color: isDark ? Colors.white70 : Colors.black54),
+                                        maxLines: 1, 
+                                        overflow: TextOverflow.ellipsis
+                                      ),
+                                    const SizedBox(height: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: primaryColor.withAlpha(30),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.person_outline_rounded, size: 12, color: primaryColor),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            "${isAr ? 'مُرسل إلى:' : 'To:'} $recipientStr",
+                                            style: TextStyle(fontSize: 11, color: primaryColor, fontWeight: FontWeight.bold),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
                                     if (r['grade'] != null || (r['comment'] != null && r['comment'].toString().isNotEmpty))
                                       Container(
                                         padding: const EdgeInsets.all(12),
@@ -596,7 +624,7 @@ class _StudentResearchsPage extends StatelessWidget {
                                           ],
                                         ),
                                       ),
-                                    const SizedBox(height: 10),
+                                    const SizedBox(height: 8),
                                     Row(
                                       children: [
                                         Icon(
@@ -617,8 +645,44 @@ class _StudentResearchsPage extends StatelessWidget {
                                     ),
                                   ],
                                 ),
-                                trailing: Icon(isSeen ? Icons.check_circle_rounded : Icons.access_time_rounded,
-                                    color: isSeen ? Colors.blue : (isDark ? Colors.white10 : Colors.grey.shade400)),
+                                trailing: IconButton(
+                                  icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
+                                  tooltip: isAr ? 'حذف الملف' : 'Delete file',
+                                  onPressed: () {
+                                    showDialog(
+                                      context: context,
+                                      builder: (dialogCtx) => AlertDialog(
+                                        backgroundColor: cardBg,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                                        title: Text(isAr ? 'حذف البحث / الشيت' : 'Delete File', style: TextStyle(color: isDark ? Colors.white : Colors.black)),
+                                        content: Text(isAr ? 'هل أنت متأكد من حذف هذا الملف؟' : 'Are you sure you want to delete this file?', style: TextStyle(color: isDark ? Colors.white70 : Colors.black87)),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(dialogCtx),
+                                            child: Text(isAr ? 'إلغاء' : 'Cancel', style: TextStyle(color: primaryColor)),
+                                          ),
+                                          TextButton(
+                                            onPressed: () async {
+                                              Navigator.pop(dialogCtx);
+                                              bool ok = await ds.deleteResearch(docId);
+                                              if (context.mounted) {
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  SnackBar(
+                                                    content: Text(ok 
+                                                      ? (isAr ? 'تم حذف الملف بنجاح' : 'File deleted successfully')
+                                                      : (isAr ? 'فشل الحذف' : 'Delete failed')),
+                                                    backgroundColor: ok ? Colors.green : Colors.red,
+                                                  ),
+                                                );
+                                              }
+                                            },
+                                            child: Text(isAr ? 'حذف' : 'Delete', style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
                               ),
                             ),
                           ],
@@ -956,13 +1020,40 @@ class _StudentSchedulePageState extends State<_StudentSchedulePage> {
               label: Text(isAr ? "إضافة حصة" : "Add Class", style: TextStyle(color: isDark ? Colors.black : Colors.white, fontWeight: FontWeight.bold)),
             ),
           ),
-          body: StreamBuilder<QuerySnapshot>(
-            stream: _ds.getStudentScheduleStream(),
+          body: StreamBuilder<List<QueryDocumentSnapshot>>(
+            stream: (() {
+              final personalStream = _ds.getStudentScheduleStream();
+              String? lvl = _ds.currentStudent?['level'];
+              String? div = _ds.currentStudent?['division'];
+
+              return personalStream.asyncMap((pSnap) async {
+                var oSnap = await _ds.schedulesColl.get();
+                List<QueryDocumentSnapshot> allDocs = [];
+                allDocs.addAll(pSnap.docs);
+
+                String sLvl = lvl ?? '';
+                String sDiv = div ?? '';
+
+                for (var oDoc in oSnap.docs) {
+                  var data = oDoc.data() as Map<String, dynamic>;
+                  String oLvl = (data['levelId'] ?? '').toString();
+                  String oDiv = (data['division'] ?? '').toString();
+
+                  bool lvlMatch = oLvl.isEmpty || oLvl == 'all' || oLvl == 'level_$sLvl' || oLvl == sLvl;
+                  bool divMatch = oDiv.isEmpty || oDiv == 'الكل' || oDiv == sDiv || oDiv.contains(sDiv) || sDiv.contains(oDiv);
+
+                  if (lvlMatch && divMatch) {
+                    allDocs.add(oDoc);
+                  }
+                }
+                return allDocs;
+              });
+            }()),
             builder: (context, snap) {
               if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-              final docs = snap.data!.docs;
+              final docs = snap.data!;
 
-              if (docs.isEmpty) return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.calendar_today_outlined, size: 80, color: isDark ? Colors.white10 : Colors.grey.withAlpha(77)), const SizedBox(height: 20), Text(isAr ? 'ابدأ ببناء جدولك الآن' : 'Start building your schedule', style: TextStyle(color: isDark ? Colors.white38 : Colors.grey.shade500))]));
+              if (docs.isEmpty) return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.calendar_today_outlined, size: 80, color: isDark ? Colors.white10 : Colors.grey.withAlpha(77)), const SizedBox(height: 20), Text(isAr ? 'لا توجد حصص أو محاضرات في جدولك حالياً' : 'No classes in your schedule currently', style: TextStyle(color: isDark ? Colors.white38 : Colors.grey.shade500))]));
 
               return ListView.builder(
                 padding: const EdgeInsets.fromLTRB(15, 0, 15, 120),
@@ -971,6 +1062,7 @@ class _StudentSchedulePageState extends State<_StudentSchedulePage> {
                   final d = docs[i].data() as Map<String, dynamic>;
                   final color = _beautifulColors[i % _beautifulColors.length];
                   bool isLec = d['type'] == (isAr ? 'محاضرة' : 'Lecture');
+                  bool isOfficial = d['isOfficial'] == true;
 
                   return Container(
                     margin: const EdgeInsets.only(bottom: 15),

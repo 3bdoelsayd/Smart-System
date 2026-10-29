@@ -3,24 +3,99 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function isAuth() {
+    function isAuthenticated() {
       return request.auth != null;
     }
 
-    // Allow public read access to colleges, levels, courses, and settings during app startup
+    function isSuperAdmin() {
+      return isAuthenticated();
+    }
+
+    function isManager() {
+      return isAuthenticated();
+    }
+
+    function isDoctorOrTa() {
+      return isAuthenticated();
+    }
+
+    // Colleges and subcollections
     match /colleges/{collegeId} {
       allow read: if true;
-      allow write: if isAuth();
+      allow write: if isAuthenticated();
 
-      match /{document=**} {
+      match /students/{studentId} {
+        allow read: if isAuthenticated();
+        allow write: if isAuthenticated();
+      }
+
+      match /doctors/{doctorId} {
+        allow read: if isAuthenticated();
+        allow write: if isAuthenticated();
+      }
+
+      match /tas/{taId} {
+        allow read: if isAuthenticated();
+        allow write: if isAuthenticated();
+      }
+
+      match /managers/{managerId} {
+        allow read: if isAuthenticated();
+        allow write: if isAuthenticated();
+      }
+
+      match /super_admins/{adminId} {
+        allow read: if isAuthenticated();
+        allow write: if isAuthenticated();
+      }
+
+      match /levels/{levelId} {
         allow read: if true;
-        allow write: if isAuth();
+        allow write: if isAuthenticated();
+
+        match /{subcollection}/{subId} {
+          allow read: if true;
+          allow write: if isAuthenticated();
+        }
+      }
+
+      match /semesters/{semesterId} {
+        allow read: if true;
+        allow write: if isAuthenticated();
+      }
+
+      match /private_chats/{chatId} {
+        allow read, write: if isAuthenticated();
+        match /messages/{messageId} {
+          allow read, write: if isAuthenticated();
+        }
       }
     }
 
-    // Default rule for other collections
-    match /{document=**} {
-      allow read, write: if isAuth();
+    match /attendance/{attId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated();
+    }
+
+    match /submissions/{subId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated();
+    }
+
+    match /exam_results/{resId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    match /grades/{gradeId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    match /notifications/{notifId} {
+      allow read, write: if isAuthenticated();
     }
   }
 }

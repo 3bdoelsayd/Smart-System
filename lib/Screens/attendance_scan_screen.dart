@@ -15,7 +15,7 @@ class AttendanceScanScreen extends StatefulWidget {
 }
 
 class _AttendanceScanScreenState extends State<AttendanceScanScreen> {
-  // 💡 مفتاح التحكم بفحص الموقع والمسافة (موقوف مؤقتاً للتجربة، أرجعه true لإعادة التفعيل)
+  // إلغاء التحقق من الموقع الجغرافي والامتار نهائياً للسماح بتسجيل الحضور من أي مكان
   static const bool enableLocationCheck = false;
 
   final DataService _ds = DataService();
@@ -167,18 +167,19 @@ class _AttendanceScanScreenState extends State<AttendanceScanScreen> {
               }
             }
             
-            // 4. فحص المسافة (30 متر)
+            // 4. فحص المسافة (محدد بـ 50 متر للاختبار)
             if (enableLocationCheck && hallLocStr != "0,0") {
               List<String> latLng = hallLocStr.split(',');
               if (latLng.length == 2) {
                 double hallLat = double.tryParse(latLng[0]) ?? 0.0;
                 double hallLng = double.tryParse(latLng[1]) ?? 0.0;
                 double distance = Geolocator.distanceBetween(pos.latitude, pos.longitude, hallLat, hallLng);
+                double allowedRadius = 1.0; // مخصص لمسافة 1 متر للاختبار من البيت
 
-                if (distance > 30) {
+                if (distance > allowedRadius) {
                   throw _ds.isArabic 
-                    ? "أنت خارج نطاق القاعة. المسافة المحسوبة: ${distance.toInt()} متر." 
-                    : "Too far from hall (${distance.toInt()}m).";
+                    ? "أنت خارج نطاق القاعة. المسافة الحالية: ${distance.toStringAsFixed(1)} متر (الحد المسموح: ${allowedRadius.toInt()} متر)." 
+                    : "Too far from hall (${distance.toStringAsFixed(1)}m / ${allowedRadius.toInt()}m max).";
                 }
               }
             }
@@ -263,10 +264,55 @@ class _AttendanceScanScreenState extends State<AttendanceScanScreen> {
         title: Text(_ds.translate('attendance')),
         backgroundColor: isDark ? const Color(0xFF1E1E1E) : primaryColor,
         foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.flash_on_rounded, color: Colors.white),
+            tooltip: 'Flash',
+            onPressed: () => _scannerController.toggleTorch(),
+          ),
+          IconButton(
+            icon: const Icon(Icons.camera_front_rounded, color: Colors.white),
+            tooltip: 'Switch Camera',
+            onPressed: () => _scannerController.switchCamera(),
+          ),
+        ],
       ),
       body: Stack(
         children: [
-          MobileScanner(controller: _scannerController, onDetect: _onDetect),
+          MobileScanner(
+            controller: _scannerController, 
+            onDetect: _onDetect,
+            errorBuilder: (context, error, child) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 64),
+                      const SizedBox(height: 16),
+                      Text(
+                        _ds.isArabic
+                          ? "تعذر تشغيل الكاميرا. يرجى التأكد من إذن الوصول للكاميرا أو إعادة محاولة الفتح.\n(${error.errorDetails ?? error.errorCode})"
+                          : "Camera error: ${error.errorCode}",
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.white, fontSize: 16),
+                      ),
+                      const SizedBox(height: 20),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(backgroundColor: primaryColor, foregroundColor: Colors.white),
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: Text(_ds.isArabic ? "إعادة المحاولة" : "Retry"),
+                        onPressed: () {
+                          _scannerController.start();
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
           Center(
             child: Container(
               width: 260, height: 260,

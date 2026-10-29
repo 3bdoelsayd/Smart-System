@@ -2,8 +2,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/data_service.dart';
+import '../utils/debouncer.dart';
 import '../utils/excel_helper.dart';
 import '../widgets/app_drawer.dart';
+import '../widgets/cached_avatar.dart';
 import '../widgets/doctor_profile_modal.dart';
 import '../widgets/student_profile_modal.dart';
 
@@ -20,10 +22,18 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
   List<String> _managedLevels = [];
   String? _selectedLevel;
   String _searchQuery = "";
-  
+  final Debouncer _searchDebouncer = Debouncer(milliseconds: 300);
+
   // Attendance Selection State
   Map<String, dynamic>? _selectedAttCourseData;
   int? _selectedAttLecture;
+
+  @override
+  void dispose() {
+    _searchDebouncer.dispose();
+    _tabController.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -443,24 +453,31 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
               if (!snap.hasData) return const Center(child: CircularProgressIndicator());
               var docs = snap.data!.docs.where((d) => (d.data() as Map)['name'].toString().toLowerCase().contains(_searchQuery.toLowerCase())).toList();
               if (docs.isEmpty) return _buildEmptyState(Icons.group_off, 'لا يوجد طلاب');
-              return ListView.builder(padding: const EdgeInsets.all(15), itemCount: docs.length, itemBuilder: (ctx, i) {
-                var d = docs[i].data() as Map<String, dynamic>;
-                return _buildListItem(
-                  title: d['name'] ?? '', 
-                  subtitle: 'ID: ${d['id']} | ${d['division']}', 
-                  icon: Icons.school, 
-                  color: Colors.green, 
-                  photoUrl: d['photoUrl'],
-                  onTap: () => showRichStudentProfileModal(
-                    context: context,
-                    studentIdOrUid: docs[i].id,
-                    studentName: d['name'],
-                    initialStudentData: d,
-                  ),
-                  onResetDevice: () => _confirmResetDevice(context, docs[i].id, d['name']),
-                  onDelete: () => _ds.deleteStudent(docs[i].id, _selectedLevel!.replaceAll('level_', ''))
-                );
-              });
+              return ListView.builder(
+                padding: const EdgeInsets.all(15), 
+                itemCount: docs.length, 
+                itemBuilder: (ctx, i) {
+                  var d = docs[i].data() as Map<String, dynamic>;
+                  return RepaintBoundary(
+                    key: ValueKey<String>(docs[i].id),
+                    child: _buildListItem(
+                      title: d['name'] ?? '', 
+                      subtitle: 'ID: ${d['id']} | ${d['division']}', 
+                      icon: Icons.school, 
+                      color: Colors.green, 
+                      photoUrl: d['photoUrl'],
+                      onTap: () => showRichStudentProfileModal(
+                        context: context,
+                        studentIdOrUid: docs[i].id,
+                        studentName: d['name'],
+                        initialStudentData: d,
+                      ),
+                      onResetDevice: () => _confirmResetDevice(context, docs[i].id, d['name']),
+                      onDelete: () => _ds.deleteStudent(docs[i].id, _selectedLevel!.replaceAll('level_', ''))
+                    ),
+                  );
+                },
+              );
             },
           ),
         ),
@@ -737,7 +754,11 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
     return Padding(
       padding: const EdgeInsets.fromLTRB(15, 15, 15, 5),
       child: TextField(
-        onChanged: (v) => setState(() => _searchQuery = v),
+        onChanged: (v) {
+          _searchDebouncer.run(() {
+            if (mounted) setState(() => _searchQuery = v);
+          });
+        },
         decoration: InputDecoration(
           hintText: _ds.isArabic ? 'ابحث بالاسم...' : 'Search by name...',
           prefixIcon: const Icon(Icons.search_rounded),
@@ -769,9 +790,10 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
             onTap: onTap,
             contentPadding: const EdgeInsets.fromLTRB(15, 12, 15, 0),
             leading: (photoUrl != null && photoUrl.isNotEmpty)
-              ? CircleAvatar(
+              ? CachedAvatar(
+                  photoUrl: photoUrl,
+                  name: title,
                   radius: 24,
-                  backgroundImage: _ds.getAvatarImageProvider(photoUrl),
                 )
               : Container(
                   padding: const EdgeInsets.all(12),
