@@ -40,7 +40,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
     super.initState();
     _managedLevels = List<String>.from(_ds.currentAdmin?['managedLevels'] ?? []);
     _selectedLevel = _managedLevels.isNotEmpty ? _managedLevels.first : null;
-    _tabController = TabController(length: 6, vsync: this);
+    _tabController = TabController(length: 7, vsync: this);
     _tabController.addListener(() {
       if (_tabController.indexIsChanging) {
         setState(() {
@@ -140,6 +140,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
                     Tab(text: 'المعيدين'),
                     Tab(text: 'الحضور'),
                     Tab(text: 'الفصول'),
+                    Tab(text: 'الجدول'),
                   ],
                 ),
               ),
@@ -154,6 +155,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
               _buildTAsTab(),
               _buildAttendanceTab(),
               _buildSemestersTab(),
+              _buildScheduleTab(),
             ],
           ),
         ),
@@ -191,6 +193,14 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
     else if (_tabController.index == 1) { label = "مادة"; action = _showAddCourseBS; }
     else if (_tabController.index == 2) { label = "دكتور"; action = _showAddDoctorBS; }
     else if (_tabController.index == 3) { label = "معيد"; action = _showAddTABs; }
+    else if (_tabController.index == 6) { 
+      return FloatingActionButton.extended(
+        onPressed: () => _showAddScheduleModal(context, _selectedLevel ?? '1'),
+        backgroundColor: Theme.of(context).primaryColor,
+        icon: const Icon(Icons.add, color: Colors.white),
+        label: Text('إضافة محاضرة', style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold)),
+      );
+    }
     else { return null; }
 
     return FloatingActionButton.extended(
@@ -986,6 +996,148 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
       isArabic: _ds.isArabic,
     );
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تصدير ملف الاكسيل بنجاح')));
+  }
+
+  Widget _buildScheduleTab() {
+    bool isDark = _ds.isDarkMode;
+    if (_selectedLevel == null) {
+      return Center(child: Text('يرجى اختيار فرقة دراسية أولاً', style: GoogleFonts.cairo(color: Colors.grey)));
+    }
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(15),
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).primaryColor,
+              foregroundColor: Colors.white,
+              minimumSize: const Size(double.infinity, 50),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+            ),
+            icon: const Icon(Icons.add_circle_outline_rounded),
+            label: Text('إضافة محاضرة رسمية للجدول', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 16)),
+            onPressed: () => _showAddScheduleModal(context, _selectedLevel!),
+          ),
+        ),
+        Expanded(
+          child: StreamBuilder<QuerySnapshot>(
+            stream: _ds.getOfficialScheduleStream(levelId: 'level_$_selectedLevel'),
+            builder: (ctx, snap) {
+              if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+              var docs = snap.data!.docs;
+
+              if (docs.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.calendar_today_outlined, size: 70, color: Colors.grey.withAlpha(80)),
+                      const SizedBox(height: 10),
+                      Text('لا توجد محاضرات مضافة لهذه الفرقة بعد', style: GoogleFonts.cairo(color: Colors.grey)),
+                    ],
+                  ),
+                );
+              }
+
+              return ListView.builder(
+                padding: const EdgeInsets.all(15),
+                itemCount: docs.length,
+                itemBuilder: (ctx, i) {
+                  var d = docs[i].data() as Map<String, dynamic>;
+                  return Card(
+                    color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                    child: ListTile(
+                      leading: CircleAvatar(backgroundColor: Theme.of(context).primaryColor.withAlpha(30), child: Icon(Icons.menu_book_rounded, color: Theme.of(context).primaryColor)),
+                      title: Text(d['subject'] ?? '', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+                      subtitle: Text('${d['dayName']} - ${d['time']} | ${d['type']}\nالشعبة: ${d['division'] ?? 'الكل'} | القاعة: ${d['hall'] ?? '--'} | د: ${d['doctor'] ?? '--'}', style: GoogleFonts.cairo(fontSize: 12)),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete_outline, color: Colors.red),
+                        onPressed: () => _ds.deleteOfficialSchedule(docs[i].id),
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showAddScheduleModal(BuildContext context, String levelStr) {
+    final subjectC = TextEditingController();
+    final timeC = TextEditingController(text: '09:00 ص');
+    final hallC = TextEditingController();
+    final doctorC = TextEditingController();
+    String dayName = 'السبت';
+    String type = 'محاضرة';
+    String division = 'الكل';
+    String levelId = 'level_$levelStr';
+
+    _showStyledBS(
+      title: 'إضافة محاضرة رسمية للفرقة $levelStr',
+      icon: Icons.calendar_today_rounded,
+      color: Theme.of(context).primaryColor,
+      children: [
+        DropdownButtonFormField<String>(
+          value: dayName,
+          dropdownColor: _ds.isDarkMode ? const Color(0xFF2C2C2C) : Colors.white,
+          decoration: InputDecoration(labelText: 'اليوم', border: OutlineInputBorder(borderRadius: BorderRadius.circular(15))),
+          items: ['السبت', 'الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'].map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
+          onChanged: (v) => dayName = v ?? 'السبت',
+        ),
+        const SizedBox(height: 15),
+        DropdownButtonFormField<String>(
+          value: type,
+          dropdownColor: _ds.isDarkMode ? const Color(0xFF2C2C2C) : Colors.white,
+          decoration: InputDecoration(labelText: 'النوع', border: OutlineInputBorder(borderRadius: BorderRadius.circular(15))),
+          items: ['محاضرة', 'سكشن'].map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
+          onChanged: (v) => type = v ?? 'محاضرة',
+        ),
+        const SizedBox(height: 15),
+        DropdownButtonFormField<String>(
+          value: division,
+          dropdownColor: _ds.isDarkMode ? const Color(0xFF2C2C2C) : Colors.white,
+          decoration: InputDecoration(labelText: 'الشعبة المستهدفة', border: OutlineInputBorder(borderRadius: BorderRadius.circular(15))),
+          items: const [
+            DropdownMenuItem(value: 'الكل', child: Text('جميع الشعب')),
+            DropdownMenuItem(value: 'نظم معلومات الأعمال', child: Text('نظم معلومات الأعمال')),
+            DropdownMenuItem(value: 'المحاسبة والمراجعة', child: Text('المحاسبة والمراجعة')),
+          ],
+          onChanged: (v) => division = v ?? 'الكل',
+        ),
+        const SizedBox(height: 15),
+        TextField(controller: subjectC, decoration: InputDecoration(labelText: 'اسم المادة', border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)))),
+        const SizedBox(height: 15),
+        TextField(controller: timeC, decoration: InputDecoration(labelText: 'الوقت (مثال: 09:00 ص)', border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)))),
+        const SizedBox(height: 15),
+        TextField(controller: hallC, decoration: InputDecoration(labelText: 'القاعة / المكان', border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)))),
+        const SizedBox(height: 15),
+        TextField(controller: doctorC, decoration: InputDecoration(labelText: 'الدكتور / المحاضر', border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)))),
+      ],
+      onSave: () async {
+        if (subjectC.text.isNotEmpty) {
+          await _ds.addOfficialSchedule(
+            levelId: levelId,
+            division: division,
+            item: {
+              'subject': subjectC.text,
+              'dayName': dayName,
+              'time': timeC.text,
+              'type': type,
+              'hall': hallC.text,
+              'doctor': doctorC.text,
+              'isOfficial': true,
+            },
+          );
+          if (context.mounted) Navigator.pop(context);
+        }
+      },
+    );
   }
 }
 
