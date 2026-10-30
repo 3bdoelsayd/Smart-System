@@ -1068,75 +1068,159 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
     );
   }
 
-  void _showAddScheduleModal(BuildContext context, String levelStr) {
-    final subjectC = TextEditingController();
-    final timeC = TextEditingController(text: '09:00 ص');
-    final hallC = TextEditingController();
-    final doctorC = TextEditingController();
+  void _showAddScheduleModal(BuildContext context, String levelStr) async {
+    List<String> subjectNames = [];
+    List<String> doctorNames = [];
+    String levelId = 'level_$levelStr';
+
+    try {
+      var coursesSnap = await _ds.getCommerceCoursesColl(levelId).get();
+      subjectNames = coursesSnap.docs.map((c) => (c.data() as Map)['name'].toString()).toList();
+    } catch (_) {}
+
+    try {
+      var docsSnap = await _ds.commerceDoctorsColl.get();
+      for (var doc in docsSnap.docs) {
+        var data = doc.data() as Map<String, dynamic>;
+        List levels = data['teachingLevels'] ?? [];
+        if (levels.isEmpty || levels.contains(levelStr) || levels.contains(levelId)) {
+          doctorNames.add(data['name'] ?? '');
+        }
+      }
+    } catch (_) {}
+
+    if (subjectNames.isEmpty) subjectNames = ['محاضرة عامة'];
+    if (doctorNames.isEmpty) doctorNames = ['د. غير محددة'];
+
+    String selectedSubject = subjectNames.first;
+    String selectedDoctor = doctorNames.first;
     String dayName = 'السبت';
     String type = 'محاضرة';
     String division = 'الكل';
-    String levelId = 'level_$levelStr';
+    TimeOfDay selectedTime = const TimeOfDay(hour: 9, minute: 0);
+    final hallC = TextEditingController();
 
-    _showStyledBS(
-      title: 'إضافة محاضرة رسمية للفرقة $levelStr',
-      icon: Icons.calendar_today_rounded,
-      color: Theme.of(context).primaryColor,
-      children: [
-        DropdownButtonFormField<String>(
-          value: dayName,
-          dropdownColor: _ds.isDarkMode ? const Color(0xFF2C2C2C) : Colors.white,
-          decoration: InputDecoration(labelText: 'اليوم', border: OutlineInputBorder(borderRadius: BorderRadius.circular(15))),
-          items: ['السبت', 'الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'].map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
-          onChanged: (v) => dayName = v ?? 'السبت',
+    if (!context.mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) => Container(
+          decoration: BoxDecoration(
+            color: _ds.isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+          ),
+          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom + 20, left: 25, right: 25, top: 25),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(width: 50, height: 5, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(10))),
+                const SizedBox(height: 20),
+                Text('إضافة محاضرة رسمية للفرقة $levelStr', style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 20),
+                DropdownButtonFormField<String>(
+                  value: dayName,
+                  dropdownColor: _ds.isDarkMode ? const Color(0xFF2C2C2C) : Colors.white,
+                  decoration: InputDecoration(labelText: 'اليوم', border: OutlineInputBorder(borderRadius: BorderRadius.circular(15))),
+                  items: ['السبت', 'الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'].map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
+                  onChanged: (v) => setModalState(() => dayName = v ?? 'السبت'),
+                ),
+                const SizedBox(height: 15),
+                DropdownButtonFormField<String>(
+                  value: type,
+                  dropdownColor: _ds.isDarkMode ? const Color(0xFF2C2C2C) : Colors.white,
+                  decoration: InputDecoration(labelText: 'النوع', border: OutlineInputBorder(borderRadius: BorderRadius.circular(15))),
+                  items: ['محاضرة', 'سكشن'].map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
+                  onChanged: (v) => setModalState(() => type = v ?? 'محاضرة'),
+                ),
+                const SizedBox(height: 15),
+                DropdownButtonFormField<String>(
+                  value: division,
+                  dropdownColor: _ds.isDarkMode ? const Color(0xFF2C2C2C) : Colors.white,
+                  decoration: InputDecoration(labelText: 'الشعبة المستهدفة', border: OutlineInputBorder(borderRadius: BorderRadius.circular(15))),
+                  items: const [
+                    DropdownMenuItem(value: 'الكل', child: Text('جميع الشعب')),
+                    DropdownMenuItem(value: 'نظم معلومات الأعمال', child: Text('نظم معلومات الأعمال')),
+                    DropdownMenuItem(value: 'المحاسبة والمراجعة', child: Text('المحاسبة والمراجعة')),
+                  ],
+                  onChanged: (v) => setModalState(() => division = v ?? 'الكل'),
+                ),
+                const SizedBox(height: 15),
+                DropdownButtonFormField<String>(
+                  value: selectedSubject,
+                  dropdownColor: _ds.isDarkMode ? const Color(0xFF2C2C2C) : Colors.white,
+                  decoration: InputDecoration(labelText: 'اختر المادة', border: OutlineInputBorder(borderRadius: BorderRadius.circular(15))),
+                  items: subjectNames.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                  onChanged: (v) => setModalState(() => selectedSubject = v ?? subjectNames.first),
+                ),
+                const SizedBox(height: 15),
+                InkWell(
+                  onTap: () async {
+                    final picked = await showTimePicker(
+                      context: context,
+                      initialTime: selectedTime,
+                    );
+                    if (picked != null) {
+                      setModalState(() => selectedTime = picked);
+                    }
+                  },
+                  child: InputDecorator(
+                    decoration: InputDecoration(
+                      labelText: 'الوقت',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
+                      suffixIcon: const Icon(Icons.access_time_rounded),
+                    ),
+                    child: Text(
+                      selectedTime.format(context),
+                      style: GoogleFonts.cairo(fontSize: 15, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 15),
+                TextField(controller: hallC, decoration: InputDecoration(labelText: 'القاعة / المكان (مثال: مدرج عبد العزيز)', border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)))),
+                const SizedBox(height: 15),
+                DropdownButtonFormField<String>(
+                  value: selectedDoctor,
+                  dropdownColor: _ds.isDarkMode ? const Color(0xFF2C2C2C) : Colors.white,
+                  decoration: InputDecoration(labelText: 'اختر الدكتور / المحاضر', border: OutlineInputBorder(borderRadius: BorderRadius.circular(15))),
+                  items: doctorNames.map((doc) => DropdownMenuItem(value: doc, child: Text(doc))).toList(),
+                  onChanged: (v) => setModalState(() => selectedDoctor = v ?? doctorNames.first),
+                ),
+                const SizedBox(height: 25),
+                SizedBox(
+                  width: double.infinity,
+                  height: 55,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: Theme.of(context).primaryColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
+                    onPressed: () async {
+                      String timeStr = selectedTime.format(context);
+                      await _ds.addOfficialSchedule(
+                        levelId: levelId,
+                        division: division,
+                        item: {
+                          'subject': selectedSubject,
+                          'dayName': dayName,
+                          'time': timeStr,
+                          'type': type,
+                          'hall': hallC.text.trim().isEmpty ? 'قاعة المحاضرات' : hallC.text.trim(),
+                          'doctor': selectedDoctor,
+                          'isOfficial': true,
+                        },
+                      );
+                      if (ctx.mounted) Navigator.pop(ctx);
+                    },
+                    child: Text('حفظ ونشر الجدول', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 16)),
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
+            ),
+          ),
         ),
-        const SizedBox(height: 15),
-        DropdownButtonFormField<String>(
-          value: type,
-          dropdownColor: _ds.isDarkMode ? const Color(0xFF2C2C2C) : Colors.white,
-          decoration: InputDecoration(labelText: 'النوع', border: OutlineInputBorder(borderRadius: BorderRadius.circular(15))),
-          items: ['محاضرة', 'سكشن'].map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
-          onChanged: (v) => type = v ?? 'محاضرة',
-        ),
-        const SizedBox(height: 15),
-        DropdownButtonFormField<String>(
-          value: division,
-          dropdownColor: _ds.isDarkMode ? const Color(0xFF2C2C2C) : Colors.white,
-          decoration: InputDecoration(labelText: 'الشعبة المستهدفة', border: OutlineInputBorder(borderRadius: BorderRadius.circular(15))),
-          items: const [
-            DropdownMenuItem(value: 'الكل', child: Text('جميع الشعب')),
-            DropdownMenuItem(value: 'نظم معلومات الأعمال', child: Text('نظم معلومات الأعمال')),
-            DropdownMenuItem(value: 'المحاسبة والمراجعة', child: Text('المحاسبة والمراجعة')),
-          ],
-          onChanged: (v) => division = v ?? 'الكل',
-        ),
-        const SizedBox(height: 15),
-        TextField(controller: subjectC, decoration: InputDecoration(labelText: 'اسم المادة', border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)))),
-        const SizedBox(height: 15),
-        TextField(controller: timeC, decoration: InputDecoration(labelText: 'الوقت (مثال: 09:00 ص)', border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)))),
-        const SizedBox(height: 15),
-        TextField(controller: hallC, decoration: InputDecoration(labelText: 'القاعة / المكان', border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)))),
-        const SizedBox(height: 15),
-        TextField(controller: doctorC, decoration: InputDecoration(labelText: 'الدكتور / المحاضر', border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)))),
-      ],
-      onSave: () async {
-        if (subjectC.text.isNotEmpty) {
-          await _ds.addOfficialSchedule(
-            levelId: levelId,
-            division: division,
-            item: {
-              'subject': subjectC.text,
-              'dayName': dayName,
-              'time': timeC.text,
-              'type': type,
-              'hall': hallC.text,
-              'doctor': doctorC.text,
-              'isOfficial': true,
-            },
-          );
-          if (context.mounted) Navigator.pop(context);
-        }
-      },
+      ),
     );
   }
 }
