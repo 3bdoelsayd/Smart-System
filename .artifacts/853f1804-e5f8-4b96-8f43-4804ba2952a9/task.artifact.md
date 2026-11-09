@@ -1,0 +1,4 @@
+- [ ] Update DataService with schedule methods, robust course/doctor/section queries, and conflict check `[DataService]`
+- [ ] Update ManagerDashboard schedule tab UI, publishing batch write, and add/edit schedule bottom sheet `[ManagerDashboard]`
+- [ ] Update StudentHome and DoctorHome schedule views `[Student/Doctor Screens]`
+- [ ] Build project and verify compilation `[Build & Test]`

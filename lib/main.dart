@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 import 'firebase_options.dart';
@@ -31,30 +32,73 @@ import 'Screens/student_doctors_list_screen.dart';
 import 'Screens/edit_profile_screen.dart';
 
 void main() async {
+  final sw = Stopwatch()..start();
+  void log(String s) => debugPrint('[${sw.elapsedMilliseconds}ms] $s');
+
   try {
     WidgetsFlutterBinding.ensureInitialized();
+    log('1 binding');
 
-    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform)
+        .timeout(const Duration(seconds: 15));
+    log('2 firebase done');
 
-    // تفعيل Supabase مع معالجة الأخطاء لضمان استمرار التشغيل
+    // إعدادات Firestore للويب: Long Polling ومن غير persistence
+    if (kIsWeb) {
+      FirebaseFirestore.instance.settings = const Settings(
+        webExperimentalForceLongPolling: true,
+        persistenceEnabled: false,
+      );
+      log('2.5 firestore settings');
+    }
+
+    // Supabase مع timeout
     try {
       await Supabase.initialize(
         url: 'https://dwkbyhyzkjzmynznilta.supabase.co',
         publishableKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR3a2J5aHl6a2p6bXluem5pbHRhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0NDc0MzEsImV4cCI6MjA5OTAyMzQzMX0.s_si7MkVvB9SuLWHQQMmoUbOOes5enaAW2Jq7oaTcNw',
-      );
+      ).timeout(const Duration(seconds: 8));
     } catch (e) {
-      debugPrint("Supabase Init Error: $e");
+      log('supabase error: $e');
     }
+    log('3 supabase done');
 
     final ds = DataService();
-    await ds.loadSettings();
 
-    String? initialRoute = '/';
-    final String? savedRole = await ds.loadSession();
-    final User? currentUser = FirebaseAuth.instance.currentUser;
+    try {
+      await ds.loadSettings().timeout(const Duration(seconds: 10));
+    } catch (e) {
+      log('loadSettings error/timeout: $e');
+    }
+    log('4 settings done');
+
+    String? savedRole;
+    try {
+      savedRole = await ds.loadSession().timeout(const Duration(seconds: 10));
+    } catch (e) {
+      log('loadSession error/timeout: $e');
+    }
+    log('5 session done');
+
+    String initialRoute = '/start';
+
+    // على الويب: استنى حالة الـ Auth تتحمّل بشكل صحيح
+    final User? currentUser = kIsWeb
+        ? await FirebaseAuth.instance
+        .authStateChanges()
+        .first
+        .timeout(const Duration(seconds: 8), onTimeout: () => null)
+        : FirebaseAuth.instance.currentUser;
+    log('5.5 auth state: ${currentUser?.uid}');
 
     if (currentUser != null && savedRole != null) {
-      await ds.loadUserData(currentUser.uid, savedRole);
+      // متستناش loadUserData: خليها تشتغل في الخلفية
+      ds.loadUserData(currentUser.uid, savedRole).then((_) {
+        log('6 userData done (background)');
+      }).catchError((e) {
+        log('loadUserData error: $e');
+      });
+
       if (savedRole == 'student') {
         initialRoute = '/student/home';
       } else if (savedRole == 'doctor' || savedRole == 'ta') {
@@ -63,26 +107,26 @@ void main() async {
         initialRoute = '/super-admin/dashboard';
       } else if (savedRole == 'manager') {
         initialRoute = '/manager/dashboard';
-      } else {
-        initialRoute = '/start';
       }
-    } else {
-      initialRoute = '/start';
     }
 
     if (!kIsWeb) {
       try {
-        await ds.initNotifications();
+        await ds.initNotifications().timeout(const Duration(seconds: 10));
       } catch (e) {
-        debugPrint("Notifications Init Error: $e");
+        log('Notifications Init Error: $e');
       }
     }
 
     runApp(UniversityApp(initialRoute: initialRoute));
+    log('7 runApp');
   } catch (e) {
     debugPrint("CRITICAL STARTUP ERROR: $e");
-    // تشغيل تطبيق طوارئ لعرض رسالة الخطأ
-    runApp(MaterialApp(home: Scaffold(body: Center(child: SelectableText("Startup Failed: $e")))));
+    runApp(MaterialApp(
+      home: Scaffold(
+        body: Center(child: SelectableText("Startup Failed: $e")),
+      ),
+    ));
   }
 }
 

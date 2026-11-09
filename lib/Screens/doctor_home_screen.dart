@@ -203,6 +203,52 @@ class DoctorHomeScreen extends StatelessWidget {
                     );
                   },
                 ),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(25, 20, 25, 10),
+                    child: Text(isAr ? 'جدول المحاضرات والسكاشن' : 'My Timetable', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87)),
+                  ),
+                ),
+                StreamBuilder<QuerySnapshot>(
+                  stream: ds.getDoctorOfficialScheduleStream(doctorId: doctorId),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) return const SliverToBoxAdapter(child: Center(child: CircularProgressIndicator()));
+                    final docs = snapshot.data!.docs;
+                    if (docs.isEmpty) {
+                      return SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Center(child: Text(isAr ? 'لا توجد محاضرات منشورة في جدولك حالياً' : 'No published lectures in your timetable', style: TextStyle(color: Colors.grey))),
+                        ),
+                      );
+                    }
+                    return SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          final data = docs[index].data() as Map<String, dynamic>;
+                          final subject = data['subjectName'] ?? data['subject'] ?? '';
+                          final day = data['day'] ?? data['dayName'] ?? '';
+                          final time = data['startTime'] ?? data['time'] ?? '';
+                          final hall = data['location'] ?? data['hall'] ?? '';
+                          final type = data['type'] ?? 'محاضرة';
+                          final levelId = data['levelId'] ?? '';
+
+                          return Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                            decoration: BoxDecoration(color: isDark ? const Color(0xFF1E1E1E) : Colors.white, borderRadius: BorderRadius.circular(15), boxShadow: [BoxShadow(color: Colors.black.withAlpha(5), blurRadius: 10)]),
+                            child: ListTile(
+                              leading: CircleAvatar(backgroundColor: Colors.indigo.withAlpha(26), child: const Icon(Icons.schedule_rounded, color: Colors.indigo)),
+                              title: Text(subject, style: const TextStyle(fontWeight: FontWeight.bold)),
+                              subtitle: Text('$day - $time | $type\n${isAr ? 'الفرقة' : 'Level'}: ${levelId.replaceAll('level_', '')} | ${isAr ? 'القاعة' : 'Hall'}: $hall'),
+                              isThreeLine: true,
+                            ),
+                          );
+                        },
+                        childCount: docs.length,
+                      ),
+                    );
+                  },
+                ),
                 const SliverToBoxAdapter(child: SizedBox(height: 50)),
               ],
             ),

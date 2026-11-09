@@ -3,99 +3,33 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-
-    function isSuperAdmin() {
-      return isAuthenticated();
-    }
-
-    function isManager() {
-      return isAuthenticated();
-    }
-
-    function isDoctorOrTa() {
-      return isAuthenticated();
-    }
-
-    // Colleges and subcollections
+    // Colleges and subcollections (including levels, courses, forum, schedule_entries, chats)
     match /colleges/{collegeId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+      allow read, write: if true;
 
-      match /students/{studentId} {
-        allow read: if isAuthenticated();
-        allow write: if isAuthenticated();
-      }
-
-      match /doctors/{doctorId} {
-        allow read: if isAuthenticated();
-        allow write: if isAuthenticated();
-      }
-
-      match /tas/{taId} {
-        allow read: if isAuthenticated();
-        allow write: if isAuthenticated();
-      }
-
-      match /managers/{managerId} {
-        allow read: if isAuthenticated();
-        allow write: if isAuthenticated();
-      }
-
-      match /super_admins/{adminId} {
-        allow read: if isAuthenticated();
-        allow write: if isAuthenticated();
-      }
-
-      match /levels/{levelId} {
-        allow read: if true;
-        allow write: if isAuthenticated();
-
-        match /{subcollection}/{subId} {
-          allow read: if true;
-          allow write: if isAuthenticated();
-        }
-      }
-
-      match /semesters/{semesterId} {
-        allow read: if true;
-        allow write: if isAuthenticated();
-      }
-
-      match /private_chats/{chatId} {
-        allow read, write: if isAuthenticated();
-        match /messages/{messageId} {
-          allow read, write: if isAuthenticated();
-        }
+      match /{document=**} {
+        allow read, write: if true;
       }
     }
 
     match /attendance/{attId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated();
+      allow read, write: if true;
     }
 
     match /submissions/{subId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated();
+      allow read, write: if true;
     }
 
     match /exam_results/{resId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     match /grades/{gradeId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     match /notifications/{notifId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
   }
 }

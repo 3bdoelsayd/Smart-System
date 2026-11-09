@@ -714,290 +714,10 @@ class _StudentSchedulePageState extends State<_StudentSchedulePage> {
     Colors.tealAccent.shade700, Colors.deepPurpleAccent, Colors.redAccent
   ];
 
-  final Map<int, String> _daysMap = {
-    1: 'Monday', 2: 'Tuesday', 3: 'Wednesday',
-    4: 'Thursday', 5: 'Friday', 6: 'Saturday', 7: 'Sunday',
-  };
-
-  final Map<int, String> _daysMapAr = {
-    1: 'الاثنين', 2: 'الثلاثاء', 3: 'الأربعاء',
-    4: 'الخميس', 5: 'الجمعة', 6: 'السبت', 7: 'الأحد',
-  };
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_ds.currentStudent != null) {
-        _ds.fetchSubjectsForLevel(
-          _ds.currentStudent!['level']?.toString() ?? '1',
-          _ds.currentStudent!['division']?.toString() ?? 'ALL'
-        );
-      }
-    });
-  }
-
-  // وظيفة محسنة لجلب الدكتور بذكاء
-  Future<List<String>> _getFilteredDoctors(String subjectName) async {
-    final student = _ds.currentStudent;
-    if (student == null) return [];
-    
-    final levelRaw = student['level']?.toString() ?? '1';
-    final normLevel = _ds.normalizeLevel(levelRaw);
-    final cleanLevel = normLevel.contains('level_') ? normLevel : 'level_$normLevel';
-
-    List<String> results = [];
-    try {
-      var coursesRef = _ds.instituteRef.collection('levels').doc(cleanLevel).collection('courses');
-      var courseQuery = await coursesRef.get();
-      
-      String normSearch = _ds.normalize(subjectName);
-
-      for (var courseDoc in courseQuery.docs) {
-        var cData = courseDoc.data() as Map<String, dynamic>;
-        String cName = (cData['name'] ?? '').toString();
-        
-        if (_ds.normalize(cName) == normSearch) {
-          String? doctorId = cData['doctor_id'];
-          if (doctorId != null && doctorId.isNotEmpty) {
-            // بحث مزدوج
-            DocumentSnapshot docSnap = await _ds.instituteRef.collection('doctors').doc(doctorId).get();
-            if (!docSnap.exists) {
-              docSnap = await _ds.doctorsColl.doc(doctorId).get();
-            }
-
-            if (docSnap.exists) {
-              final docData = docSnap.data() as Map<String, dynamic>?;
-              String? docName = docData?['name'];
-              if (docName != null) results.add(docName);
-            }
-          }
-        }
-      }
-    } catch (e) { 
-      debugPrint("Error filtering doctors: $e"); 
-    }
-    return results.toSet().toList()..sort();
-  }
-
-  void _addScheduleItem() async {
-    String? selectedSub;
-    String type = _ds.isArabic ? 'محاضرة' : 'Lecture';
-    String instructor = '';
-    String sectionNum = '';
-    String location = '';
-    String group = '';
-    int selectedDay = DateTime.now().weekday;
-    TimeOfDay selectedTime = const TimeOfDay(hour: 9, minute: 0);
-    List<String> filteredDoctorNames = [];
-    bool isLoadingDoctors = false;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setModalState) {
-          bool isLec = type == (_ds.isArabic ? 'محاضرة' : 'Lecture');
-
-          return Container(
-            decoration: BoxDecoration(
-              color: _ds.isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-            ),
-            padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 25, right: 25, top: 25),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(width: 50, height: 5, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(10))),
-                  const SizedBox(height: 20),
-                  Text(_ds.isArabic ? "إضافة للجدول" : "Add to Schedule", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: _ds.isDarkMode ? const Color(0xFF03DAC6) : const Color(0xFF673AB7))),
-                  const SizedBox(height: 10),
-                  
-                  Row(
-                    children: [
-                      Expanded(
-                        child: RadioListTile<String>(
-                          title: Text(_ds.isArabic ? 'محاضرة' : 'Lecture', style: const TextStyle(fontSize: 13)),
-                          value: _ds.isArabic ? 'محاضرة' : 'Lecture',
-                          groupValue: type,
-                          activeColor: _ds.isDarkMode ? const Color(0xFF03DAC6) : const Color(0xFF673AB7),
-                          onChanged: (v) async {
-                            setModalState(() { type = v!; instructor = ''; });
-                            if (selectedSub != null) {
-                               setModalState(() => isLoadingDoctors = true);
-                               filteredDoctorNames = await _getFilteredDoctors(selectedSub!);
-                               setModalState(() {
-                                  isLoadingDoctors = false;
-                                  instructor = filteredDoctorNames.isNotEmpty ? filteredDoctorNames.first : '';
-                               });
-                            }
-                          },
-                        ),
-                      ),
-                      Expanded(
-                        child: RadioListTile<String>(
-                          title: Text(_ds.isArabic ? 'سكشن' : 'Section', style: const TextStyle(fontSize: 13)),
-                          value: _ds.isArabic ? 'سكشن' : 'Section',
-                          groupValue: type,
-                          activeColor: _ds.isDarkMode ? const Color(0xFF03DAC6) : const Color(0xFF673AB7),
-                          onChanged: (v) => setModalState(() { type = v!; instructor = ''; }),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  DropdownButtonFormField<String>(
-                    value: selectedSub,
-                    isExpanded: true,
-                    dropdownColor: _ds.isDarkMode ? const Color(0xFF2C2C2C) : Colors.white,
-                    decoration: InputDecoration(
-                      labelText: _ds.isArabic ? "المادة" : "Subject",
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
-                    ),
-                    items: _ds.allSubjects.map((s) => DropdownMenuItem(
-                      value: s, 
-                      child: Text(s, overflow: TextOverflow.ellipsis, style: TextStyle(color: _ds.isDarkMode ? Colors.white : Colors.black87))
-                    )).toList(),
-                    onChanged: (v) async {
-                      setModalState(() { selectedSub = v; instructor = ''; isLoadingDoctors = true; });
-                      if (v != null) {
-                        filteredDoctorNames = await _getFilteredDoctors(v);
-                        setModalState(() {
-                          isLoadingDoctors = false;
-                          if (isLec) instructor = filteredDoctorNames.isNotEmpty ? filteredDoctorNames.first : '';
-                        });
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 15),
-
-                  if (isLec) ...[
-                    if (isLoadingDoctors)
-                      const LinearProgressIndicator()
-                    else
-                      DropdownButtonFormField<String>(
-                        key: ValueKey('doc_$selectedSub'),
-                        value: filteredDoctorNames.contains(instructor) ? instructor : null,
-                        isExpanded: true,
-                        dropdownColor: _ds.isDarkMode ? const Color(0xFF2C2C2C) : Colors.white,
-                        decoration: InputDecoration(
-                          labelText: _ds.isArabic ? "الدكتور" : "Doctor",
-                          hintText: _ds.isArabic ? "اختر المادة أولاً" : "Choose subject first",
-                          helperText: filteredDoctorNames.isEmpty && selectedSub != null ? (_ds.isArabic ? "لم يتم العثور على دكتور لهذه المادة" : "No doctor found") : null,
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
-                        ),
-                        items: filteredDoctorNames.map((n) => DropdownMenuItem(
-                          value: n, 
-                          child: Text(n, overflow: TextOverflow.ellipsis, style: TextStyle(color: _ds.isDarkMode ? Colors.white : Colors.black87))
-                        )).toList(),
-                        onChanged: (v) => setModalState(() => instructor = v ?? ''),
-                      ),
-                  ] else ...[
-                    TextField(
-                      decoration: InputDecoration(
-                        labelText: _ds.isArabic ? "اسم المعيد" : "Assistant Name",
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
-                      ),
-                      onChanged: (v) => instructor = v,
-                    ),
-                    const SizedBox(height: 15),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            decoration: InputDecoration(labelText: _ds.isArabic ? "رقم السكشن" : "Section No.", border: OutlineInputBorder(borderRadius: BorderRadius.circular(15))),
-                            onChanged: (v) => sectionNum = v,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: TextField(
-                            decoration: InputDecoration(labelText: _ds.isArabic ? "المجموعة" : "Group", border: OutlineInputBorder(borderRadius: BorderRadius.circular(15))),
-                            onChanged: (v) => group = v,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 15),
-                    TextField(
-                      decoration: InputDecoration(labelText: _ds.isArabic ? "القاعة / المعمل" : "Hall / Lab", border: OutlineInputBorder(borderRadius: BorderRadius.circular(15))),
-                      onChanged: (v) => location = v,
-                    ),
-                  ],
-
-                  const SizedBox(height: 15),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: DropdownButtonFormField<int>(
-                          value: selectedDay,
-                          decoration: InputDecoration(labelText: _ds.isArabic ? "اليوم" : "Day", border: OutlineInputBorder(borderRadius: BorderRadius.circular(15))),
-                          items: [1,2,3,4,5,6,7].map((d) => DropdownMenuItem(value: d, child: Text(_ds.isArabic ? _daysMapAr[d]! : _daysMap[d]!))).toList(),
-                          onChanged: (v) => selectedDay = v!,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: InkWell(
-                          onTap: () async {
-                            final time = await showTimePicker(context: context, initialTime: selectedTime);
-                            if (time != null) setModalState(() => selectedTime = time);
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 12),
-                            decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(15)),
-                            child: Text(selectedTime.format(context), textAlign: TextAlign.center),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 30),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 55,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _ds.isDarkMode ? const Color(0xFF03DAC6) : const Color(0xFF673AB7),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))
-                      ),
-                      onPressed: () async {
-                        if (selectedSub != null) {
-                          final itemData = {
-                            'subject': selectedSub,
-                            'type': type,
-                            'instructor': instructor,
-                            'sectionNum': sectionNum,
-                            'location': location,
-                            'group': group,
-                            'dayIndex': selectedDay,
-                            'dayName': _ds.isArabic ? _daysMapAr[selectedDay] : _daysMap[selectedDay],
-                            'time': selectedTime.format(context),
-                          };
-                          await _ds.saveScheduleItem(itemData);
-                          if (mounted) Navigator.pop(ctx);
-                        }
-                      },
-                      child: Text(_ds.isArabic ? "إضافة للجدول" : "Add to Schedule", style: TextStyle(color: _ds.isDarkMode ? Colors.black : Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                  const SizedBox(height: 30),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     bool isAr = _ds.isArabic;
     bool isDark = _ds.isDarkMode;
-    Color primaryColor = isDark ? const Color(0xFF03DAC6) : const Color(0xFF673AB7);
 
     return ListenableBuilder(
       listenable: _ds,
@@ -1011,58 +731,72 @@ class _StudentSchedulePageState extends State<_StudentSchedulePage> {
             backgroundColor: isDark ? const Color(0xFF121212) : Colors.white,
             foregroundColor: isDark ? Colors.white : Colors.black,
           ),
-          floatingActionButton: Padding(
-            padding: const EdgeInsets.only(bottom: 100),
-            child: FloatingActionButton.extended(
-              onPressed: _addScheduleItem,
-              backgroundColor: primaryColor,
-              icon: Icon(Icons.add, color: isDark ? Colors.black : Colors.white),
-              label: Text(isAr ? "إضافة حصة" : "Add Class", style: TextStyle(color: isDark ? Colors.black : Colors.white, fontWeight: FontWeight.bold)),
-            ),
-          ),
-          body: StreamBuilder<List<QueryDocumentSnapshot>>(
-            stream: (() {
-              final personalStream = _ds.getStudentScheduleStream();
-              String? lvl = _ds.currentStudent?['level'];
-              String? div = _ds.currentStudent?['division'];
-
-              return personalStream.asyncMap((pSnap) async {
-                var oSnap = await _ds.schedulesColl.get();
-                List<QueryDocumentSnapshot> allDocs = [];
-                allDocs.addAll(pSnap.docs);
-
-                String sLvl = lvl ?? '';
-                String sDiv = div ?? '';
-
-                for (var oDoc in oSnap.docs) {
-                  var data = oDoc.data() as Map<String, dynamic>;
-                  String oLvl = (data['levelId'] ?? '').toString();
-                  String oDiv = (data['division'] ?? '').toString();
-
-                  bool lvlMatch = oLvl.isEmpty || oLvl == 'all' || oLvl == 'level_$sLvl' || oLvl == sLvl;
-                  bool divMatch = oDiv.isEmpty || oDiv == 'الكل' || oDiv == sDiv || oDiv.contains(sDiv) || sDiv.contains(oDiv);
-
-                  if (lvlMatch && divMatch) {
-                    allDocs.add(oDoc);
-                  }
-                }
-                return allDocs;
-              });
-            }()),
+          body: StreamBuilder<QuerySnapshot>(
+            stream: _ds.scheduleEntriesColl.where('isPublished', isEqualTo: true).snapshots(),
             builder: (context, snap) {
               if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-              final docs = snap.data!;
 
-              if (docs.isEmpty) return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.calendar_today_outlined, size: 80, color: isDark ? Colors.white10 : Colors.grey.withAlpha(77)), const SizedBox(height: 20), Text(isAr ? 'لا توجد حصص أو محاضرات في جدولك حالياً' : 'No classes in your schedule currently', style: TextStyle(color: isDark ? Colors.white38 : Colors.grey.shade500))]));
+              String? lvl = _ds.currentStudent?['level'];
+              String? div = _ds.currentStudent?['division'];
+              String sLvl = lvl ?? '';
+              String sDiv = div ?? '';
+              String cleanLvl = _ds.normalizeLevel(sLvl);
+
+              final docs = snap.data!.docs.where((doc) {
+                final data = doc.data() as Map<String, dynamic>;
+                String oLvl = (data['levelId'] ?? data['level'] ?? '').toString();
+                String oDiv = (data['targetSection'] ?? data['division'] ?? '').toString();
+
+                bool lvlMatch = oLvl.isEmpty || oLvl == 'all' || oLvl == 'level_$sLvl' || oLvl == sLvl || oLvl.contains(cleanLvl);
+                
+                String normODiv = _ds.normalizeDivision(oDiv);
+                String normSDiv = _ds.normalizeDivision(sDiv);
+
+                bool divMatch = normODiv == 'all' || 
+                                normSDiv == 'all' || 
+                                normODiv == normSDiv || 
+                                oDiv.isEmpty || 
+                                oDiv == 'all' || 
+                                oDiv == 'الكل' || 
+                                oDiv == 'جميع الشعب' || 
+                                oDiv == sDiv || 
+                                oDiv.contains(sDiv) || 
+                                sDiv.contains(oDiv);
+                
+                return lvlMatch && divMatch;
+              }).toList();
+
+              if (docs.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.calendar_today_outlined, size: 80, color: isDark ? Colors.white10 : Colors.grey.withAlpha(77)),
+                      const SizedBox(height: 20),
+                      Text(
+                        isAr ? 'لا توجد محاضرات أو سكاشن منشورة في جدولك حالياً' : 'No published classes in your schedule currently',
+                        style: TextStyle(color: isDark ? Colors.white38 : Colors.grey.shade500),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                );
+              }
 
               return ListView.builder(
-                padding: const EdgeInsets.fromLTRB(15, 0, 15, 120),
+                padding: const EdgeInsets.fromLTRB(15, 15, 15, 40),
                 itemCount: docs.length,
                 itemBuilder: (ctx, i) {
                   final d = docs[i].data() as Map<String, dynamic>;
                   final color = _beautifulColors[i % _beautifulColors.length];
-                  bool isLec = d['type'] == (isAr ? 'محاضرة' : 'Lecture');
-                  bool isOfficial = d['isOfficial'] == true;
+                  
+                  String subject = d['subjectName'] ?? d['subject'] ?? '';
+                  String doctor = d['doctorName'] ?? d['doctor'] ?? '--';
+                  String day = d['day'] ?? d['dayName'] ?? '';
+                  String time = d['startTime'] ?? d['time'] ?? '';
+                  String type = d['type'] ?? 'محاضرة';
+                  String hall = d['location'] ?? d['hall'] ?? '--';
+                  String section = d['targetSection'] ?? d['division'] ?? 'الكل';
 
                   return Container(
                     margin: const EdgeInsets.only(bottom: 15),
@@ -1088,7 +822,7 @@ class _StudentSchedulePageState extends State<_StudentSchedulePage> {
                                     children: [
                                       Expanded(
                                         child: Text(
-                                          d['subject'] ?? '', 
+                                          subject, 
                                           style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87),
                                           maxLines: 2,
                                           overflow: TextOverflow.ellipsis,
@@ -1098,34 +832,30 @@ class _StudentSchedulePageState extends State<_StudentSchedulePage> {
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                         decoration: BoxDecoration(color: color.withAlpha(26), borderRadius: BorderRadius.circular(8)),
-                                        child: Text("${d['type'] ?? ''} ${d['sectionNum'] ?? ''}", style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.bold)),
+                                        child: Text(type, style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.bold)),
                                       ),
                                     ],
                                   ),
                                   const SizedBox(height: 5),
-                                  if (d['instructor'] != null && d['instructor'].toString().isNotEmpty)
-                                    Text("${isAr ? (isLec ? 'الدكتور:' : 'المعيد:') : (isLec ? 'Doctor:' : 'Assistant:')} ${d['instructor']}", style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black54)),
-                                  if (!isLec && d['location'] != null && d['location'].toString().isNotEmpty)
-                                    Text("${isAr ? 'المكان:' : 'Location:'} ${d['location']}", style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black54)),
-                                  if (d['group'] != null && d['group'].toString().isNotEmpty)
-                                    Text("${isAr ? 'المجموعة:' : 'Group:'} ${d['group']}", style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black54)),
+                                  Text("${isAr ? 'المحاضر/المعيد:' : 'Instructor:'} $doctor", style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black54)),
+                                  Text("${isAr ? 'القاعة:' : 'Hall:'} $hall", style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black54)),
+                                  Text("${isAr ? 'الشعبة:' : 'Section:'} ${section == 'all' ? 'جميع الشعب' : section}", style: TextStyle(fontSize: 13, color: Colors.purple.shade300)),
                                   const SizedBox(height: 8),
                                   Row(
                                     children: [
                                       Icon(Icons.calendar_today, size: 14, color: isDark ? Colors.white38 : Colors.grey.shade600),
                                       const SizedBox(width: 5),
-                                      Text(d['dayName'] ?? '', style: TextStyle(color: isDark ? Colors.white38 : Colors.grey.shade600)),
+                                      Text(day, style: TextStyle(color: isDark ? Colors.white38 : Colors.grey.shade600)),
                                       const SizedBox(width: 15),
                                       Icon(Icons.access_time, size: 14, color: isDark ? Colors.white38 : Colors.grey.shade600),
                                       const SizedBox(width: 5),
-                                      Text(d['time'] ?? '', style: TextStyle(color: isDark ? Colors.white38 : Colors.grey.shade600)),
+                                      Text(time, style: TextStyle(color: isDark ? Colors.white38 : Colors.grey.shade600)),
                                     ],
                                   ),
                                 ],
                               ),
                             ),
                           ),
-                          IconButton(icon: Icon(Icons.delete_outline, color: isDark ? Colors.redAccent.withAlpha(150) : Colors.redAccent), onPressed: () => _ds.deleteScheduleItem(docs[i].id)),
                         ],
                       ),
                     ),

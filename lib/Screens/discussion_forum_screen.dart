@@ -32,9 +32,7 @@ class _DiscussionForumScreenState extends State<DiscussionForumScreen> {
   bool _isSending = false;
 
   // تم تعديل المسار ليكون ديناميكياً حسب المعهد المختار
-  DocumentReference get _courseRef => FirebaseFirestore.instance
-      .collection('colleges')
-      .doc(_ds.selectedInstituteId ?? 'commerce') 
+  DocumentReference get _courseRef => _ds.instituteRef
       .collection('levels')
       .doc(widget.levelId)
       .collection('courses')
@@ -43,8 +41,19 @@ class _DiscussionForumScreenState extends State<DiscussionForumScreen> {
   void _sendMessage() async {
     if (_messageController.text.trim().isEmpty || _isSending) return;
 
-    final user = _ds.userRole == 'student' ? _ds.currentStudent : _ds.currentDoctor;
-    if (user == null) return;
+    Map<String, dynamic>? user;
+    if (_ds.userRole == 'student') {
+      user = _ds.currentStudent;
+    } else if (_ds.userRole == 'doctor' || _ds.userRole == 'ta') {
+      user = _ds.currentDoctor;
+    } else if (_ds.userRole == 'manager' || _ds.userRole == 'super_admin') {
+      user = _ds.currentAdmin;
+    }
+
+    if (user == null) {
+      _showError("تعذر العثور على بيانات الحساب المودعة للإرسال");
+      return;
+    }
 
     setState(() => _isSending = true);
 
@@ -57,7 +66,7 @@ class _DiscussionForumScreenState extends State<DiscussionForumScreen> {
           return;
         }
         List banned = data?['bannedUids'] ?? [];
-        if (banned.contains(user['uid'])) {
+        if (banned.contains(user['uid'] ?? user['id'])) {
           _showError("تم حظرك من المشاركة في هذا النقاش");
           return;
         }
@@ -67,8 +76,8 @@ class _DiscussionForumScreenState extends State<DiscussionForumScreen> {
       _messageController.clear();
 
       await _courseRef.collection('forum').add({
-        'authorId': user['uid'] ?? user['id'],
-        'authorName': user['name'],
+        'authorId': user['uid'] ?? user['id'] ?? 'user',
+        'authorName': user['name'] ?? 'مستخدم',
         'authorRole': _ds.userRole,
         'photoUrl': user['photoUrl'] ?? '',
         'content': content,
@@ -79,7 +88,8 @@ class _DiscussionForumScreenState extends State<DiscussionForumScreen> {
         _scrollController.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
       }
     } catch (e) {
-      _showError("فشل إرسال الرسالة");
+      debugPrint("Error sending message: $e");
+      _showError("فشل إرسال الرسالة: $e");
     } finally {
       setState(() => _isSending = false);
     }
@@ -303,15 +313,16 @@ class _DiscussionForumScreenState extends State<DiscussionForumScreen> {
               backgroundColor: isDark ? const Color(0xFF1A1A1A) : primaryColor,
               foregroundColor: Colors.white,
               actions: [
-                if (_ds.userRole == 'doctor') ...[
-                  IconButton(
-                    icon: const Icon(Icons.chat_bubble_outline_rounded),
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (ctx) => const DoctorStudentsListScreen()),
+                if (_ds.userRole != 'student') ...[
+                  if (_ds.userRole == 'doctor' || _ds.userRole == 'ta')
+                    IconButton(
+                      icon: const Icon(Icons.chat_bubble_outline_rounded),
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (ctx) => const DoctorStudentsListScreen()),
+                      ),
+                      tooltip: isAr ? "قائمة الطلاب والواتساب" : "Students Chat",
                     ),
-                    tooltip: isAr ? "قائمة الطلاب والواتساب" : "Students Chat",
-                  ),
                   IconButton(
                     icon: const Icon(Icons.people_outline_rounded),
                     onPressed: _showBannedList,
@@ -358,17 +369,19 @@ class _DiscussionForumScreenState extends State<DiscussionForumScreen> {
                           
                           String? myId;
                           if (_ds.userRole == 'student') {
-                            myId = _ds.currentStudent?['uid']?.toString();
+                            myId = _ds.currentStudent?['uid']?.toString() ?? _ds.currentStudent?['id']?.toString();
+                          } else if (_ds.userRole == 'doctor' || _ds.userRole == 'ta') {
+                            myId = _ds.currentDoctor?['uid']?.toString() ?? _ds.currentDoctor?['id']?.toString();
                           } else {
-                            myId = _ds.currentDoctor?['uid']?.toString();
+                            myId = _ds.currentAdmin?['uid']?.toString() ?? _ds.currentAdmin?['id']?.toString();
                           }
                           
                           bool isMe = (authorId != null && myId != null && authorId == myId);
-                          bool isDoc = data['authorRole'] == 'doctor';
+                          String role = data['authorRole']?.toString() ?? 'student';
 
                           return GestureDetector(
                             onLongPress: () => _showStudentOptions(data),
-                            child: _buildChat_Bubble(data, isMe, isDoc, isDark, primaryColor),
+                            child: _buildChat_Bubble(data, isMe, role, isDark, primaryColor),
                           );
                         },
                       );
@@ -413,7 +426,18 @@ class _DiscussionForumScreenState extends State<DiscussionForumScreen> {
     );
   }
 
-  Widget _buildChat_Bubble(Map<String, dynamic> data, bool isMe, bool isDoc, bool isDark, Color primaryColor) {
+  Widget _buildChat_Bubble(Map<String, dynamic> data, bool isMe, String role, bool isDark, Color primaryColor) {
+    bool isDoc = role == 'doctor';
+    bool isTa = role == 'ta';
+    bool isManager = role == 'manager' || role == 'super_admin';
+    bool isStaff = isDoc || isTa || isManager;
+
+    Color bubbleColor = isMe 
+        ? primaryColor 
+        : (isDoc ? Colors.orange.withAlpha(40) : (isTa ? Colors.teal.withAlpha(40) : (isManager ? Colors.indigo.withAlpha(40) : (isDark ? const Color(0xFF1E1E1E) : Colors.white))));
+
+    String roleTitle = isDoc ? 'دكتور' : (isTa ? 'معيد' : (isManager ? 'مدير الفرقة' : ''));
+
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
@@ -421,14 +445,14 @@ class _DiscussionForumScreenState extends State<DiscussionForumScreen> {
         constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isMe ? primaryColor : (isDoc ? Colors.orange.withAlpha(40) : (isDark ? const Color(0xFF1E1E1E) : Colors.white)),
+          color: bubbleColor,
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(15),
             topRight: const Radius.circular(15),
             bottomLeft: isMe ? const Radius.circular(15) : Radius.zero,
             bottomRight: isMe ? Radius.zero : const Radius.circular(15),
           ),
-          border: isDoc ? Border.all(color: Colors.orange.withAlpha(100), width: 1) : null,
+          border: isStaff ? Border.all(color: isDoc ? Colors.orange.withAlpha(100) : (isTa ? Colors.teal.withAlpha(100) : Colors.indigo.withAlpha(100)), width: 1) : null,
           boxShadow: [BoxShadow(color: Colors.black.withAlpha(5), blurRadius: 5)],
         ),
         child: Column(
@@ -437,14 +461,14 @@ class _DiscussionForumScreenState extends State<DiscussionForumScreen> {
             if (!isMe)
               InkWell(
                 onTap: () {
-                  if (isDoc) {
+                  if (isStaff) {
                     showRichDoctorProfileModal(
                       context: context,
                       doctorUidOrEmail: data['authorId'] ?? '',
                       doctorName: data['authorName'],
                     );
                   } else {
-                    if (_ds.userRole == 'doctor') {
+                    if (_ds.userRole != 'student') {
                       _showStudentOptions(data);
                     } else {
                       showRichStudentProfileModal(
@@ -469,14 +493,23 @@ class _DiscussionForumScreenState extends State<DiscussionForumScreen> {
                       style: TextStyle(
                         fontWeight: FontWeight.bold, 
                         fontSize: 11, 
-                        color: isDoc ? Colors.orange : (isDark ? Colors.white70 : Colors.black54),
-                        decoration: !isDoc ? TextDecoration.underline : null
+                        color: isDoc ? Colors.orange : (isTa ? Colors.teal : (isManager ? Colors.indigo : (isDark ? Colors.white70 : Colors.black54))),
                       ),
                     ),
-                    if (isDoc) ...[
+                    if (isStaff) ...[
                       const SizedBox(width: 4),
-                      const Icon(Icons.verified_rounded, color: Colors.orange, size: 12),
-                    ]
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: isDoc ? Colors.orange.withAlpha(30) : (isTa ? Colors.teal.withAlpha(30) : Colors.indigo.withAlpha(30)),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          roleTitle,
+                          style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: isDoc ? Colors.orange : (isTa ? Colors.teal : Colors.indigo)),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

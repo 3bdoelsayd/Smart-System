@@ -8,6 +8,7 @@ import '../widgets/app_drawer.dart';
 import '../widgets/cached_avatar.dart';
 import '../widgets/doctor_profile_modal.dart';
 import '../widgets/student_profile_modal.dart';
+import 'discussion_forum_screen.dart';
 
 class ManagerDashboard extends StatefulWidget {
   const ManagerDashboard({super.key});
@@ -22,6 +23,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
   List<String> _managedLevels = [];
   String? _selectedLevel;
   String _searchQuery = "";
+  String _selectedStudentDivisionFilter = 'all';
   final Debouncer _searchDebouncer = Debouncer(milliseconds: 300);
 
   // Attendance Selection State
@@ -40,7 +42,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
     super.initState();
     _managedLevels = List<String>.from(_ds.currentAdmin?['managedLevels'] ?? []);
     _selectedLevel = _managedLevels.isNotEmpty ? _managedLevels.first : null;
-    _tabController = TabController(length: 7, vsync: this);
+    _tabController = TabController(length: 8, vsync: this);
     _tabController.addListener(() {
       if (_tabController.indexIsChanging) {
         setState(() {
@@ -138,6 +140,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
                     Tab(text: 'المواد'),
                     Tab(text: 'الدكاترة'),
                     Tab(text: 'المعيدين'),
+                    Tab(text: 'المناقشات'),
                     Tab(text: 'الحضور'),
                     Tab(text: 'الفصول'),
                     Tab(text: 'الجدول'),
@@ -153,6 +156,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
               _buildCoursesTab(),
               _buildDoctorsTab(),
               _buildTAsTab(),
+              _buildForumsTab(),
               _buildAttendanceTab(),
               _buildSemestersTab(),
               _buildScheduleTab(),
@@ -193,7 +197,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
     else if (_tabController.index == 1) { label = "مادة"; action = _showAddCourseBS; }
     else if (_tabController.index == 2) { label = "دكتور"; action = _showAddDoctorBS; }
     else if (_tabController.index == 3) { label = "معيد"; action = _showAddTABs; }
-    else if (_tabController.index == 6) { 
+    else if (_tabController.index == 7) { 
       return FloatingActionButton.extended(
         onPressed: () => _showAddScheduleModal(context, _selectedLevel ?? '1'),
         backgroundColor: Theme.of(context).primaryColor,
@@ -335,25 +339,54 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
   void _showAddCourseBS() async {
     final nameC = TextEditingController(); 
     final lecturesC = TextEditingController(text: "12");
-    String? selDiv; String? selSem; String? selDoc; String? selTa;
+    String? selDiv; String? selSem; String? selDoc;
+    List<String> selectedTaIds = [];
     var semSnap = await _ds.commerceSemestersColl.where('isActive', isEqualTo: true).get(); 
     var docSnap = await _ds.commerceDoctorsColl.get();
     var taSnap = await _ds.commerceTasColl.get();
 
-    _showStyledBS(title: 'إضافة مادة ودكتور ومعيد', icon: Icons.book, color: Colors.deepPurple, children: [
+    _showStyledBS(title: 'إضافة مادة ودكتور ومعيدين', icon: Icons.book, color: Colors.deepPurple, children: [
       _buildInputField(nameC, 'اسم المادة', Icons.book_outlined),
       _buildInputField(lecturesC, 'عدد المحاضرات / السكاشن', Icons.format_list_numbered, isNumber: true),
       _buildDropdown('الشعبة', Icons.groups, [const DropdownMenuItem(value: 'all', child: Text('الكل')), const DropdownMenuItem(value: 'محاسبه', child: Text('محاسبه')), const DropdownMenuItem(value: 'نظم معلومات الاعمال', child: Text('نظم معلومات الاعمال'))], (v) => selDiv = v),
       _buildDropdown('الفصل الدراسي (النشط حالياً)', Icons.calendar_today, semSnap.docs.map((d) => DropdownMenuItem(value: d.id, child: Text((d.data() as Map)['name'] ?? ''))).toList(), (v) => selSem = v),
       _buildDropdown('الدكتور المسؤول', Icons.person_search, docSnap.docs.map((d) => DropdownMenuItem(value: d.id, child: Text((d.data() as Map)['name'] ?? ''))).toList(), (v) => selDoc = v),
-      _buildDropdown('المعيد المسؤول (السيكشن)', Icons.badge_outlined, [
-        const DropdownMenuItem(value: null, child: Text('بدون معيد')),
-        ...taSnap.docs.map((d) => DropdownMenuItem(value: d.id, child: Text((d.data() as Map)['name'] ?? '')))
-      ], (v) => selTa = v, value: selTa),
+      StatefulBuilder(
+        builder: (ctx, setMultiState) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('اختر المعيدين المسؤولين (يمكن اختيار أكثر من معيد):', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 13)),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: taSnap.docs.map((d) {
+                final id = d.id;
+                final name = (d.data() as Map)['name'] ?? '';
+                final isSelected = selectedTaIds.contains(id);
+                return FilterChip(
+                  label: Text('م. $name', style: GoogleFonts.cairo(fontSize: 12)),
+                  selected: isSelected,
+                  selectedColor: Colors.teal.shade200,
+                  onSelected: (selected) {
+                    setMultiState(() {
+                      if (selected) {
+                        selectedTaIds.add(id);
+                      } else {
+                        selectedTaIds.remove(id);
+                      }
+                    });
+                  },
+                );
+              }).toList(),
+            ),
+          ],
+        ),
+      ),
     ], onSave: () async {
       if (selSem != null && selDoc != null && nameC.text.isNotEmpty) {
         int count = int.tryParse(lecturesC.text) ?? 12;
-        await _ds.addCourseToLevel(_selectedLevel!, nameC.text, selDiv ?? 'all', selSem!, selDoc!, lecturesCount: count, taId: selTa);
+        await _ds.addCourseToLevel(_selectedLevel!, nameC.text, selDiv ?? 'all', selSem!, selDoc!, lecturesCount: count, taId: selectedTaIds.isNotEmpty ? selectedTaIds.first : null, taIds: selectedTaIds);
         if (mounted) Navigator.pop(context);
       }
     });
@@ -365,7 +398,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
     final lecturesC = TextEditingController(text: (data['lecturesCount'] ?? 12).toString());
     String? selDiv = data['division'];
     String? selDoc = data['doctor_id'];
-    String? selTa = data['ta_id'];
+    List<String> selectedTaIds = List<String>.from(data['ta_ids'] ?? (data['ta_id'] != null ? [data['ta_id']] : []));
     
     var docSnap = await _ds.commerceDoctorsColl.get();
     var taSnap = await _ds.commerceTasColl.get();
@@ -383,10 +416,38 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
           const DropdownMenuItem(value: 'نظم معلومات الاعمال', child: Text('نظم معلومات الاعمال'))
         ], (v) => selDiv = v, value: selDiv),
         _buildDropdown('الدكتور المسؤول', Icons.person_search, docSnap.docs.map((d) => DropdownMenuItem(value: d.id, child: Text((d.data() as Map)['name'] ?? ''))).toList(), (v) => selDoc = v, value: selDoc),
-        _buildDropdown('المعيد المسؤول (السيكشن)', Icons.badge_outlined, [
-          const DropdownMenuItem(value: null, child: Text('بدون معيد')),
-          ...taSnap.docs.map((d) => DropdownMenuItem(value: d.id, child: Text((d.data() as Map)['name'] ?? '')))
-        ], (v) => selTa = v, value: selTa),
+        StatefulBuilder(
+          builder: (ctx, setMultiState) => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('اختر المعيدين المسؤولين (يمكن اختيار أكثر من معيد):', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 13)),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: taSnap.docs.map((d) {
+                  final id = d.id;
+                  final name = (d.data() as Map)['name'] ?? '';
+                  final isSelected = selectedTaIds.contains(id);
+                  return FilterChip(
+                    label: Text('م. $name', style: GoogleFonts.cairo(fontSize: 12)),
+                    selected: isSelected,
+                    selectedColor: Colors.teal.shade200,
+                    onSelected: (selected) {
+                      setMultiState(() {
+                        if (selected) {
+                          selectedTaIds.add(id);
+                        } else {
+                          selectedTaIds.remove(id);
+                        }
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
+        ),
       ], 
       onSave: () async {
         if (nameC.text.isNotEmpty && selDoc != null) {
@@ -396,7 +457,8 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
             'lecturesCount': count,
             'division': selDiv ?? 'all',
             'doctor_id': selDoc,
-            'ta_id': selTa,
+            'ta_id': selectedTaIds.isNotEmpty ? selectedTaIds.first : null,
+            'ta_ids': selectedTaIds,
           });
           if (mounted) Navigator.pop(context);
         }
@@ -456,13 +518,74 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
     return Column(
       children: [
         _buildSearchField(),
+        StreamBuilder<QuerySnapshot>(
+          stream: _ds.getCommerceSectionsColl(_selectedLevel!).snapshots(),
+          builder: (ctx, secSnap) {
+            List<Map<String, String>> sectionsList = [{'id': 'all', 'name': 'جميع الشعب'}];
+            if (secSnap.hasData) {
+              for (var doc in secSnap.data!.docs) {
+                var d = doc.data() as Map<String, dynamic>;
+                sectionsList.add({'id': d['name'] ?? doc.id, 'name': d['name'] ?? 'شعبة'});
+              }
+            }
+            if (sectionsList.length == 1) {
+              sectionsList.addAll([
+                {'id': 'نظم معلومات الاعمال', 'name': 'نظم معلومات الأعمال'},
+                {'id': 'محاسبه', 'name': 'المحاسبة والمراجعة'},
+              ]);
+            }
+
+            return Container(
+              height: 48,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              margin: const EdgeInsets.only(bottom: 8),
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: sectionsList.length,
+                itemBuilder: (ctx, i) {
+                  final sec = sectionsList[i];
+                  final isSelected = _selectedStudentDivisionFilter == sec['id'];
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: ChoiceChip(
+                      label: Text(sec['name']!, style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold, color: isSelected ? Colors.white : null)),
+                      selected: isSelected,
+                      selectedColor: Theme.of(context).primaryColor,
+                      onSelected: (selected) {
+                        if (selected) {
+                          setState(() => _selectedStudentDivisionFilter = sec['id']!);
+                        }
+                      },
+                    ),
+                  );
+                },
+              ),
+            );
+          },
+        ),
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
             stream: _ds.studentsColl.where('level', isEqualTo: _selectedLevel!.replaceAll('level_', '')).snapshots(),
             builder: (ctx, snap) {
               if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-              var docs = snap.data!.docs.where((d) => (d.data() as Map)['name'].toString().toLowerCase().contains(_searchQuery.toLowerCase())).toList();
-              if (docs.isEmpty) return _buildEmptyState(Icons.group_off, 'لا يوجد طلاب');
+              
+              var docs = snap.data!.docs.where((d) {
+                final data = d.data() as Map<String, dynamic>;
+                String sName = (data['name'] ?? '').toString().toLowerCase();
+                String sDiv = (data['division'] ?? '').toString();
+
+                bool matchesSearch = sName.contains(_searchQuery.toLowerCase());
+                
+                bool matchesDiv = _selectedStudentDivisionFilter == 'all' || 
+                                  _ds.normalizeDivision(sDiv) == _ds.normalizeDivision(_selectedStudentDivisionFilter) ||
+                                  sDiv.contains(_selectedStudentDivisionFilter) ||
+                                  _selectedStudentDivisionFilter.contains(sDiv);
+
+                return matchesSearch && matchesDiv;
+              }).toList();
+
+              if (docs.isEmpty) return _buildEmptyState(Icons.group_off, 'لا يوجد طلاب لهذه الشعبة');
+
               return ListView.builder(
                 padding: const EdgeInsets.all(15), 
                 itemCount: docs.length, 
@@ -472,7 +595,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
                     key: ValueKey<String>(docs[i].id),
                     child: _buildListItem(
                       title: d['name'] ?? '', 
-                      subtitle: 'ID: ${d['id']} | ${d['division']}', 
+                      subtitle: 'ID: ${d['id']} | الشعبة: ${d['division']}', 
                       icon: Icons.school, 
                       color: Colors.green, 
                       photoUrl: d['photoUrl'],
@@ -573,7 +696,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
 
   Widget _buildDoctorsTab() {
     return StreamBuilder<QuerySnapshot>(
-      stream: _ds.commerceDoctorsColl.where('teachingLevels', arrayContains: _selectedLevel).snapshots(),
+      stream: _ds.commerceDoctorsColl.snapshots(),
       builder: (ctx, snap) {
         if (!snap.hasData) return const Center(child: CircularProgressIndicator());
         var docs = snap.data!.docs;
@@ -592,6 +715,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
               doctorName: d['name'],
               initialDoctorData: d,
             ),
+            onEdit: () => _showEditDoctorBS(docs[i]),
             onDelete: () => _ds.deleteDoctor(docs[i].id)
           );
         });
@@ -601,11 +725,11 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
 
   Widget _buildTAsTab() {
     return StreamBuilder<QuerySnapshot>(
-      stream: _ds.commerceTasColl.where('teachingLevels', arrayContains: _selectedLevel).snapshots(),
+      stream: _ds.commerceTasColl.snapshots(),
       builder: (ctx, snap) {
         if (!snap.hasData) return const Center(child: CircularProgressIndicator());
         var docs = snap.data!.docs;
-        if (docs.isEmpty) return _buildEmptyState(Icons.person_off_outlined, 'لا يوجد معيدين مسجلين لهذه الفرقة');
+        if (docs.isEmpty) return _buildEmptyState(Icons.person_off_outlined, 'لا يوجد معيدين مسجلين');
         return ListView.builder(padding: const EdgeInsets.all(15), itemCount: docs.length, itemBuilder: (ctx, i) {
           var d = docs[i].data() as Map<String, dynamic>;
           return _buildListItem(
@@ -620,9 +744,115 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
               doctorName: d['name'],
               initialDoctorData: d,
             ),
+            onEdit: () => _showEditTABS(docs[i]),
             onDelete: () => _ds.deleteTA(docs[i].id)
           );
         });
+      },
+    );
+  }
+
+  Widget _buildForumsTab() {
+    if (_selectedLevel == null) {
+      return Center(child: Text('يرجى اختيار فرقة دراسية أولاً', style: GoogleFonts.cairo(color: Colors.grey)));
+    }
+
+    String levelId = _selectedLevel!;
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: _ds.getCommerceCoursesColl(levelId).snapshots(),
+      builder: (ctx, snap) {
+        if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+        var courses = snap.data!.docs;
+        if (courses.isEmpty) return _buildEmptyState(Icons.forum_outlined, 'لا توجد مواد لمواضيع المناقشة');
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(15),
+          itemCount: courses.length,
+          itemBuilder: (ctx, i) {
+            var courseDoc = courses[i];
+            var d = courseDoc.data() as Map<String, dynamic>;
+            String courseName = d['name'] ?? 'مادة';
+            String division = d['division'] ?? 'الكل';
+
+            return Card(
+              color: _ds.isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+              margin: const EdgeInsets.only(bottom: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              child: ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: Colors.cyan.withAlpha(30),
+                  child: const Icon(Icons.forum_rounded, color: Colors.cyan),
+                ),
+                title: Text(courseName, style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+                subtitle: Text('الشعبة: $division | انقر لدخول شات المادة', style: GoogleFonts.cairo(fontSize: 12, color: Colors.grey)),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.cyan),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (ctx) => DiscussionForumScreen(
+                        levelId: levelId,
+                        courseId: courseDoc.id,
+                        courseName: courseName,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showEditDoctorBS(DocumentSnapshot doc) {
+    var d = doc.data() as Map<String, dynamic>;
+    final nameC = TextEditingController(text: d['name'] ?? '');
+    final emailC = TextEditingController(text: d['email'] ?? '');
+
+    _showStyledBS(
+      title: 'تعديل بيانات الدكتور',
+      icon: Icons.edit_note_rounded,
+      color: Colors.pink,
+      children: [
+        _buildInputField(nameC, 'اسم الدكتور', Icons.person),
+        _buildInputField(emailC, 'البريد الإلكتروني', Icons.email_outlined),
+      ],
+      onSave: () async {
+        if (nameC.text.isNotEmpty) {
+          await _ds.updateDoctorByAdmin(doc.id, name: nameC.text.trim(), email: emailC.text.trim());
+          if (mounted) {
+            Navigator.pop(context);
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تعديل بيانات الدكتور بنجاح')));
+          }
+        }
+      },
+    );
+  }
+
+  void _showEditTABS(DocumentSnapshot doc) {
+    var d = doc.data() as Map<String, dynamic>;
+    final nameC = TextEditingController(text: d['name'] ?? '');
+    final emailC = TextEditingController(text: d['email'] ?? '');
+
+    _showStyledBS(
+      title: 'تعديل بيانات المعيد',
+      icon: Icons.edit_note_rounded,
+      color: Colors.teal,
+      children: [
+        _buildInputField(nameC, 'اسم المعيد', Icons.person),
+        _buildInputField(emailC, 'البريد الإلكتروني', Icons.email_outlined),
+      ],
+      onSave: () async {
+        if (nameC.text.isNotEmpty) {
+          await _ds.updateTAByAdmin(doc.id, name: nameC.text.trim(), email: emailC.text.trim());
+          if (mounted) {
+            Navigator.pop(context);
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تعديل بيانات المعيد بنجاح')));
+          }
+        }
       },
     );
   }
@@ -1004,25 +1234,91 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
       return Center(child: Text('يرجى اختيار فرقة دراسية أولاً', style: GoogleFonts.cairo(color: Colors.grey)));
     }
 
+    String cleanLvl = _ds.normalizeLevel(_selectedLevel!);
+    String levelId = 'level_$cleanLvl';
+
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.all(15),
-          child: ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).primaryColor,
-              foregroundColor: Colors.white,
-              minimumSize: const Size(double.infinity, 50),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-            ),
-            icon: const Icon(Icons.add_circle_outline_rounded),
-            label: Text('إضافة محاضرة رسمية للجدول', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 16)),
-            onPressed: () => _showAddScheduleModal(context, _selectedLevel!),
+          padding: const EdgeInsets.fromLTRB(15, 15, 15, 5),
+          child: Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).primaryColor,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(double.infinity, 50),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                  ),
+                  icon: const Icon(Icons.add_circle_outline_rounded),
+                  label: Text('إضافة محاضرة رسمية للجدول', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 15)),
+                  onPressed: () => _showAddScheduleModal(context, cleanLvl),
+                ),
+              ),
+              const SizedBox(width: 10),
+              StreamBuilder<QuerySnapshot>(
+                stream: _ds.getOfficialScheduleStream(levelId: levelId),
+                builder: (context, snapshot) {
+                  int unpublishedCount = 0;
+                  if (snapshot.hasData) {
+                    unpublishedCount = snapshot.data!.docs.where((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      return data['isPublished'] != true;
+                    }).length;
+                  }
+                  return ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green.shade700,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(130, 50),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                    ),
+                    icon: const Icon(Icons.publish_rounded),
+                    label: Text(unpublishedCount > 0 ? 'نشر ($unpublishedCount)' : 'نشر الجدول', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 14)),
+                    onPressed: () async {
+                      bool confirm = await showDialog(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: Text('نشر الجدول للطلاب', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+                          content: Text('هل أنت متأكد من نشر جميع المحاضرات الحالية للفرقة $cleanLvl لكي تظهر للطلاب؟', style: GoogleFonts.cairo()),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('إلغاء', style: GoogleFonts.cairo())),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
+                              onPressed: () => Navigator.pop(ctx, true),
+                              child: Text('تأكيد النشر', style: GoogleFonts.cairo()),
+                            ),
+                          ],
+                        ),
+                      ) ?? false;
+
+                      if (confirm) {
+                        try {
+                          await _ds.publishScheduleEntriesForLevel(levelId, publish: true);
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('تم نشر جدول المحاضرات بنجاح للطلاب')),
+                            );
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('فشل النشر: $e'), backgroundColor: Colors.red),
+                            );
+                          }
+                        }
+                      }
+                    },
+                  );
+                },
+              ),
+            ],
           ),
         ),
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
-            stream: _ds.getOfficialScheduleStream(levelId: 'level_$_selectedLevel'),
+            stream: _ds.getOfficialScheduleStream(levelId: levelId),
             builder: (ctx, snap) {
               if (!snap.hasData) return const Center(child: CircularProgressIndicator());
               var docs = snap.data!.docs;
@@ -1044,18 +1340,104 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
                 padding: const EdgeInsets.all(15),
                 itemCount: docs.length,
                 itemBuilder: (ctx, i) {
-                  var d = docs[i].data() as Map<String, dynamic>;
+                  var doc = docs[i];
+                  var d = doc.data() as Map<String, dynamic>;
+                  bool isPublished = d['isPublished'] == true;
+                  String subject = d['subjectName'] ?? d['subject'] ?? '';
+                  String doctor = d['doctorName'] ?? d['doctor'] ?? '--';
+                  String day = d['day'] ?? d['dayName'] ?? 'السبت';
+                  String time = d['startTime'] ?? d['time'] ?? '09:00';
+                  String type = d['type'] ?? 'محاضرة';
+                  String hall = d['location'] ?? d['hall'] ?? '--';
+                  String section = d['targetSection'] ?? d['division'] ?? 'الكل';
+
                   return Card(
                     color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                     margin: const EdgeInsets.only(bottom: 12),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                    child: ListTile(
-                      leading: CircleAvatar(backgroundColor: Theme.of(context).primaryColor.withAlpha(30), child: Icon(Icons.menu_book_rounded, color: Theme.of(context).primaryColor)),
-                      title: Text(d['subject'] ?? '', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
-                      subtitle: Text('${d['dayName']} - ${d['time']} | ${d['type']}\nالشعبة: ${d['division'] ?? 'الكل'} | القاعة: ${d['hall'] ?? '--'} | د: ${d['doctor'] ?? '--'}', style: GoogleFonts.cairo(fontSize: 12)),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.delete_outline, color: Colors.red),
-                        onPressed: () => _ds.deleteOfficialSchedule(docs[i].id),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  CircleAvatar(
+                                    backgroundColor: Theme.of(context).primaryColor.withAlpha(30),
+                                    child: Icon(Icons.menu_book_rounded, color: Theme.of(context).primaryColor, size: 20),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Text(subject, style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 16)),
+                                ],
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: isPublished ? Colors.green.withAlpha(30) : Colors.orange.withAlpha(30),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  isPublished ? 'منشور' : 'مسودة',
+                                  style: GoogleFonts.cairo(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: isPublished ? Colors.green.shade700 : Colors.orange.shade800,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const Divider(height: 16),
+                          Text('اليوم: $day  |  الوقت: $time  |  النوع: $type', style: GoogleFonts.cairo(fontSize: 13, fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 4),
+                          Text('الدكتور: $doctor  |  القاعة: $hall', style: GoogleFonts.cairo(fontSize: 13, color: Colors.grey.shade600)),
+                          const SizedBox(height: 4),
+                          Text('الشعبة المستهدفة: ${section == 'all' ? 'جميع الشعب' : section}', style: GoogleFonts.cairo(fontSize: 12, color: Colors.purple.shade300)),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              TextButton.icon(
+                                style: TextButton.styleFrom(foregroundColor: Colors.blue),
+                                icon: const Icon(Icons.edit_outlined, size: 16),
+                                label: Text('تعديل', style: GoogleFonts.cairo()),
+                                onPressed: () => _showAddScheduleModal(context, cleanLvl, existingEntry: d, existingId: doc.id),
+                              ),
+                              const SizedBox(width: 8),
+                              TextButton.icon(
+                                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                                icon: const Icon(Icons.delete_outline, size: 16),
+                                label: Text('حذف', style: GoogleFonts.cairo()),
+                                onPressed: () async {
+                                  bool confirm = await showDialog(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                      title: Text('تأكيد الحذف', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+                                      content: Text('هل أنت متأكد من حذف هذه المحاضرة؟', style: GoogleFonts.cairo()),
+                                      actions: [
+                                        TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('إلغاء', style: GoogleFonts.cairo())),
+                                        ElevatedButton(
+                                          style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+                                          onPressed: () => Navigator.pop(ctx, true),
+                                          child: Text('حذف', style: GoogleFonts.cairo()),
+                                        ),
+                                      ],
+                                    ),
+                                  ) ?? false;
+                                  if (confirm) {
+                                    await _ds.deleteOfficialScheduleEntry(doc.id);
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حذف المحاضرة بنجاح')));
+                                    }
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                   );
@@ -1068,37 +1450,106 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
     );
   }
 
-  void _showAddScheduleModal(BuildContext context, String levelStr) async {
-    List<String> subjectNames = [];
-    List<String> doctorNames = [];
+  void _showAddScheduleModal(BuildContext context, String levelStr, {Map<String, dynamic>? existingEntry, String? existingId}) async {
     String levelId = 'level_$levelStr';
+    bool isEditing = existingEntry != null && existingId != null;
+
+    List<Map<String, dynamic>> coursesList = [];
+    List<Map<String, dynamic>> instructorsList = [];
+    List<Map<String, dynamic>> sectionsList = [{'id': 'all', 'name': 'جميع الشعب'}];
+
+    String cleanInstructor(String rawName, String prefix) {
+      String name = rawName.trim();
+      while (true) {
+        String oldName = name;
+        name = name.replaceFirst(RegExp(r'^(دكتور|د\.|ميد|م\.|مهندس|أ\.|استاذ|أستاذ|أ\s+|\.\s*)\s*', caseSensitive: false), '').trim();
+        if (name == oldName || name.isEmpty) break;
+      }
+      if (name.isEmpty) return '';
+      return '$prefix $name';
+    }
 
     try {
       var coursesSnap = await _ds.getCommerceCoursesColl(levelId).get();
-      subjectNames = coursesSnap.docs.map((c) => (c.data() as Map)['name'].toString()).toList();
-    } catch (_) {}
+      coursesList = coursesSnap.docs.map((c) => {'id': c.id, ...c.data() as Map<String, dynamic>}).toList();
+    } catch (e) {
+      debugPrint("Error fetching courses: $e");
+    }
 
     try {
       var docsSnap = await _ds.commerceDoctorsColl.get();
       for (var doc in docsSnap.docs) {
         var data = doc.data() as Map<String, dynamic>;
-        List levels = data['teachingLevels'] ?? [];
-        if (levels.isEmpty || levels.contains(levelStr) || levels.contains(levelId)) {
-          doctorNames.add(data['name'] ?? '');
+        String formatted = cleanInstructor(data['name'] ?? '', 'د.');
+        if (formatted.isNotEmpty) {
+          instructorsList.add({'id': doc.id, 'name': formatted});
         }
+      }
+    } catch (e) {
+      debugPrint("Error fetching doctors: $e");
+    }
+
+    try {
+      var taSnap = await _ds.commerceTasColl.get();
+      for (var doc in taSnap.docs) {
+        var data = doc.data() as Map<String, dynamic>;
+        String formatted = cleanInstructor(data['name'] ?? '', 'م.');
+        if (formatted.isNotEmpty) {
+          instructorsList.add({'id': doc.id, 'name': formatted});
+        }
+      }
+    } catch (e) {
+      debugPrint("Error fetching TAs: $e");
+    }
+
+    instructorsList.add({'id': 'other', 'name': 'أخرى (إدخال يدوي)'});
+
+    try {
+      var secSnap = await _ds.getCommerceSectionsColl(levelId).get();
+      for (var doc in secSnap.docs) {
+        var data = doc.data() as Map<String, dynamic>;
+        sectionsList.add({'id': data['id'] ?? doc.id, 'name': data['name'] ?? 'شعبة'});
+      }
+    } catch (e) {
+      debugPrint("Error fetching sections: $e");
+    }
+
+    if (coursesList.isEmpty) {
+      coursesList = [{'id': 'none', 'name': 'يرجى إضافة مواد من تبويب المواد أولاً'}];
+    }
+    if (instructorsList.length <= 1) {
+      instructorsList.insert(0, {'id': 'none', 'name': 'دكتور / معيد غير محدد'});
+    }
+
+    Map<String, dynamic> selectedCourse = coursesList.firstWhere(
+      (c) => c['id'] == existingEntry?['subjectId'] || c['name'] == existingEntry?['subject'],
+      orElse: () => coursesList.first,
+    );
+
+    bool isCustomInstructor = existingEntry?['doctorId']?.toString().startsWith('custom_') ?? false;
+    Map<String, dynamic> selectedInstructor = isCustomInstructor 
+        ? instructorsList.firstWhere((i) => i['id'] == 'other', orElse: () => instructorsList.first)
+        : instructorsList.firstWhere(
+            (d) => d['id'] == existingEntry?['doctorId'] || d['name'] == existingEntry?['doctor'],
+            orElse: () => instructorsList.first,
+          );
+
+    final instructorCustomC = TextEditingController(text: isCustomInstructor ? (existingEntry?['doctorName'] ?? existingEntry?['doctor'] ?? '') : '');
+
+    String dayName = existingEntry?['day'] ?? existingEntry?['dayName'] ?? 'السبت';
+    String type = existingEntry?['type'] ?? 'محاضرة';
+    String targetSection = existingEntry?['targetSection'] ?? existingEntry?['division'] ?? 'all';
+    
+    String timeStr = existingEntry?['startTime'] ?? existingEntry?['time'] ?? '09:00';
+    TimeOfDay selectedTime = const TimeOfDay(hour: 9, minute: 0);
+    try {
+      final parts = timeStr.split(':');
+      if (parts.length == 2) {
+        selectedTime = TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
       }
     } catch (_) {}
 
-    if (subjectNames.isEmpty) subjectNames = ['محاضرة عامة'];
-    if (doctorNames.isEmpty) doctorNames = ['د. غير محددة'];
-
-    String selectedSubject = subjectNames.first;
-    String selectedDoctor = doctorNames.first;
-    String dayName = 'السبت';
-    String type = 'محاضرة';
-    String division = 'الكل';
-    TimeOfDay selectedTime = const TimeOfDay(hour: 9, minute: 0);
-    final hallC = TextEditingController();
+    final hallC = TextEditingController(text: existingEntry?['location'] ?? existingEntry?['hall'] ?? 'قاعة المحاضرات');
 
     if (!context.mounted) return;
 
@@ -1119,7 +1570,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
               children: [
                 Container(width: 50, height: 5, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(10))),
                 const SizedBox(height: 20),
-                Text('إضافة محاضرة رسمية للفرقة $levelStr', style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.bold)),
+                Text(isEditing ? 'تعديل المحاضرة الرسمية' : 'إضافة محاضرة رسمية للفرقة $levelStr', style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 20),
                 DropdownButtonFormField<String>(
                   value: dayName,
@@ -1138,23 +1589,22 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
                 ),
                 const SizedBox(height: 15),
                 DropdownButtonFormField<String>(
-                  value: division,
+                  value: sectionsList.any((s) => s['name'] == targetSection || s['id'] == targetSection) ? targetSection : 'all',
                   dropdownColor: _ds.isDarkMode ? const Color(0xFF2C2C2C) : Colors.white,
                   decoration: InputDecoration(labelText: 'الشعبة المستهدفة', border: OutlineInputBorder(borderRadius: BorderRadius.circular(15))),
-                  items: const [
-                    DropdownMenuItem(value: 'الكل', child: Text('جميع الشعب')),
-                    DropdownMenuItem(value: 'نظم معلومات الأعمال', child: Text('نظم معلومات الأعمال')),
-                    DropdownMenuItem(value: 'المحاسبة والمراجعة', child: Text('المحاسبة والمراجعة')),
-                  ],
-                  onChanged: (v) => setModalState(() => division = v ?? 'الكل'),
+                  items: sectionsList.map((sec) => DropdownMenuItem(
+                    value: sec['id'] == 'all' ? 'all' : (sec['name']?.toString() ?? 'all'),
+                    child: Text(sec['name'].toString())
+                  )).toList(),
+                  onChanged: (v) => setModalState(() => targetSection = v ?? 'all'),
                 ),
                 const SizedBox(height: 15),
-                DropdownButtonFormField<String>(
-                  value: selectedSubject,
+                DropdownButtonFormField<Map<String, dynamic>>(
+                  value: selectedCourse,
                   dropdownColor: _ds.isDarkMode ? const Color(0xFF2C2C2C) : Colors.white,
                   decoration: InputDecoration(labelText: 'اختر المادة', border: OutlineInputBorder(borderRadius: BorderRadius.circular(15))),
-                  items: subjectNames.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
-                  onChanged: (v) => setModalState(() => selectedSubject = v ?? subjectNames.first),
+                  items: coursesList.map((c) => DropdownMenuItem(value: c, child: Text(c['name'] ?? ''))).toList(),
+                  onChanged: (v) => setModalState(() => selectedCourse = v ?? coursesList.first),
                 ),
                 const SizedBox(height: 15),
                 InkWell(
@@ -1174,21 +1624,31 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
                       suffixIcon: const Icon(Icons.access_time_rounded),
                     ),
                     child: Text(
-                      selectedTime.format(context),
+                      '${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}',
                       style: GoogleFonts.cairo(fontSize: 15, fontWeight: FontWeight.bold),
                     ),
                   ),
                 ),
                 const SizedBox(height: 15),
-                TextField(controller: hallC, decoration: InputDecoration(labelText: 'القاعة / المكان (مثال: مدرج عبد العزيز)', border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)))),
+                TextField(controller: hallC, decoration: InputDecoration(labelText: 'القاعة / المكان', border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)))),
                 const SizedBox(height: 15),
-                DropdownButtonFormField<String>(
-                  value: selectedDoctor,
+                DropdownButtonFormField<Map<String, dynamic>>(
+                  value: selectedInstructor,
                   dropdownColor: _ds.isDarkMode ? const Color(0xFF2C2C2C) : Colors.white,
-                  decoration: InputDecoration(labelText: 'اختر الدكتور / المحاضر', border: OutlineInputBorder(borderRadius: BorderRadius.circular(15))),
-                  items: doctorNames.map((doc) => DropdownMenuItem(value: doc, child: Text(doc))).toList(),
-                  onChanged: (v) => setModalState(() => selectedDoctor = v ?? doctorNames.first),
+                  decoration: InputDecoration(labelText: 'اختر الدكتور / المعيد', border: OutlineInputBorder(borderRadius: BorderRadius.circular(15))),
+                  items: instructorsList.map((doc) => DropdownMenuItem(value: doc, child: Text(doc['name'] ?? ''))).toList(),
+                  onChanged: (v) => setModalState(() => selectedInstructor = v ?? instructorsList.first),
                 ),
+                if (selectedInstructor['id'] == 'other') ...[
+                  const SizedBox(height: 15),
+                  TextField(
+                    controller: instructorCustomC,
+                    decoration: InputDecoration(
+                      labelText: 'اسم المحاضر / المعيد (كتابة يدوي)',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 25),
                 SizedBox(
                   width: double.infinity,
@@ -1196,23 +1656,63 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(backgroundColor: Theme.of(context).primaryColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
                     onPressed: () async {
-                      String timeStr = selectedTime.format(context);
-                      await _ds.addOfficialSchedule(
-                        levelId: levelId,
-                        division: division,
-                        item: {
-                          'subject': selectedSubject,
-                          'dayName': dayName,
-                          'time': timeStr,
-                          'type': type,
-                          'hall': hallC.text.trim().isEmpty ? 'قاعة المحاضرات' : hallC.text.trim(),
-                          'doctor': selectedDoctor,
-                          'isOfficial': true,
-                        },
-                      );
-                      if (ctx.mounted) Navigator.pop(ctx);
+                      if (selectedCourse['id'] == 'none') {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يرجى إضافة أو اختيار مادة صحيحة أولاً')));
+                        return;
+                      }
+                      String formattedTime = '${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}';
+                      String hallText = hallC.text.trim().isEmpty ? 'قاعة المحاضرات' : hallC.text.trim();
+
+                      String finalDocId = selectedInstructor['id'];
+                      String finalDocName = selectedInstructor['name'];
+                      if (finalDocId == 'other') {
+                        finalDocId = 'custom_${DateTime.now().millisecondsSinceEpoch}';
+                        finalDocName = instructorCustomC.text.trim().isEmpty ? 'مُحاضر غير محدد' : instructorCustomC.text.trim();
+                      }
+
+                      try {
+                        if (isEditing) {
+                          await _ds.updateOfficialScheduleEntry(
+                            entryId: existingId,
+                            levelId: levelId,
+                            day: dayName,
+                            type: type,
+                            targetSection: targetSection,
+                            subjectId: selectedCourse['id'],
+                            subjectName: selectedCourse['name'],
+                            doctorId: finalDocId,
+                            doctorName: finalDocName,
+                            startTime: formattedTime,
+                            location: hallText,
+                          );
+                        } else {
+                          await _ds.addOfficialScheduleEntry(
+                            levelId: levelId,
+                            day: dayName,
+                            type: type,
+                            targetSection: targetSection,
+                            subjectId: selectedCourse['id'],
+                            subjectName: selectedCourse['name'],
+                            doctorId: finalDocId,
+                            doctorName: finalDocName,
+                            startTime: formattedTime,
+                            location: hallText,
+                          );
+                        }
+
+                        if (ctx.mounted) {
+                          Navigator.of(ctx).pop();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(isEditing ? 'تم تعديل المحاضرة بنجاح' : 'تمت إضافة المحاضرة بنجاح')),
+                          );
+                        }
+                      } catch (e) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('خطأ أثناء الحفظ: $e'), backgroundColor: Colors.red),
+                        );
+                      }
                     },
-                    child: Text('حفظ ونشر الجدول', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 16)),
+                    child: Text(isEditing ? 'تعديل وحفظ التغييرات' : 'حفظ وإضافة للجدول', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 16)),
                   ),
                 ),
                 const SizedBox(height: 20),

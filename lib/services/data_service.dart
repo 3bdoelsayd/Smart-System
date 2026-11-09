@@ -666,15 +666,17 @@ class DataService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> addCourseToLevel(String levelId, String name, String division, String semesterId, String doctorId, {int lecturesCount = 12, String? taId}) async {
+  Future<void> addCourseToLevel(String levelId, String name, String division, String semesterId, String doctorId, {int lecturesCount = 12, String? taId, List<String>? taIds}) async {
     String cid = _firestore.collection('tmp').doc().id;
+    List<String> finalTaIds = taIds ?? (taId != null ? [taId] : []);
     await getCommerceCoursesColl(levelId).doc(cid).set({
       'id': cid,
       'name': name,
       'division': division,
       'semester_id': semesterId,
       'doctor_id': doctorId,
-      'ta_id': taId,
+      'ta_id': finalTaIds.isNotEmpty ? finalTaIds.first : taId,
+      'ta_ids': finalTaIds,
       'level_id': levelId,
       'lecturesCount': lecturesCount,
       'createdAt': FieldValue.serverTimestamp(),
@@ -757,6 +759,20 @@ class DataService extends ChangeNotifier {
   Future<void> deleteDoctor(String uid) async { await commerceDoctorsColl.doc(uid).delete(); notifyListeners(); }
   Future<void> deleteTA(String uid) async { await commerceTasColl.doc(uid).delete(); notifyListeners(); }
   Future<void> deleteManager(String uid) async { await commerceManagersColl.doc(uid).delete(); notifyListeners(); }
+
+  Future<void> updateDoctorByAdmin(String docId, {required String name, String? email}) async {
+    Map<String, dynamic> data = {'name': name};
+    if (email != null && email.isNotEmpty) data['email'] = email;
+    await commerceDoctorsColl.doc(docId).set(data, SetOptions(merge: true));
+    notifyListeners();
+  }
+
+  Future<void> updateTAByAdmin(String taId, {required String name, String? email}) async {
+    Map<String, dynamic> data = {'name': name};
+    if (email != null && email.isNotEmpty) data['email'] = email;
+    await commerceTasColl.doc(taId).set(data, SetOptions(merge: true));
+    notifyListeners();
+  }
 
   Future<void> clearAllNotifications(String type) async {
     var snap = await notificationsColl.where('targetType', isEqualTo: type).get();
@@ -1162,6 +1178,7 @@ class DataService extends ChangeNotifier {
   }
 
   CollectionReference get schedulesColl => instituteRef.collection('schedules');
+  CollectionReference get scheduleEntriesColl => instituteRef.collection('schedule_entries');
 
   Future<void> addOfficialSchedule({
     required String levelId,
@@ -1186,12 +1203,120 @@ class DataService extends ChangeNotifier {
   }
 
   Stream<QuerySnapshot> getOfficialScheduleStream({String? levelId, String? division}) {
-    if (selectedInstituteId == null) return const Stream.empty();
-    Query q = schedulesColl;
+    if (selectedInstituteId == null) return _firestore.collection('empty_fallback').snapshots();
+    // Also support schedule_entries if schedulesColl is empty or for unified view
+    Query q = scheduleEntriesColl;
     if (levelId != null && levelId.isNotEmpty) {
-      q = q.where('levelId', isEqualTo: levelId);
+      String cleanLvl = normalizeLevel(levelId);
+      q = q.where('levelId', whereIn: [levelId, 'level_$cleanLvl', cleanLvl]);
     }
     return q.snapshots();
+  }
+
+  Future<void> addOfficialScheduleEntry({
+    required String levelId,
+    required String day,
+    required String type,
+    required String targetSection,
+    required String subjectId,
+    required String subjectName,
+    required String doctorId,
+    required String doctorName,
+    required String startTime,
+    String? endTime,
+    required String location,
+  }) async {
+    if (selectedInstituteId == null) throw Exception("Institute not selected");
+    await scheduleEntriesColl.add({
+      'levelId': levelId,
+      'day': day,
+      'type': type,
+      'targetSection': targetSection,
+      'subjectId': subjectId,
+      'subjectName': subjectName,
+      'doctorId': doctorId,
+      'doctorName': doctorName,
+      'startTime': startTime,
+      'endTime': endTime ?? '',
+      'location': location,
+      'isPublished': false,
+      'instituteId': selectedInstituteId,
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+      'createdBy': _auth.currentUser?.email ?? 'admin',
+    });
+    notifyListeners();
+  }
+
+  Future<void> updateOfficialScheduleEntry({
+    required String entryId,
+    required String levelId,
+    required String day,
+    required String type,
+    required String targetSection,
+    required String subjectId,
+    required String subjectName,
+    required String doctorId,
+    required String doctorName,
+    required String startTime,
+    String? endTime,
+    required String location,
+  }) async {
+    if (selectedInstituteId == null) throw Exception("Institute not selected");
+    await scheduleEntriesColl.doc(entryId).update({
+      'levelId': levelId,
+      'day': day,
+      'type': type,
+      'targetSection': targetSection,
+      'subjectId': subjectId,
+      'subjectName': subjectName,
+      'doctorId': doctorId,
+      'doctorName': doctorName,
+      'startTime': startTime,
+      'endTime': endTime ?? '',
+      'location': location,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+    notifyListeners();
+  }
+
+  Future<void> deleteOfficialScheduleEntry(String entryId) async {
+    await scheduleEntriesColl.doc(entryId).delete();
+    notifyListeners();
+  }
+
+  Future<void> publishScheduleEntriesForLevel(String levelId, {bool publish = true}) async {
+    String cleanLvl = normalizeLevel(levelId);
+    var snap = await scheduleEntriesColl
+        .where('levelId', whereIn: [levelId, 'level_$cleanLvl', cleanLvl])
+        .get();
+    
+    WriteBatch batch = _firestore.batch();
+    for (var doc in snap.docs) {
+      batch.update(doc.reference, {
+        'isPublished': publish,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    }
+    await batch.commit();
+    notifyListeners();
+  }
+
+  Stream<QuerySnapshot> getStudentOfficialScheduleStream({required String levelId}) {
+    if (selectedInstituteId == null) return _firestore.collection('empty_fallback').snapshots();
+    String cleanLvl = normalizeLevel(levelId);
+    return scheduleEntriesColl
+        .where('levelId', whereIn: [levelId, 'level_$cleanLvl', cleanLvl])
+        .where('isPublished', isEqualTo: true)
+        .snapshots();
+  }
+
+  Stream<QuerySnapshot> getDoctorOfficialScheduleStream({required String doctorId}) {
+    if (selectedInstituteId == null) return _firestore.collection('empty_fallback').snapshots();
+    return scheduleEntriesColl
+        .where('doctorId', isEqualTo: doctorId)
+        .where('isPublished', isEqualTo: true)
+        .snapshots();
   }
 
   Future<void> changeUserPassword(String id, String newPass, bool isStud) async {
@@ -1329,6 +1454,7 @@ class DataService extends ChangeNotifier {
     String n = div.toLowerCase().trim();
     if (n == 'is' || n.contains('نظم')) return 'نظم معلومات الاعمال';
     if (n == 'acc' || n.contains('محاسبه') || n.contains('محاسبة')) return 'محاسبه';
+    if (n == 'all' || n == 'الكل' || n.contains('جميع') || n.contains('عام') || n == 'general') return 'all';
     return n;
   }
 
