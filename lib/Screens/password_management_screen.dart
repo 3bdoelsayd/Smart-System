@@ -85,6 +85,8 @@ class _PasswordManagementScreenState extends State<PasswordManagementScreen> {
                     return q.isEmpty || name.contains(q) || id.contains(q);
                   }).toList();
 
+                  users.sort((a, b) => (a.data() as Map<String, dynamic>)['name'].toString().compareTo((b.data() as Map<String, dynamic>)['name'].toString()));
+
                   return ListView.builder(
                     itemCount: users.length,
                     itemBuilder: (ctx, i) {

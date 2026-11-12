@@ -21,11 +21,11 @@ class AppDrawer extends StatelessWidget {
           bool isDark = ds.isDarkMode;
 
           bool isDoctor = ds.userRole == 'doctor' || ds.userRole == 'ta';
-          bool isSuperAdmin = ds.userRole == 'super_admin';
+          bool isSuperAdmin = ds.userRole == 'super_admin' || ds.userRole == 'super_admin_plus';
           bool isManager = ds.userRole == 'manager';
 
           bool isStaff = ds.userRole == 'doctor' || ds.userRole == 'ta';
-          bool isAdmin = ds.userRole == 'manager' || ds.userRole == 'super_admin';
+          bool isAdmin = ds.userRole == 'manager' || ds.userRole == 'super_admin' || ds.userRole == 'super_admin_plus';
           
           String? profilePhoto;
           if (isAdmin) {
@@ -137,6 +137,12 @@ class AppDrawer extends StatelessWidget {
                       if (isManager) ...[
                         const Divider(indent: 20, endIndent: 20),
                         _buildDrawerItem(
+                          icon: Icons.quiz_rounded,
+                          title: isAr ? 'مراقبة الاختبارات' : 'Exams Monitoring',
+                          textColor: textColor, iconColor: iconColor,
+                          onTap: () { Navigator.pop(context); Navigator.pushNamed(context, '/manager/exams'); },
+                        ),
+                        _buildDrawerItem(
                           icon: Icons.school_rounded,
                           title: isAr ? 'إدارة الطلاب' : 'Manage Students',
                           textColor: textColor, iconColor: iconColor,
@@ -181,6 +187,12 @@ class AppDrawer extends StatelessWidget {
                       if (isDoctor) ...[
                         const Divider(indent: 20, endIndent: 20),
                         _buildDrawerItem(
+                          icon: Icons.quiz_rounded,
+                          title: isAr ? 'الاختبارات والكويزات' : 'Exams & Quizzes',
+                          textColor: textColor, iconColor: iconColor,
+                          onTap: () { Navigator.pop(context); Navigator.pushNamed(context, '/doctor/exams'); },
+                        ),
+                        _buildDrawerItem(
                           icon: Icons.group_rounded,
                           title: isAr ? (ds.userRole == 'ta' ? 'حضور السكاشن' : 'إدارة الحضور') : 'Attendance Management',
                           textColor: textColor, iconColor: iconColor,
@@ -196,6 +208,12 @@ class AppDrawer extends StatelessWidget {
 
                       if (!isSuperAdmin && !isManager && !isDoctor) ...[
                         const Divider(indent: 20, endIndent: 20),
+                        _buildDrawerItem(
+                          icon: Icons.quiz_rounded,
+                          title: isAr ? 'الاختبارات والكويزات' : 'Exams & Quizzes',
+                          textColor: textColor, iconColor: iconColor,
+                          onTap: () { Navigator.pop(context); Navigator.pushNamed(context, '/student/exams'); },
+                        ),
                         _buildDrawerItem(
                           icon: Icons.assignment_rounded,
                           title: isAr ? 'أبحاثي المرفوعة' : 'My Submissions',

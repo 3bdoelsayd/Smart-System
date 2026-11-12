@@ -95,10 +95,11 @@ class DoctorHomeScreen extends StatelessWidget {
         final List<String> teachingLevels = List<String>.from(ds.currentDoctor?['teachingLevels'] ?? []);
 
         final List<Map<String, dynamic>> cards = [
+          {'icon': Icons.quiz_rounded, 'title': isAr ? 'الاختبارات والكويزات' : 'Exams & Quizzes', 'route': '/doctor/exams', 'color': Colors.deepOrange},
           {'icon': Icons.qr_code_rounded, 'title': ds.userRole == 'ta' ? (isAr ? 'حضور السكاشن' : 'Section Attendance') : ds.translate('attendance_mng'), 'route': '/doctor/attendance', 'color': Colors.blue},
           {'icon': Icons.assignment_turned_in_rounded, 'title': ds.translate('research_review'), 'route': '/doctor/researches', 'color': Colors.orange},
           {'icon': Icons.forum_rounded, 'title': ds.translate('forum'), 'color': Colors.cyan, 'action': 'open_picker'},
-          {'icon': Icons.settings_rounded, 'title': ds.translate('settings'), 'route': '/settings', 'color': Colors.purple},
+          // {'icon': Icons.settings_rounded, 'title': ds.translate('settings'), 'route': '/settings', 'color': Colors.purple},
         ];
 
         return Directionality(

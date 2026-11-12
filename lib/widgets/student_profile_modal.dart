@@ -217,6 +217,75 @@ void showRichStudentProfileModal({
                   ),
                 ],
               ),
+              if (ds.userRole == 'manager' || ds.userRole == 'super_admin') ...[
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange.shade800,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                    ),
+                    icon: const Icon(Icons.lock_reset_rounded, color: Colors.white),
+                    label: Text(isAr ? "تغيير كلمة المرور للطالب" : "Change Password", style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold)),
+                    onPressed: () {
+                      final passC = TextEditingController();
+                      showDialog(
+                        context: context,
+                        builder: (dialogCtx) => AlertDialog(
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          title: Text(isAr ? 'تغيير كلمة المرور للطالب' : 'Change Student Password', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(isAr ? 'أدخل كلمة المرور الجديدة للطالب ($name):' : 'Enter new password for ($name):', style: GoogleFonts.cairo(fontSize: 13)),
+                              const SizedBox(height: 15),
+                              TextField(
+                                controller: passC,
+                                obscureText: true,
+                                decoration: InputDecoration(
+                                  labelText: isAr ? 'كلمة المرور الجديدة' : 'New Password',
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
+                                  prefixIcon: const Icon(Icons.lock_outline),
+                                ),
+                              ),
+                            ],
+                          ),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.pop(dialogCtx), child: Text(isAr ? 'إلغاء' : 'Cancel', style: GoogleFonts.cairo())),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.orange.shade800, foregroundColor: Colors.white),
+                              onPressed: () async {
+                                if (passC.text.trim().isNotEmpty) {
+                                  try {
+                                    await ds.changeStudentPasswordByAdmin(
+                                      studentUid: uid,
+                                      newPassword: passC.text.trim(),
+                                      levelId: level,
+                                    );
+                                    if (context.mounted) {
+                                      Navigator.pop(dialogCtx);
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text(isAr ? 'تم تغيير كلمة المرور فوراً بنجاح!' : 'Password changed successfully!'), backgroundColor: Colors.green),
+                                      );
+                                    }
+                                  } catch (e) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('خطأ أثناء تغيير كلمة المرور: $e'), backgroundColor: Colors.red),
+                                    );
+                                  }
+                                }
+                              },
+                              child: Text(isAr ? 'تحديث الفوري' : 'Update Now', style: GoogleFonts.cairo()),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
             ],
           ),
         ),

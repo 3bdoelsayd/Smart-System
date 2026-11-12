@@ -112,7 +112,11 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
                           onPressed: () => Scaffold.of(context).openDrawer()
                         )),
                         Text(_ds.isArabic ? 'لوحة تحكم المدير' : 'Manager Dashboard', style: GoogleFonts.cairo(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                        const CircleAvatar(backgroundColor: Colors.white24, child: Icon(Icons.person, color: Colors.white)),
+                        IconButton(
+                          icon: const Icon(Icons.quiz_rounded, color: Colors.white),
+                          onPressed: () => Navigator.pushNamed(context, '/manager/exams'),
+                          tooltip: _ds.isArabic ? 'مراقبة الاختبارات' : 'Exams',
+                        ),
                       ],
                     ),
                     const SizedBox(height: 25),
@@ -606,6 +610,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
                         initialStudentData: d,
                       ),
                       onResetDevice: () => _confirmResetDevice(context, docs[i].id, d['name']),
+                      onChangePassword: () => _showChangeStudentPasswordDialog(docs[i].id, d['name'] ?? '', _selectedLevel),
                       onDelete: () => _ds.deleteStudent(docs[i].id, _selectedLevel!.replaceAll('level_', ''))
                     ),
                   );
@@ -700,6 +705,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
       builder: (ctx, snap) {
         if (!snap.hasData) return const Center(child: CircularProgressIndicator());
         var docs = snap.data!.docs;
+        docs.sort((a, b) => (a.data() as Map<String, dynamic>)['name'].toString().compareTo((b.data() as Map<String, dynamic>)['name'].toString()));
         if (docs.isEmpty) return _buildEmptyState(Icons.person_off_outlined, 'لا يوجد دكاترة');
         return ListView.builder(padding: const EdgeInsets.all(15), itemCount: docs.length, itemBuilder: (ctx, i) {
           var d = docs[i].data() as Map<String, dynamic>;
@@ -729,6 +735,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
       builder: (ctx, snap) {
         if (!snap.hasData) return const Center(child: CircularProgressIndicator());
         var docs = snap.data!.docs;
+        docs.sort((a, b) => (a.data() as Map<String, dynamic>)['name'].toString().compareTo((b.data() as Map<String, dynamic>)['name'].toString()));
         if (docs.isEmpty) return _buildEmptyState(Icons.person_off_outlined, 'لا يوجد معيدين مسجلين');
         return ListView.builder(padding: const EdgeInsets.all(15), itemCount: docs.length, itemBuilder: (ctx, i) {
           var d = docs[i].data() as Map<String, dynamic>;
@@ -969,6 +976,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
       builder: (ctx, snap) {
         if (!snap.hasData) return const Center(child: CircularProgressIndicator());
         var docs = snap.data!.docs;
+        docs.sort((a, b) => (a.data() as Map<String, dynamic>)['name'].toString().compareTo((b.data() as Map<String, dynamic>)['name'].toString()));
         if (docs.isEmpty) return _buildEmptyState(Icons.calendar_month, 'لا توجد فصول');
         return ListView.builder(
           padding: const EdgeInsets.all(15),
@@ -1008,7 +1016,62 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
     );
   }
 
-  Widget _buildListItem({required String title, required String subtitle, required IconData icon, required Color color, String? photoUrl, VoidCallback? onTap, required VoidCallback onDelete, VoidCallback? onEdit, VoidCallback? onResetDevice}) {
+  void _showChangeStudentPasswordDialog(String uid, String name, String? level) {
+    final passC = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('تغيير كلمة المرور للطالب', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('أدخل كلمة المرور الجديدة للطالب ($name):', style: GoogleFonts.cairo(fontSize: 13)),
+            const SizedBox(height: 15),
+            TextField(
+              controller: passC,
+              obscureText: true,
+              decoration: InputDecoration(
+                labelText: 'كلمة المرور الجديدة',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
+                prefixIcon: const Icon(Icons.lock_outline),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogCtx), child: Text('إلغاء', style: GoogleFonts.cairo())),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange.shade800, foregroundColor: Colors.white),
+            onPressed: () async {
+              if (passC.text.trim().isNotEmpty) {
+                try {
+                  await _ds.changeStudentPasswordByAdmin(
+                    studentUid: uid,
+                    newPassword: passC.text.trim(),
+                    levelId: level,
+                  );
+                  if (mounted) {
+                    Navigator.pop(dialogCtx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('تم تغيير كلمة المرور وتفعيلها فوراً بنجاح!'), backgroundColor: Colors.green),
+                    );
+                  }
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('خطأ أثناء تغيير كلمة المرور: $e'), backgroundColor: Colors.red),
+                  );
+                }
+              }
+            },
+            child: Text('تحديث الفوري', style: GoogleFonts.cairo()),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildListItem({required String title, required String subtitle, required IconData icon, required Color color, String? photoUrl, VoidCallback? onTap, required VoidCallback onDelete, VoidCallback? onEdit, VoidCallback? onResetDevice, VoidCallback? onChangePassword}) {
     final isDark = _ds.isDarkMode;
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -1051,6 +1114,33 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
+                if (onChangePassword != null)
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(end: 8),
+                    child: InkWell(
+                      onTap: onChangePassword,
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.blue.withOpacity(0.2)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.lock_reset_rounded, color: Colors.blue, size: 16),
+                            const SizedBox(width: 4),
+                            Text(
+                              _ds.isArabic ? "تغيير الباسورد" : "Change Pass",
+                              style: GoogleFonts.cairo(color: Colors.blue, fontSize: 10, fontWeight: FontWeight.w900),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 if (onResetDevice != null)
                   Padding(
                     padding: const EdgeInsetsDirectional.only(end: 8),

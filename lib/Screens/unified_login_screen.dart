@@ -91,7 +91,8 @@ class _UnifiedLoginScreenState extends State<UnifiedLoginScreen> with SingleTick
       }
 
       switch (role) {
-        case 'super_admin': Navigator.pushReplacementNamed(context, '/super-admin/dashboard'); break;
+        case 'super_admin':
+        case 'super_admin_plus': Navigator.pushReplacementNamed(context, '/super-admin/dashboard'); break;
         case 'manager': Navigator.pushReplacementNamed(context, '/manager/dashboard'); break;
         case 'doctor': 
         case 'ta': Navigator.pushReplacementNamed(context, '/doctor/home'); break;

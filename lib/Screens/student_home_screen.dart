@@ -351,9 +351,9 @@ class _StudentDashboardPage extends StatelessWidget {
             delegate: SliverChildBuilderDelegate(
               (ctx, i) {
                 final cards = [
+                  {'icon': Icons.quiz_rounded, 'title': isAr ? 'الاختبارات والكويزات' : 'Exams & Quizzes', 'route': '/student/exams', 'color': Colors.deepOrange},
                   {'icon': Icons.qr_code_scanner_rounded, 'title': ds.translate('attendance'), 'route': '/student/attendance-scan', 'color': Colors.blue},
                   {'icon': Icons.cloud_upload_rounded, 'title': ds.translate('upload_research'), 'route': '/student/research-upload', 'color': Colors.orange},
-                  {'icon': Icons.history_rounded, 'title': ds.translate('research_history'), 'route': '/student/research-list', 'color': Colors.teal},
                   {'icon': Icons.forum_rounded, 'title': isAr ? 'ساحة النقاش' : 'Forum', 'color': Colors.cyan, 'action': 'open_picker'},
                 ];
                 return DashboardCard(

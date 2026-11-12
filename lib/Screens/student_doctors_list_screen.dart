@@ -61,6 +61,8 @@ class _StudentDoctorsListScreenState extends State<StudentDoctorsListScreen> {
             bottom: TabBar(
               indicatorColor: isDark ? const Color(0xFF03DAC6) : Colors.amber,
               indicatorWeight: 3,
+              labelColor: Colors.white,
+              unselectedLabelColor: Colors.white70,
               labelStyle: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 13),
               unselectedLabelStyle: GoogleFonts.cairo(fontSize: 12),
               tabs: [
@@ -131,6 +133,8 @@ class _StudentDoctorsListScreenState extends State<StudentDoctorsListScreen> {
           }).toList();
         }
 
+        docs.sort((a, b) => (a.data() as Map<String, dynamic>)['name'].toString().compareTo((b.data() as Map<String, dynamic>)['name'].toString()));
+
         if (docs.isEmpty) {
           return Center(
             child: Text(
@@ -179,6 +183,8 @@ class _StudentDoctorsListScreenState extends State<StudentDoctorsListScreen> {
           }).toList();
         }
 
+        docs.sort((a, b) => (a.data() as Map<String, dynamic>)['name'].toString().compareTo((b.data() as Map<String, dynamic>)['name'].toString()));
+
         if (docs.isEmpty) {
           return Center(
             child: Text(
@@ -225,6 +231,8 @@ class _StudentDoctorsListScreenState extends State<StudentDoctorsListScreen> {
             return name.contains(_searchQuery);
           }).toList();
         }
+
+        docs.sort((a, b) => (a.data() as Map<String, dynamic>)['name'].toString().compareTo((b.data() as Map<String, dynamic>)['name'].toString()));
 
         if (docs.isEmpty) {
           return Center(

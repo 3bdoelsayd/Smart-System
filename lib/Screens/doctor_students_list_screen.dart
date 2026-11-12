@@ -102,6 +102,8 @@ class _DoctorStudentsListScreenState extends State<DoctorStudentsListScreen> {
                     return true;
                   }).toList();
 
+                  docs.sort((a, b) => (a.data() as Map<String, dynamic>)['name'].toString().compareTo((b.data() as Map<String, dynamic>)['name'].toString()));
+
                   if (docs.isEmpty) {
                     return Center(
                       child: Text(

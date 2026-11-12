@@ -46,7 +46,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
           Navigator.pushReplacementNamed(context, '/student/home');
         } else if (type == 'doctor') {
           Navigator.pushReplacementNamed(context, '/doctor/home');
-        } else if (type == 'super_admin') {
+        } else if (type == 'super_admin' || type == 'super_admin_plus') {
           Navigator.pushReplacementNamed(context, '/super-admin/dashboard');
         } else if (type == 'manager') {
           Navigator.pushReplacementNamed(context, '/manager/dashboard');

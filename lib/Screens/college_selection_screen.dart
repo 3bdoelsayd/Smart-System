@@ -61,11 +61,6 @@ class _CollegeSelectionScreenState extends State<CollegeSelectionScreen> {
                         isAr ? 'لا توجد كليات متاحة حالياً' : 'No colleges available',
                         style: GoogleFonts.cairo(color: Colors.grey, fontSize: 16),
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        isAr ? 'يرجى إضافة الكليات من لوحة التحكم' : 'Please add colleges from Firebase Console',
-                        style: GoogleFonts.cairo(color: Colors.grey.shade400, fontSize: 12),
-                      ),
                     ],
                   ),
                 );
@@ -85,6 +80,7 @@ class _CollegeSelectionScreenState extends State<CollegeSelectionScreen> {
                     }
                   } catch (_) {}
                   String id = colleges[index].id;
+                  bool isTest = college['isTestFaculty'] == true || college['hidden'] == true;
                   String name = isAr ? (college['nameAr'] ?? id) : (college['nameEn'] ?? id);
                   String? logo = college['logoUrl'];
 
@@ -93,9 +89,10 @@ class _CollegeSelectionScreenState extends State<CollegeSelectionScreen> {
                     decoration: BoxDecoration(
                       color: isDark ? const Color(0xFF1A1A1E) : Colors.white,
                       borderRadius: BorderRadius.circular(22),
+                      border: isTest ? Border.all(color: Colors.orange.shade400, width: 2) : null,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withAlpha(isDark ? 40 : 10),
+                          color: isTest ? Colors.orange.withAlpha(40) : Colors.black.withAlpha(isDark ? 40 : 10),
                           blurRadius: 15,
                           offset: const Offset(0, 8),
                         )
@@ -117,7 +114,7 @@ class _CollegeSelectionScreenState extends State<CollegeSelectionScreen> {
                                 width: 55,
                                 height: 55,
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF673AB7).withAlpha(15),
+                                  color: isTest ? Colors.orange.withAlpha(25) : const Color(0xFF673AB7).withAlpha(15),
                                   borderRadius: BorderRadius.circular(15),
                                 ),
                                 child: logo != null && logo.isNotEmpty
@@ -125,31 +122,59 @@ class _CollegeSelectionScreenState extends State<CollegeSelectionScreen> {
                                         borderRadius: BorderRadius.circular(15),
                                         child: Image.network(logo, fit: BoxFit.cover),
                                       )
-                                    : const Icon(Icons.account_balance_rounded, color: Color(0xFF673AB7), size: 28),
+                                    : Icon(
+                                        isTest ? Icons.science_rounded : Icons.account_balance_rounded,
+                                        color: isTest ? Colors.orange.shade700 : const Color(0xFF673AB7),
+                                        size: 28,
+                                      ),
                               ),
                               const SizedBox(width: 18),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      name,
-                                      style: GoogleFonts.cairo(
-                                        fontSize: 17,
-                                        fontWeight: FontWeight.bold,
-                                        color: isDark ? Colors.white : const Color(0xFF2D3142),
-                                      ),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            name,
+                                            style: GoogleFonts.cairo(
+                                              fontSize: 17,
+                                              fontWeight: FontWeight.bold,
+                                              color: isDark ? Colors.white : const Color(0xFF2D3142),
+                                            ),
+                                          ),
+                                        ),
+                                        if (isTest)
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: Colors.orange.withAlpha(30),
+                                              borderRadius: BorderRadius.circular(8),
+                                              border: Border.all(color: Colors.orange.shade300),
+                                            ),
+                                            child: Text(
+                                              isAr ? 'مختبرين' : 'Testers',
+                                              style: GoogleFonts.cairo(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.orange.shade800),
+                                            ),
+                                          ),
+                                      ],
                                     ),
+                                    const SizedBox(height: 4),
                                     Text(
-                                      isAr ? 'اضغط للدخول للخدمات' : 'Tap to enter services',
+                                      isTest
+                                          ? (isAr ? 'قائمة حسابات المختبرين' : 'Testers accounts list  ')
+                                          : (isAr ? 'اضغط للدخول للخدمات' : 'Tap to enter services'),
                                       style: GoogleFonts.cairo(
                                         fontSize: 12,
-                                        color: Colors.grey,
+                                        color: isTest ? Colors.orange.shade700 : Colors.grey,
+                                        fontWeight: isTest ? FontWeight.w600 : FontWeight.normal,
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
+                              const SizedBox(width: 8),
                               Icon(
                                 isAr ? Icons.arrow_back_ios_new_rounded : Icons.arrow_forward_ios_rounded,
                                 size: 16,

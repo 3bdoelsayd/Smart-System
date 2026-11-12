@@ -31,12 +31,16 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
       String? savedUser = prefs.getString('saved_login_user');
       String? savedPass = prefs.getString('saved_login_pass');
       bool remember = prefs.getBool('saved_remember_me') ?? true;
-      if (remember && savedUser != null && savedPass != null) {
+      if (remember) {
+        if (savedUser != null && _idController.text.isEmpty) {
+          _idController.text = savedUser;
+        }
+        if (savedPass != null && _passwordController.text.isEmpty) {
+          _passwordController.text = savedPass;
+        }
         if (mounted) {
           setState(() {
-            _idController.text = savedUser;
-            _passwordController.text = savedPass;
-            _rememberMe = true;
+            _rememberMe = remember;
           });
         }
       }
@@ -96,7 +100,7 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
       builder: (context, _) {
         bool isAr = _ds.isArabic;
         bool isDark = _ds.isDarkMode;
-        
+
         Color primaryColor = isDark ? const Color(0xFFFFFFFF) : const Color(0xFF673AB7);
         final scaffoldBg = isDark ? const Color(0xFF121212) : Colors.white;
         final cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
@@ -114,9 +118,9 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
                     gradient: LinearGradient(
                       begin: Alignment.topRight,
                       end: Alignment.bottomLeft,
-                      colors: isDark 
-                        ? [const Color(0xFF1A1A1A), const Color(0xFF0F0F0F)]
-                        : [const Color(0xFF673AB7), const Color(0xFF512DA8)],
+                      colors: isDark
+                          ? [const Color(0xFF1A1A1A), const Color(0xFF0F0F0F)]
+                          : [const Color(0xFF673AB7), const Color(0xFF512DA8)],
                     ),
                     borderRadius: const BorderRadius.only(
                       bottomLeft: Radius.circular(60),
@@ -124,9 +128,23 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
                     ),
                   ),
                 ),
-                
-                Positioned(top: -30, left: -30, child: CircleAvatar(radius: 80, backgroundColor: Colors.white.withAlpha(isDark ? 5 : 26))),
-                Positioned(top: 100, right: -40, child: CircleAvatar(radius: 60, backgroundColor: Colors.white.withAlpha(isDark ? 5 : 13))),
+
+                Positioned(
+                  top: -30,
+                  left: -30,
+                  child: CircleAvatar(
+                    radius: 80,
+                    backgroundColor: Colors.white.withAlpha(isDark ? 5 : 26),
+                  ),
+                ),
+                Positioned(
+                  top: 100,
+                  right: -40,
+                  child: CircleAvatar(
+                    radius: 60,
+                    backgroundColor: Colors.white.withAlpha(isDark ? 5 : 13),
+                  ),
+                ),
 
                 SafeArea(
                   child: SingleChildScrollView(
@@ -139,21 +157,34 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
                             color: Colors.white,
                             shape: BoxShape.circle,
                             boxShadow: [
-                              BoxShadow(color: Colors.black.withAlpha(26), blurRadius: 20, offset: const Offset(0, 10))
+                              BoxShadow(
+                                color: Colors.black.withAlpha(26),
+                                blurRadius: 20,
+                                offset: const Offset(0, 10),
+                              )
                             ],
                           ),
                           child: Hero(
                             tag: 'student_icon',
-                            child: Icon(Icons.school_rounded, size: 60, color: isDark ? const Color(0xFF121212) : primaryColor),
+                            child: Icon(
+                              Icons.school_rounded,
+                              size: 60,
+                              color: isDark ? const Color(0xFF121212) : primaryColor,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 25),
                         Text(
                           isAr ? 'بوابة الطلاب' : 'Student Portal',
-                          style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -1),
+                          style: const TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                            letterSpacing: -1,
+                          ),
                         ),
                         const SizedBox(height: 40),
-                        
+
                         Container(
                           margin: const EdgeInsets.symmetric(horizontal: 25),
                           padding: const EdgeInsets.all(30),
@@ -161,59 +192,94 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
                             color: cardBg,
                             borderRadius: BorderRadius.circular(35),
                             boxShadow: [
-                              BoxShadow(color: Colors.black.withAlpha(isDark ? 100 : 20), blurRadius: 30, offset: const Offset(0, 15))
+                              BoxShadow(
+                                color: Colors.black.withAlpha(isDark ? 100 : 20),
+                                blurRadius: 30,
+                                offset: const Offset(0, 15),
+                              )
                             ],
                           ),
-                          child: AutofillGroup(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  isAr ? 'تسجيل الدخول' : 'Sign In',
-                                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: textColor),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                isAr ? 'تسجيل الدخول' : 'Sign In',
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  color: textColor,
                                 ),
-                                const SizedBox(height: 30),
-                                _buildTextField(_idController, isAr ? 'كود الطالب' : 'Student ID', Icons.badge_outlined, primaryColor, isDark, autofillHints: const [AutofillHints.username, AutofillHints.telephoneNumber]),
-                                const SizedBox(height: 20),
-                                _buildTextField(_passwordController, isAr ? 'كلمة المرور' : 'Password', Icons.lock_person_outlined, primaryColor, isDark, isPass: true, autofillHints: const [AutofillHints.password]),
-                                const SizedBox(height: 15),
-                                Row(
-                                  children: [
-                                    SizedBox(
-                                      height: 24, width: 24,
-                                      child: Checkbox(
-                                        value: _rememberMe,
-                                        activeColor: isDark ? const Color(0xFF03DAC6) : const Color(0xFF673AB7),
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                                        onChanged: (v) => setState(() => _rememberMe = v ?? false),
+                              ),
+                              const SizedBox(height: 30),
+                              _buildTextField(
+                                _idController,
+                                isAr ? 'كود الطالب' : 'Student ID',
+                                Icons.badge_outlined,
+                                primaryColor,
+                                isDark,
+                                autofillHints: const [
+                                  AutofillHints.username,
+                                  AutofillHints.telephoneNumber
+                                ],
+                              ),
+                              const SizedBox(height: 20),
+                              _buildTextField(
+                                _passwordController,
+                                isAr ? 'كلمة المرور' : 'Password',
+                                Icons.lock_person_outlined,
+                                primaryColor,
+                                isDark,
+                                isPass: true,
+                                autofillHints: const [AutofillHints.password],
+                              ),
+                              const SizedBox(height: 15),
+                              Row(
+                                children: [
+                                  SizedBox(
+                                    height: 24,
+                                    width: 24,
+                                    child: Checkbox(
+                                      value: _rememberMe,
+                                      activeColor: isDark
+                                          ? const Color(0xFF03DAC6)
+                                          : const Color(0xFF673AB7),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      onChanged: (v) =>
+                                          setState(() => _rememberMe = v ?? false),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  GestureDetector(
+                                    onTap: () =>
+                                        setState(() => _rememberMe = !_rememberMe),
+                                    child: Text(
+                                      isAr
+                                          ? "تذكرني (حفظ بيانات الدخول)"
+                                          : "Remember Me",
+                                      style: GoogleFonts.cairo(
+                                        fontSize: 13,
+                                        color: textColor,
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     ),
-                                    const SizedBox(width: 8),
-                                    GestureDetector(
-                                      onTap: () => setState(() => _rememberMe = !_rememberMe),
-                                      child: Text(
-                                        isAr ? "تذكرني (حفظ بيانات الدخول)" : "Remember Me",
-                                        style: GoogleFonts.cairo(
-                                          fontSize: 13,
-                                          color: textColor,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 25),
-                                _buildLoginButton(primaryColor, isAr, isDark),
-                              ],
-                            ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 25),
+                              _buildLoginButton(primaryColor, isAr, isDark),
+                            ],
                           ),
                         ),
-                        
+
                         const SizedBox(height: 40),
                         GestureDetector(
                           onTap: _showAffairsContact,
                           child: Text(
-                            isAr ? 'نسيت كلمة المرور؟ تواصل مع شؤون الطلاب' : 'Forgot Password? Contact Student Affairs',
+                            isAr
+                                ? 'نسيت كلمة المرور؟ تواصل مع شؤون الطلاب'
+                                : 'Forgot Password? Contact Student Affairs',
                             style: TextStyle(
                               color: isDark ? Colors.white38 : Colors.grey.shade600,
                               fontSize: 14,
@@ -231,28 +297,57 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
             ),
           ),
         );
-      }
+      },
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String label, IconData icon, Color color, bool isDark, {bool isPass = false, Iterable<String>? autofillHints}) {
+  Widget _buildTextField(
+      TextEditingController controller,
+      String label,
+      IconData icon,
+      Color color,
+      bool isDark, {
+        bool isPass = false,
+        Iterable<String>? autofillHints,
+      }) {
     return TextField(
       controller: controller,
       obscureText: isPass && !_showPassword,
       autofillHints: autofillHints,
-      style: TextStyle(fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black),
+      style: TextStyle(
+        fontWeight: FontWeight.w600,
+        color: isDark ? Colors.white : Colors.black,
+      ),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: TextStyle(color: isDark ? Colors.white38 : Colors.grey.shade500, fontSize: 14),
+        labelStyle: TextStyle(
+          color: isDark ? Colors.white38 : Colors.grey.shade500,
+          fontSize: 14,
+        ),
         prefixIcon: Icon(icon, color: color.withAlpha(179)),
-        suffixIcon: isPass ? IconButton(
-          icon: Icon(_showPassword ? Icons.visibility_rounded : Icons.visibility_off_rounded, color: isDark ? Colors.white24 : Colors.grey.shade400),
+        suffixIcon: isPass
+            ? IconButton(
+          icon: Icon(
+            _showPassword
+                ? Icons.visibility_rounded
+                : Icons.visibility_off_rounded,
+            color: isDark ? Colors.white24 : Colors.grey.shade400,
+          ),
           onPressed: () => setState(() => _showPassword = !_showPassword),
-        ) : null,
+        )
+            : null,
         filled: true,
         fillColor: isDark ? Colors.black.withAlpha(50) : Colors.grey.shade50,
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide(color: isDark ? Colors.white10 : Colors.grey.shade100)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide(color: color, width: 1.5)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(20),
+          borderSide: BorderSide(
+            color: isDark ? Colors.white10 : Colors.grey.shade100,
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(20),
+          borderSide: BorderSide(color: color, width: 1.5),
+        ),
       ),
     );
   }
@@ -265,7 +360,11 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
         borderRadius: BorderRadius.circular(20),
         gradient: LinearGradient(colors: [color, color.withAlpha(217)]),
         boxShadow: [
-          BoxShadow(color: color.withAlpha(isDark ? 40 : 77), blurRadius: 15, offset: const Offset(0, 8))
+          BoxShadow(
+            color: color.withAlpha(isDark ? 40 : 77),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          )
         ],
       ),
       child: ElevatedButton(
@@ -274,13 +373,21 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
           shadowColor: Colors.transparent,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         ),
-        onPressed: _isLoading ? null : () async {
+        onPressed: _isLoading
+            ? null
+            : () async {
           _ds.playClickSound();
           String studentId = _idController.text.trim();
           String password = _passwordController.text.trim();
 
           if (studentId.isEmpty || password.isEmpty) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(isAr ? 'يرجى ملء كافة الحقول' : 'Please fill all fields')));
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  isAr ? 'يرجى ملء كافة الحقول' : 'Please fill all fields',
+                ),
+              ),
+            );
             return;
           }
 
@@ -302,15 +409,32 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
           if (mounted) {
             setState(() => _isLoading = false);
             if (success) {
-              Navigator.pushNamedAndRemoveUntil(context, '/student/home', (r) => false);
+              Navigator.pushNamedAndRemoveUntil(
+                context,
+                '/student/home',
+                    (r) => false,
+              );
             } else {
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(isAr ? 'بيانات الدخول غير صحيحة' : 'Invalid Credentials')));
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    isAr ? 'بيانات الدخول غير صحيحة' : 'Invalid Credentials',
+                  ),
+                ),
+              );
             }
           }
         },
-        child: _isLoading 
-          ? const CircularProgressIndicator(color: Colors.white) 
-          : Text(isAr ? 'دخول للمنصة' : 'Enter Platform', style: TextStyle(color: isDark ? Colors.black : Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+        child: _isLoading
+            ? const CircularProgressIndicator(color: Colors.white)
+            : Text(
+          isAr ? 'دخول للمنصة' : 'Enter Platform',
+          style: TextStyle(
+            color: isDark ? Colors.black : Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
       ),
     );
   }

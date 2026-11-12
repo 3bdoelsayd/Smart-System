@@ -14,7 +14,7 @@ class AttendanceScanScreen extends StatefulWidget {
   State<AttendanceScanScreen> createState() => _AttendanceScanScreenState();
 }
 
-class _AttendanceScanScreenState extends State<AttendanceScanScreen> {
+class _AttendanceScanScreenState extends State<AttendanceScanScreen> with WidgetsBindingObserver {
   // إلغاء التحقق من الموقع الجغرافي والامتار نهائياً للسماح بتسجيل الحضور من أي مكان
   static const bool enableLocationCheck = false;
 
@@ -24,27 +24,64 @@ class _AttendanceScanScreenState extends State<AttendanceScanScreen> {
   Position? _currentPosition;
   StreamSubscription<Position>? _positionStream;
 
+  bool _cameraGranted = false;
+  bool _cameraPermanentlyDenied = false;
+
   @override
   void initState() {
     super.initState();
-    _scannerController = MobileScannerController();
+    WidgetsBinding.instance.addObserver(this);
+    _scannerController = MobileScannerController(
+      autoStart: false,
+      facing: CameraFacing.back,
+      detectionSpeed: DetectionSpeed.noDuplicates,
+    );
     _initScannerAndSession();
+  }
+
+  Future<void> _requestCameraAndStart() async {
+    try {
+      var cameraStatus = await Permission.camera.status;
+      if (!cameraStatus.isGranted) {
+        cameraStatus = await Permission.camera.request();
+      }
+      if (mounted) {
+        setState(() {
+          _cameraGranted = cameraStatus.isGranted;
+          _cameraPermanentlyDenied = cameraStatus.isPermanentlyDenied;
+        });
+      }
+      if (cameraStatus.isGranted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _startCamera();
+        });
+      }
+    } catch (e) {
+      debugPrint("Request camera error: $e");
+    }
+  }
+
+  Future<void> _startCamera() async {
+    if (!mounted) return;
+    try {
+      await _scannerController.start();
+    } catch (e) {
+      debugPrint("Start camera error: $e");
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (!mounted) return;
+      try {
+        await _scannerController.start();
+      } catch (e2) {
+        debugPrint("Start camera retry error: $e2");
+      }
+    }
   }
 
   Future<void> _initScannerAndSession() async {
     try {
-      // 1. طلب صلاحية الكاميرا
-      var cameraStatus = await Permission.camera.request();
-      if (!cameraStatus.isGranted && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_ds.isArabic ? "يرجى السماح باستخدام الكاميرا لمسح الرمز" : "Camera permission is required"),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      await _requestCameraAndStart();
 
-      // 2. التحقق من تحميل بيانات الطالب
+      // التحقق من تحميل بيانات الطالب
       if (_ds.currentStudent == null) {
         final userId = FirebaseAuth.instance.currentUser?.uid;
         if (userId != null) {
@@ -90,7 +127,20 @@ class _AttendanceScanScreenState extends State<AttendanceScanScreen> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!_cameraGranted) return;
+    if (state == AppLifecycleState.resumed) {
+      if (!_isProcessing) {
+        _startCamera();
+      }
+    } else if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
+      _scannerController.stop();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _positionStream?.cancel();
     _scannerController.dispose();
     super.dispose();
@@ -212,9 +262,7 @@ class _AttendanceScanScreenState extends State<AttendanceScanScreen> {
             ));
           }
           setState(() => _isProcessing = false); 
-          try {
-            await _scannerController.start();
-          } catch (_) {}
+          await _startCamera();
         }
       }
     }
@@ -260,6 +308,7 @@ class _AttendanceScanScreenState extends State<AttendanceScanScreen> {
     bool isDark = _ds.isDarkMode;
     Color primaryColor = isDark ? const Color(0xFF03DAC6) : const Color(0xFF673AB7);
     return Scaffold(
+      backgroundColor: Colors.black,
       appBar: AppBar(
         title: Text(_ds.translate('attendance')),
         backgroundColor: isDark ? const Color(0xFF1E1E1E) : primaryColor,
@@ -279,40 +328,76 @@ class _AttendanceScanScreenState extends State<AttendanceScanScreen> {
       ),
       body: Stack(
         children: [
-          MobileScanner(
-            controller: _scannerController, 
-            onDetect: _onDetect,
-            errorBuilder: (context, error, child) {
-              return Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 64),
-                      const SizedBox(height: 16),
-                      Text(
-                        _ds.isArabic
-                          ? "تعذر تشغيل الكاميرا. يرجى التأكد من إذن الوصول للكاميرا أو إعادة محاولة الفتح.\n(${error.errorDetails ?? error.errorCode})"
-                          : "Camera error: ${error.errorCode}",
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.white, fontSize: 16),
+          _cameraGranted
+              ? MobileScanner(
+                  controller: _scannerController, 
+                  onDetect: _onDetect,
+                  errorBuilder: (context, error, child) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 64),
+                            const SizedBox(height: 16),
+                            Text(
+                              _ds.isArabic
+                                ? "تعذر تشغيل الكاميرا. يرجى التأكد من إذن الوصول للكاميرا أو إعادة محاولة الفتح.\n(${error.errorDetails?.message ?? error.errorCode.name})"
+                                : "Camera error: ${error.errorDetails?.message ?? error.errorCode.name}",
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(color: Colors.white, fontSize: 16),
+                            ),
+                            const SizedBox(height: 20),
+                            ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(backgroundColor: primaryColor, foregroundColor: Colors.white),
+                              icon: const Icon(Icons.refresh_rounded),
+                              label: Text(_ds.isArabic ? "إعادة المحاولة" : "Retry"),
+                              onPressed: () {
+                                _startCamera();
+                              },
+                            ),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 20),
-                      ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(backgroundColor: primaryColor, foregroundColor: Colors.white),
-                        icon: const Icon(Icons.refresh_rounded),
-                        label: Text(_ds.isArabic ? "إعادة المحاولة" : "Retry"),
-                        onPressed: () {
-                          _scannerController.start();
-                        },
-                      ),
-                    ],
+                    );
+                  },
+                )
+              : Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.camera_alt_outlined, color: Colors.white70, size: 64),
+                        const SizedBox(height: 16),
+                        Text(
+                          _cameraPermanentlyDenied
+                              ? (_ds.isArabic
+                                  ? "صلاحية الكاميرا مرفوضة. فعّلها من إعدادات التطبيق."
+                                  : "Camera permission denied. Please enable it in app settings.")
+                              : (_ds.isArabic
+                                  ? "جاري تجهيز الكاميرا..."
+                                  : "Preparing camera..."),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.white, fontSize: 16),
+                        ),
+                        const SizedBox(height: 20),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: primaryColor, foregroundColor: Colors.white),
+                          onPressed: _cameraPermanentlyDenied
+                              ? () => openAppSettings()
+                              : _requestCameraAndStart,
+                          child: Text(
+                            _cameraPermanentlyDenied
+                                ? (_ds.isArabic ? "فتح الإعدادات" : "Open Settings")
+                                : (_ds.isArabic ? "إعطاء الصلاحية" : "Grant Permission"),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              );
-            },
-          ),
           Center(
             child: Container(
               width: 260, height: 260,

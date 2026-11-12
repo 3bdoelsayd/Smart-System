@@ -27,9 +27,114 @@ class SuperAdminDashboard extends StatefulWidget {
 class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   final DataService _ds = DataService();
 
+  void _showAddCollegeDialog(BuildContext context, bool isAr) {
+    final idController = TextEditingController();
+    final nameArController = TextEditingController();
+    final nameEnController = TextEditingController();
+    final logoController = TextEditingController();
+    bool isLoading = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text(isAr ? 'إضافة كلية / معهد جديد' : 'Add New College / Institute', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: idController,
+                  decoration: InputDecoration(
+                    labelText: isAr ? 'معرف الكلية بالإنجليزية (مثل: engineering)' : 'College ID (e.g. engineering)',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: nameArController,
+                  decoration: InputDecoration(
+                    labelText: isAr ? 'اسم الكلية بالعربية' : 'College Name (Arabic)',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: nameEnController,
+                  decoration: InputDecoration(
+                    labelText: isAr ? 'اسم الكلية بالإنجليزية' : 'College Name (English)',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: logoController,
+                  decoration: InputDecoration(
+                    labelText: isAr ? 'رابط شعار الكلية (اختياري)' : 'Logo URL (Optional)',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isLoading ? null : () => Navigator.pop(ctx),
+              child: Text(isAr ? 'إلغاء' : 'Cancel', style: GoogleFonts.cairo()),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF673AB7),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: isLoading ? null : () async {
+                if (idController.text.trim().isEmpty || nameArController.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(isAr ? 'يرجى إدخال المعرف والاسم بالعربية' : 'Please enter ID and Arabic name'))
+                  );
+                  return;
+                }
+                setDialogState(() => isLoading = true);
+                try {
+                  await _ds.createNewCollege(
+                    collegeId: idController.text.trim(),
+                    nameAr: nameArController.text.trim(),
+                    nameEn: nameEnController.text.trim(),
+                    logoUrl: logoController.text.trim(),
+                  );
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(isAr ? 'تم إنشاء الكلية بنجاح 🎉' : 'College created successfully 🎉'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  setDialogState(() => isLoading = false);
+                  if (ctx.mounted) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                    );
+                  }
+                }
+              },
+              child: isLoading
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : Text(isAr ? 'إضافة الكلية' : 'Add College', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (_ds.userRole != 'super_admin' || _ds.currentAdmin == null) {
+    if (_ds.userRole != 'super_admin' && _ds.userRole != 'super_admin_plus' || _ds.currentAdmin == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         Navigator.pushNamedAndRemoveUntil(context, '/start', (r) => false);
       });
@@ -43,7 +148,25 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         bool isDark = _ds.isDarkMode;
         final adminName = _ds.currentAdmin?['name'] ?? _ds.translate('super_admin');
 
-        final List<Map<String, dynamic>> cards = [
+        final List<Map<String, dynamic>> cards = [];
+        if (_ds.userRole == 'super_admin_plus') {
+          cards.add({
+            'icon': Icons.add_business_rounded,
+            'title': isAr ? 'إضافة كلية جديدة' : 'Add New College',
+            'widget': null,
+            'color': const Color(0xFFE91E63),
+            'subtitle': isAr ? 'صلاحية سوبر أدمن بلس: إنشاء كلية مستقلة' : 'Master Plus: Create independent college',
+            'isAction': true,
+          });
+          cards.add({
+            'icon': Icons.account_balance_rounded,
+            'title': isAr ? 'إدارة الكليات' : 'Colleges Management',
+            'widget': const CollegesManagementView(),
+            'color': const Color(0xFF8E24AA),
+            'subtitle': isAr ? 'عرض ومعاينة وحذف كليات النظام' : 'View, manage and delete colleges',
+          });
+        }
+        cards.addAll([
           {'icon': Icons.layers_rounded, 'title': _ds.translate('manage_levels'), 'widget': const LevelsManagementView(), 'color': const Color(0xFF673AB7), 'subtitle': isAr ? 'إدارة الفرق الدراسية' : 'Manage academic levels'},
           {'icon': Icons.grid_view_rounded, 'title': _ds.translate('manage_sections'), 'widget': const SectionsManagementView(), 'color': const Color(0xFF00BCD4), 'subtitle': isAr ? 'توزيع الطلاب والشعب' : 'Distribute sections'},
           {'icon': Icons.school_rounded, 'title': _ds.translate('manage_students'), 'widget': const StudentsManagementView(), 'color': const Color(0xFF4CAF50), 'subtitle': isAr ? 'قاعدة بيانات الطلاب' : 'Students database'},
@@ -52,7 +175,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           {'icon': Icons.admin_panel_settings_rounded, 'title': _ds.translate('manage_managers'), 'widget': const ManagersManagementView(), 'color': const Color(0xFFFF9800), 'subtitle': isAr ? 'صلاحيات المديرين' : 'Managers roles'},
           {'icon': Icons.calendar_month_rounded, 'title': _ds.translate('semesters'), 'widget': const SemestersManagementView(), 'color': const Color(0xFF607D8B), 'subtitle': isAr ? 'الفصول والتقويم' : 'Academic calendar'},
           {'icon': Icons.calendar_today_rounded, 'title': isAr ? 'إدارة الجدول الدراسي' : 'Timetable Management', 'widget': const ScheduleManagementView(), 'color': Colors.indigo, 'subtitle': isAr ? 'جداول المحاضرات الرسمية' : 'Official lecture timetables'},
-        ];
+        ]);
 
         return Directionality(
           textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
@@ -143,7 +266,13 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                     title: cards[i]['title'] as String,
                     subtitle: cards[i]['subtitle'] as String,
                     color: cards[i]['color'] as Color,
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => SubPageWrapper(title: cards[i]['title'], child: cards[i]['widget']))),
+                    onTap: () {
+                      if (cards[i]['isAction'] == true) {
+                        _showAddCollegeDialog(context, isAr);
+                      } else {
+                        Navigator.push(context, MaterialPageRoute(builder: (context) => SubPageWrapper(title: cards[i]['title'], child: cards[i]['widget'])));
+                      }
+                    },
                     isDark: isDark,
                   ),
                   childCount: cards.length,
@@ -1388,6 +1517,7 @@ class _ManagersManagementViewState extends State<ManagersManagementView> {
                 var data = d.data() as Map<String, dynamic>;
                 return (data['name'] ?? "").toString().toLowerCase().contains(_searchQuery.toLowerCase());
               }).toList();
+              docs.sort((a, b) => (a.data() as Map<String, dynamic>)['name'].toString().compareTo((b.data() as Map<String, dynamic>)['name'].toString()));
 
               if (docs.isEmpty) return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.admin_panel_settings_outlined, size: 80, color: Colors.grey.withAlpha(50)), const SizedBox(height: 10), Text('لا يوجد مديرين حالياً', style: GoogleFonts.cairo(color: Colors.grey))]));
 
@@ -2366,6 +2496,7 @@ class _DoctorsManagementViewState extends State<DoctorsManagementView> {
             builder: (ctx, snap) {
               if (!snap.hasData) return const Center(child: CircularProgressIndicator());
               var docs = snap.data!.docs.where((d) => (d.data() as Map)['name'].toString().toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+              docs.sort((a, b) => (a.data() as Map<String, dynamic>)['name'].toString().compareTo((b.data() as Map<String, dynamic>)['name'].toString()));
               return ListView.builder(
                 padding: const EdgeInsets.all(15),
                 itemCount: docs.length,
@@ -2594,6 +2725,7 @@ class _TAsManagementViewState extends State<TAsManagementView> {
             builder: (ctx, snap) {
               if (!snap.hasData) return const Center(child: CircularProgressIndicator());
               var docs = snap.data!.docs.where((d) => (d.data() as Map)['name'].toString().toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+              docs.sort((a, b) => (a.data() as Map<String, dynamic>)['name'].toString().compareTo((b.data() as Map<String, dynamic>)['name'].toString()));
               return ListView.builder(
                 padding: const EdgeInsets.all(15),
                 itemCount: docs.length,
@@ -2614,6 +2746,281 @@ class _TAsManagementViewState extends State<TAsManagementView> {
           ),
         ),
       ],
+    );
+  }
+}
+
+class CollegesManagementView extends StatefulWidget {
+  const CollegesManagementView({super.key});
+
+  @override
+  State<CollegesManagementView> createState() => _CollegesManagementViewState();
+}
+
+class _CollegesManagementViewState extends State<CollegesManagementView> {
+  final DataService _ds = DataService();
+
+  void _showAddCollegeDialog(BuildContext context, bool isAr) {
+    final idController = TextEditingController();
+    final nameArController = TextEditingController();
+    final nameEnController = TextEditingController();
+    final logoController = TextEditingController();
+    bool isLoading = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text(isAr ? 'إضافة كلية / معهد جديد' : 'Add New College / Institute', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: idController,
+                  decoration: InputDecoration(
+                    labelText: isAr ? 'معرف الكلية بالإنجليزية (مثل: engineering)' : 'College ID (e.g. engineering)',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: nameArController,
+                  decoration: InputDecoration(
+                    labelText: isAr ? 'اسم الكلية بالعربية' : 'College Name (Arabic)',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: nameEnController,
+                  decoration: InputDecoration(
+                    labelText: isAr ? 'اسم الكلية بالإنجليزية' : 'College Name (English)',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: logoController,
+                  decoration: InputDecoration(
+                    labelText: isAr ? 'رابط شعار الكلية (اختياري)' : 'Logo URL (Optional)',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isLoading ? null : () => Navigator.pop(ctx),
+              child: Text(isAr ? 'إلغاء' : 'Cancel', style: GoogleFonts.cairo()),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF673AB7),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: isLoading ? null : () async {
+                if (idController.text.trim().isEmpty || nameArController.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(isAr ? 'يرجى إدخال المعرف والاسم بالعربية' : 'Please enter ID and Arabic name'))
+                  );
+                  return;
+                }
+                setDialogState(() => isLoading = true);
+                try {
+                  await _ds.createNewCollege(
+                    collegeId: idController.text.trim(),
+                    nameAr: nameArController.text.trim(),
+                    nameEn: nameEnController.text.trim(),
+                    logoUrl: logoController.text.trim(),
+                  );
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(isAr ? 'تم إنشاء الكلية بنجاح 🎉' : 'College created successfully 🎉'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  setDialogState(() => isLoading = false);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                    );
+                  }
+                }
+              },
+              child: isLoading
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : Text(isAr ? 'إضافة الكلية' : 'Add College', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmDeleteCollege(BuildContext context, String collegeId, String collegeName, bool isAr) async {
+    bool confirm = await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(isAr ? 'حذف الكلية' : 'Delete College', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: Colors.red)),
+        content: Text(
+          isAr 
+            ? 'هل أنت متأكد من حذف كلية "$collegeName"؟ سيتم فقدان كافة بياناتها نهائياً.' 
+            : 'Are you sure you want to delete "$collegeName"? All its data will be permanently lost.',
+          style: GoogleFonts.cairo(),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(isAr ? 'إلغاء' : 'Cancel', style: GoogleFonts.cairo())),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(isAr ? 'حذف نهائي' : 'Delete', style: GoogleFonts.cairo()),
+          ),
+        ],
+      ),
+    ) ?? false;
+
+    if (confirm) {
+      try {
+        await FirebaseFirestore.instance.collection('colleges').doc(collegeId).delete();
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(isAr ? 'تم حذف الكلية بنجاح' : 'College deleted successfully'), backgroundColor: Colors.green),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          );
+        }
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    bool isAr = _ds.isArabic;
+    bool isDark = _ds.isDarkMode;
+
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: const Color(0xFF673AB7),
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.add_business_rounded),
+        label: Text(isAr ? 'إضافة كلية جديدة' : 'Add New College', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+        onPressed: () => _showAddCollegeDialog(context, isAr),
+      ),
+      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: FirebaseFirestore.instance.collection('colleges').withConverter<Map<String, dynamic>>(
+          fromFirestore: (snapshot, _) => snapshot.data() ?? {},
+          toFirestore: (model, _) => model,
+        ).snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator(color: Color(0xFF673AB7)));
+          }
+
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.account_balance_outlined, size: 70, color: Colors.grey.withAlpha(120)),
+                  const SizedBox(height: 16),
+                  Text(isAr ? 'لا توجد كليات مسجلة حالياً' : 'No colleges registered', style: GoogleFonts.cairo(color: Colors.grey, fontSize: 16)),
+                ],
+              ),
+            );
+          }
+
+          var colleges = snapshot.data!.docs;
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(20),
+            itemCount: colleges.length,
+            itemBuilder: (context, index) {
+              final raw = colleges[index].data();
+              String id = colleges[index].id;
+              String nameAr = raw['nameAr'] ?? id;
+              String nameEn = raw['nameEn'] ?? id;
+              String? logo = raw['logoUrl'];
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1A1A1E) : Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withAlpha(isDark ? 40 : 15), blurRadius: 12, offset: const Offset(0, 5))
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(18),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF673AB7).withAlpha(20),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: logo != null && logo.isNotEmpty
+                            ? ClipRRect(borderRadius: BorderRadius.circular(14), child: Image.network(logo, fit: BoxFit.cover))
+                            : const Icon(Icons.account_balance_rounded, color: Color(0xFF673AB7), size: 26),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              isAr ? nameAr : nameEn,
+                              style: GoogleFonts.cairo(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              "ID: $id",
+                              style: GoogleFonts.cairo(fontSize: 12, color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.login_rounded, color: Color(0xFF673AB7)),
+                        tooltip: isAr ? 'اختر وتصفح' : 'Select',
+                        onPressed: () async {
+                          await _ds.setInstitute(id);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(isAr ? 'تم تحديد الكلية: $nameAr' : 'Selected college: $nameAr')),
+                            );
+                          }
+                        },
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
+                        tooltip: isAr ? 'حذف' : 'Delete',
+                        onPressed: () => _confirmDeleteCollege(context, id, nameAr, isAr),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }

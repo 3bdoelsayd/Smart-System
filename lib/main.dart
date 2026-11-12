@@ -30,6 +30,9 @@ import 'Screens/college_selection_screen.dart';
 import 'Screens/doctor_students_list_screen.dart';
 import 'Screens/student_doctors_list_screen.dart';
 import 'Screens/edit_profile_screen.dart';
+import 'Screens/exams/doctor_exams_list_screen.dart';
+import 'Screens/exams/student_exams_list_screen.dart';
+import 'Screens/exams/manager_exams_screen.dart';
 
 void main() async {
   final sw = Stopwatch()..start();
@@ -103,7 +106,7 @@ void main() async {
         initialRoute = '/student/home';
       } else if (savedRole == 'doctor' || savedRole == 'ta') {
         initialRoute = '/doctor/home';
-      } else if (savedRole == 'super_admin') {
+      } else if (savedRole == 'super_admin' || savedRole == 'super_admin_plus') {
         initialRoute = '/super-admin/dashboard';
       } else if (savedRole == 'manager') {
         initialRoute = '/manager/dashboard';
@@ -174,6 +177,9 @@ class UniversityApp extends StatelessWidget {
             '/settings': (context) => const SettingsScreen(),
             '/edit-profile': (context) => const EditProfileScreen(),
             '/student/doctors-chat': (context) => const StudentDoctorsListScreen(),
+            '/doctor/exams': (context) => const DoctorExamsListScreen(),
+            '/student/exams': (context) => const StudentExamsListScreen(),
+            '/manager/exams': (context) => const ManagerExamsScreen(),
           },
         );
       },

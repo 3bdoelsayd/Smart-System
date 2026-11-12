@@ -1,35 +1,71 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Colleges and subcollections (including levels, courses, forum, schedule_entries, chats)
-    match /colleges/{collegeId} {
-      allow read, write: if true;
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
 
+    function isTestUser() {
+      return isAuthenticated() && request.auth.token.email != null && (
+        request.auth.token.email.matches('1000[1-9]\\.college@smart\\.com') ||
+        request.auth.token.email.matches('1001[0-3]\\.college@smart\\.com')
+      );
+    }
+
+    // College context security rules
+    match /colleges/{collegeId} {
+
+      // Prevent test users from accessing real colleges, and prevent real users from accessing 'testers' college
+      allow read, write: if isAuthenticated() && (
+        (collegeId == 'testers') ||
+        (collegeId != 'testers' && !isTestUser())
+      );
+
+      // Exams Collection
+      match /exams/{examId} {
+        allow read: if isAuthenticated();
+        allow create, update, delete: if isAuthenticated();
+
+        match /questions/{questionId} {
+          allow read: if isAuthenticated();
+          allow create, update, delete: if isAuthenticated();
+        }
+
+        match /submissions/{submissionId} {
+          allow read: if isAuthenticated();
+          allow create: if isAuthenticated()
+            && request.resource.data.studentUid == request.auth.uid;
+          allow update: if isAuthenticated();
+          allow delete: if isAuthenticated();
+        }
+      }
+
+      // Notifications Collection
+      match /notifications/{notificationId} {
+        allow read: if isAuthenticated();
+        allow create, update, delete: if isAuthenticated();
+      }
+
+      // Private Chats Collection
+      match /private_chats/{chatId} {
+        allow read, write: if isAuthenticated();
+
+        match /messages/{messageId} {
+          allow read, write: if isAuthenticated();
+        }
+      }
+
+      // Default college collection rules
       match /{document=**} {
-        allow read, write: if true;
+        allow read, write: if isAuthenticated();
       }
     }
 
-    match /attendance/{attId} {
-      allow read, write: if true;
-    }
-
-    match /submissions/{subId} {
-      allow read, write: if true;
-    }
-
-    match /exam_results/{resId} {
-      allow read, write: if true;
-    }
-
-    match /grades/{gradeId} {
-      allow read, write: if true;
-    }
-
-    match /notifications/{notifId} {
-      allow read, write: if true;
+    // Root collections fallback
+    match /{document=**} {
+      allow read, write: if isAuthenticated();
     }
   }
 }

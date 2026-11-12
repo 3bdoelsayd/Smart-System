@@ -123,6 +123,8 @@ class _ExamResultsManagementScreenState extends State<ExamResultsManagementScree
                 return levelMatch && divMatch && searchMatch;
               }).toList();
 
+              students.sort((a, b) => (a.data() as Map<String, dynamic>)['name'].toString().compareTo((b.data() as Map<String, dynamic>)['name'].toString()));
+
               return StreamBuilder<QuerySnapshot>(
                 stream: _ds.gradesColl.where('subject', isEqualTo: _selectedSubject).snapshots(),
                 builder: (context, courseworkSnap) {

@@ -223,6 +223,48 @@ class ExcelHelper {
     await _saveAndShareExcel(excel, "Doctors_Template");
   }
 
+  static Future<void> exportExamResultsToExcel({
+    required String examTitle,
+    required String subject,
+    required String level,
+    required double totalScore,
+    required List<Map<String, dynamic>> results,
+    required bool isArabic,
+  }) async {
+    var excel = Excel.createExcel();
+    Sheet sheetObject = excel['Sheet1'];
+
+    sheetObject.appendRow([
+      TextCellValue(isArabic ? 'اسم الطالب' : 'Student Name'),
+      TextCellValue(isArabic ? 'الرقم الجامعي' : 'Student ID'),
+      TextCellValue(isArabic ? 'حالة الأداء' : 'Status'),
+      TextCellValue(isArabic ? 'الدرجة المحسوبة' : 'Score'),
+      TextCellValue(isArabic ? 'الدرجة الكلية' : 'Max Score'),
+      TextCellValue(isArabic ? 'النسبة المئوية' : 'Percentage'),
+      TextCellValue(isArabic ? 'تاريخ ووقت التسليم' : 'Submission Time'),
+    ]);
+
+    for (var item in results) {
+      double score = (item['finalScore'] ?? item['autoScore'] ?? 0.0).toDouble();
+      double maxPts = (item['maxScore'] ?? totalScore).toDouble();
+      double pct = maxPts > 0 ? (score / maxPts) * 100 : 0.0;
+
+      sheetObject.appendRow([
+        TextCellValue(item['studentName']?.toString() ?? ''),
+        TextCellValue(item['studentId']?.toString() ?? ''),
+        TextCellValue(item['statusText']?.toString() ?? ''),
+        TextCellValue(score.toStringAsFixed(1)),
+        TextCellValue(maxPts.toStringAsFixed(1)),
+        TextCellValue('${pct.toStringAsFixed(1)}%'),
+        TextCellValue(item['submittedAt']?.toString() ?? '--'),
+      ]);
+    }
+
+    String sanitizedTitle = examTitle.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_').trim();
+    String fileName = isArabic ? "نتائج_اختبار_${sanitizedTitle}" : "Exam_Results_${sanitizedTitle}";
+    await _saveAndShareExcel(excel, fileName);
+  }
+
   static Future<void> _saveAndShareExcel(Excel excel, String fileName) async {
     final fileBytes = excel.save();
     if (fileBytes != null) {
