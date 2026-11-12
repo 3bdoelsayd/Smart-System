@@ -14,7 +14,7 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "com.example.untitled27"
+    namespace = "com.smartuniversity.system"
     compileSdk = 36
     ndkVersion = "28.2.13676358"
 
@@ -39,7 +39,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.untitled27"
+        applicationId = "com.smartuniversity.system"
         minSdk = 24
         targetSdk = 36
         versionCode = flutter.versionCode

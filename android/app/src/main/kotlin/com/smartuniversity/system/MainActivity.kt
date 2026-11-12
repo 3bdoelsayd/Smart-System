@@ -1,4 +1,4 @@
-package com.example.untitled27
+package com.smartuniversity.system
 
 import io.flutter.embedding.android.FlutterActivity
 
