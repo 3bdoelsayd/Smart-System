@@ -719,6 +719,47 @@ class DataService extends ChangeNotifier {
     }
   }
 
+  Future<void> reportForumMessage({
+    required String collegeId,
+    required String levelId,
+    required String courseId,
+    required String courseName,
+    required String messageDocId,
+    required String messageContent,
+    required String authorId,
+    required String authorName,
+    required String authorRole,
+    required String reporterId,
+    required String reporterName,
+    required String reporterRole,
+    String? reason,
+  }) async {
+    try {
+      var collegeRef = _firestore.collection('colleges').doc(collegeId);
+      await collegeRef.collection('reports').add({
+        'collegeId': collegeId,
+        'levelId': levelId,
+        'courseId': courseId,
+        'courseName': courseName,
+        'messageDocId': messageDocId,
+        'messageContent': messageContent,
+        'authorId': authorId,
+        'authorName': authorName,
+        'authorRole': authorRole,
+        'reporterId': reporterId,
+        'reporterName': reporterName,
+        'reporterRole': reporterRole,
+        'reason': reason ?? '',
+        'status': 'pending',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      notifyListeners();
+    } catch (e) {
+      debugPrint("❌ Report forum message error: $e");
+      rethrow;
+    }
+  }
+
   DocumentReference get instituteRef {
     if (selectedInstituteId == null) {
       throw Exception("Institute not selected");

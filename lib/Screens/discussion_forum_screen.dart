@@ -5,7 +5,6 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/data_service.dart';
 import '../widgets/doctor_profile_modal.dart';
 import '../widgets/student_profile_modal.dart';
-import 'private_chat_screen.dart';
 import 'doctor_students_list_screen.dart';
 import 'student_doctors_list_screen.dart';
 
@@ -204,16 +203,132 @@ class _DiscussionForumScreenState extends State<DiscussionForumScreen> {
     );
   }
 
-  void _showStudentOptions(Map<String, dynamic> msgData) async {
-    if (_ds.userRole != 'doctor') return;
-    if (msgData['authorRole'] != 'student') return;
+  void _showReportDialog(Map<String, dynamic> msgData, String msgDocId) {
+    final reasonController = TextEditingController();
+    bool isAr = _ds.isArabic;
 
-    final studentUid = msgData['authorId'];
-    final studentSnap = await FirebaseFirestore.instance.collectionGroup('students').where('uid', isEqualTo: studentUid).get();
-    if (studentSnap.docs.isEmpty) return;
-    final studentData = studentSnap.docs.first.data() as Map<String, dynamic>;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(Icons.flag_rounded, color: Colors.redAccent),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                isAr ? "الإبلاغ عن رسالة مخالفة" : "Report Offensive Message",
+                style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey.withAlpha(25),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.withAlpha(50)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    msgData['authorName'] ?? (isAr ? 'مستخدم' : 'User'),
+                    style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.purple),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    msgData['content'] ?? '',
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.cairo(fontSize: 13),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 15),
+            TextField(
+              controller: reasonController,
+              decoration: InputDecoration(
+                labelText: isAr ? "سبب الإبلاغ (اختياري)" : "Reason (Optional)",
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(isAr ? "إلغاء" : "Cancel", style: GoogleFonts.cairo()),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              try {
+                String myName = "مستخدم";
+                String myUid = "user";
+                if (_ds.userRole == 'student') {
+                  myName = _ds.currentStudent?['name']?.toString() ?? 'طالب';
+                  myUid = _ds.currentStudent?['uid']?.toString() ?? _ds.currentStudent?['id']?.toString() ?? 'student';
+                } else if (_ds.userRole == 'doctor' || _ds.userRole == 'ta') {
+                  myName = _ds.currentDoctor?['name']?.toString() ?? 'دكتور';
+                  myUid = _ds.currentDoctor?['uid']?.toString() ?? _ds.currentDoctor?['id']?.toString() ?? 'doctor';
+                } else {
+                  myName = _ds.currentAdmin?['name']?.toString() ?? 'مدير';
+                  myUid = _ds.currentAdmin?['uid']?.toString() ?? 'admin';
+                }
 
-    if (!mounted) return;
+                await _ds.reportForumMessage(
+                  collegeId: _ds.selectedInstituteId ?? 'commerce',
+                  levelId: widget.levelId,
+                  courseId: widget.courseId,
+                  courseName: widget.courseName,
+                  messageDocId: msgDocId,
+                  messageContent: msgData['content'] ?? '',
+                  authorId: msgData['authorId'] ?? '',
+                  authorName: msgData['authorName'] ?? '',
+                  authorRole: msgData['authorRole'] ?? 'student',
+                  reporterId: myUid,
+                  reporterName: myName,
+                  reporterRole: _ds.userRole ?? 'student',
+                  reason: reasonController.text.trim(),
+                );
+
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(isAr ? "تم إرسال الإبلاغ لمدير الفرقة بنجاح 🚩" : "Report sent to manager 🚩"),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
+                  );
+                }
+              }
+            },
+            child: Text(isAr ? "إرسال الإبلاغ" : "Send Report", style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showMessageOptions(Map<String, dynamic> msgData, String msgDocId, bool isMe) {
+    bool isAr = _ds.isArabic;
 
     showModalBottomSheet(
       context: context,
@@ -227,51 +342,44 @@ class _DiscussionForumScreenState extends State<DiscussionForumScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircleAvatar(
-              radius: 35,
-              backgroundColor: Colors.blue.withAlpha(30),
-              backgroundImage: _ds.getAvatarImageProvider(studentData['photoUrl']),
-              child: (studentData['photoUrl'] ?? '').toString().isEmpty ? const Icon(Icons.person, size: 40, color: Colors.blue) : null,
-            ),
+            Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade400, borderRadius: BorderRadius.circular(10))),
             const SizedBox(height: 15),
-            Text(studentData['name'] ?? '', style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.bold)),
-            Text("كود الطالب: ${studentData['id']}", style: const TextStyle(color: Colors.grey)),
-            const Divider(height: 30),
-            _optionTile(Icons.person_rounded, "عرض الملف الشخصي", Colors.purple, () {
-              Navigator.pop(ctx);
-              showRichStudentProfileModal(
-                context: context,
-                studentIdOrUid: studentUid,
-                studentName: studentData['name'],
-                initialStudentData: studentData,
-              );
-            }),
-            if ((studentData['phone'] ?? '').toString().isNotEmpty)
-              _optionTile(Icons.chat_rounded, "مراسلة عبر واتساب", Colors.green, () {
+            Text(
+              msgData['authorName'] ?? '',
+              style: GoogleFonts.cairo(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              msgData['content'] ?? '',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.cairo(color: Colors.grey, fontSize: 13),
+            ),
+            const Divider(height: 25),
+            if (!isMe)
+              _optionTile(Icons.flag_rounded, isAr ? "الإبلاغ عن هذه الرسالة لمدير الفرقة" : "Report to Level Manager", Colors.redAccent, () {
                 Navigator.pop(ctx);
-                _ds.launchWhatsApp(studentData['phone']);
+                _showReportDialog(msgData, msgDocId);
               }),
-            _optionTile(Icons.forum_rounded, "فتح شات خاص", Colors.blue, () {
-              Navigator.pop(ctx);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (c) => PrivateChatScreen(
-                    otherUserId: studentUid,
-                    otherUserName: studentData['name'] ?? 'الطالب',
-                    otherUserRole: 'student',
-                    otherUserPhotoUrl: studentData['photoUrl'],
-                  ),
-                ),
-              );
-            }),
-            _optionTile(Icons.block, "حظر من هذا النقاش", Colors.red, () async {
-              Navigator.pop(ctx);
-              await _courseRef.update({
-                'bannedUids': FieldValue.arrayUnion([studentUid])
-              });
-              _showError("تم حظر الطالب بنجاح");
-            }),
+            if (_ds.userRole == 'doctor' && msgData['authorRole'] == 'student') ...[
+              _optionTile(Icons.block, isAr ? "حظر الطالب من النقاش" : "Block Student", Colors.orange, () async {
+                Navigator.pop(ctx);
+                await _courseRef.update({
+                  'bannedUids': FieldValue.arrayUnion([msgData['authorId']])
+                });
+                _showError("تم حظر الطالب بنجاح");
+              }),
+            ],
+            if (isMe || _ds.userRole == 'doctor' || _ds.userRole == 'manager' || _ds.userRole == 'super_admin')
+              _optionTile(Icons.delete_outline_rounded, isAr ? "حذف الرسالة" : "Delete Message", Colors.red, () async {
+                Navigator.pop(ctx);
+                try {
+                  await _courseRef.collection('forum').doc(msgDocId).delete();
+                  _showError(isAr ? "تم حذف الرسالة" : "Message deleted");
+                } catch (e) {
+                  _showError("Error: $e");
+                }
+              }),
           ],
         ),
       ),
@@ -380,7 +488,7 @@ class _DiscussionForumScreenState extends State<DiscussionForumScreen> {
                           String role = data['authorRole']?.toString() ?? 'student';
 
                           return GestureDetector(
-                            onLongPress: () => _showStudentOptions(data),
+                            onLongPress: () => _showMessageOptions(data, docs[index].id, isMe),
                             child: _buildChat_Bubble(data, isMe, role, isDark, primaryColor),
                           );
                         },
@@ -469,7 +577,7 @@ class _DiscussionForumScreenState extends State<DiscussionForumScreen> {
                     );
                   } else {
                     if (_ds.userRole != 'student') {
-                      _showStudentOptions(data);
+                      _showMessageOptions(data, '', isMe);
                     } else {
                       showRichStudentProfileModal(
                         context: context,

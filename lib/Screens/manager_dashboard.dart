@@ -42,7 +42,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
     super.initState();
     _managedLevels = List<String>.from(_ds.currentAdmin?['managedLevels'] ?? []);
     _selectedLevel = _managedLevels.isNotEmpty ? _managedLevels.first : null;
-    _tabController = TabController(length: 8, vsync: this);
+    _tabController = TabController(length: 9, vsync: this);
     _tabController.addListener(() {
       if (_tabController.indexIsChanging) {
         setState(() {
@@ -148,6 +148,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
                     Tab(text: 'الحضور'),
                     Tab(text: 'الفصول'),
                     Tab(text: 'الجدول'),
+                    Tab(text: 'البلاغات'),
                   ],
                 ),
               ),
@@ -164,6 +165,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
               _buildAttendanceTab(),
               _buildSemestersTab(),
               _buildScheduleTab(),
+              _buildReportsTab(),
             ],
           ),
         ),
@@ -1318,6 +1320,8 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تصدير ملف الاكسيل بنجاح')));
   }
 
+  Widget _buildReportsTab() => ReportsManagementView(filterLevelId: _selectedLevel);
+
   Widget _buildScheduleTab() {
     bool isDark = _ds.isDarkMode;
     if (_selectedLevel == null) {
@@ -1831,4 +1835,315 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
   }
   @override
   bool shouldRebuild(_SliverAppBarDelegate oldDelegate) => false;
+}
+
+class ReportsManagementView extends StatefulWidget {
+  final String? filterLevelId;
+  const ReportsManagementView({super.key, this.filterLevelId});
+
+  @override
+  State<ReportsManagementView> createState() => _ReportsManagementViewState();
+}
+
+class _ReportsManagementViewState extends State<ReportsManagementView> {
+  final DataService _ds = DataService();
+
+  Future<void> _deleteMessageAndResolve(String collegeId, String levelId, String courseId, String msgDocId, String reportDocId, bool isAr) async {
+    try {
+      if (msgDocId.isNotEmpty && levelId.isNotEmpty && courseId.isNotEmpty) {
+        await FirebaseFirestore.instance
+            .collection('colleges')
+            .doc(collegeId)
+            .collection('levels')
+            .doc(levelId)
+            .collection('courses')
+            .doc(courseId)
+            .collection('forum')
+            .doc(msgDocId)
+            .delete();
+      }
+      await FirebaseFirestore.instance
+          .collection('colleges')
+          .doc(collegeId)
+          .collection('reports')
+          .doc(reportDocId)
+          .delete();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isAr ? "تم حذف الرسالة المخالفة وحذف البلاغ بنجاح" : "Message deleted and report resolved"),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _banUserAndResolve(String collegeId, String levelId, String courseId, String authorId, String reportDocId, bool isAr) async {
+    try {
+      if (authorId.isNotEmpty && levelId.isNotEmpty && courseId.isNotEmpty) {
+        await FirebaseFirestore.instance
+            .collection('colleges')
+            .doc(collegeId)
+            .collection('levels')
+            .doc(levelId)
+            .collection('courses')
+            .doc(courseId)
+            .update({
+          'bannedUids': FieldValue.arrayUnion([authorId])
+        });
+      }
+      await FirebaseFirestore.instance
+          .collection('colleges')
+          .doc(collegeId)
+          .collection('reports')
+          .doc(reportDocId)
+          .delete();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isAr ? "تم حظر الطالب وإغلاق البلاغ بنجاح" : "User banned and report resolved"),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _dismissReport(String collegeId, String reportDocId, bool isAr) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('colleges')
+          .doc(collegeId)
+          .collection('reports')
+          .doc(reportDocId)
+          .delete();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(isAr ? "تم تجاهل البلاغ" : "Report dismissed")),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    bool isAr = _ds.isArabic;
+    bool isDark = _ds.isDarkMode;
+    String collegeId = _ds.selectedInstituteId ?? 'commerce';
+
+    Query<Map<String, dynamic>> query = FirebaseFirestore.instance
+        .collection('colleges')
+        .doc(collegeId)
+        .collection('reports')
+        .orderBy('createdAt', descending: true);
+
+    if (widget.filterLevelId != null && widget.filterLevelId!.isNotEmpty) {
+      query = query.where('levelId', isEqualTo: widget.filterLevelId);
+    }
+
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: query.snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator(color: Color(0xFF673AB7)));
+          }
+
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.verified_user_rounded, size: 70, color: Colors.green.withAlpha(120)),
+                  const SizedBox(height: 16),
+                  Text(
+                    isAr ? "لا توجد بلاغات معلقة حالياً 🎉" : "No pending reports 🎉",
+                    style: GoogleFonts.cairo(color: Colors.grey, fontSize: 16),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          var docs = snapshot.data!.docs;
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: docs.length,
+            itemBuilder: (context, index) {
+              var data = docs[index].data();
+              String reportDocId = docs[index].id;
+              String msgDocId = data['messageDocId'] ?? '';
+              String msgContent = data['messageContent'] ?? '';
+              String authorName = data['authorName'] ?? (isAr ? 'مرسل مجهول' : 'Unknown');
+              String authorId = data['authorId'] ?? '';
+              String reporterName = data['reporterName'] ?? (isAr ? 'مُبَلّغ' : 'Reporter');
+              String courseName = data['courseName'] ?? '';
+              String levelId = data['levelId'] ?? '';
+              String courseId = data['courseId'] ?? '';
+              String reason = data['reason'] ?? '';
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1A1A1E) : Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.redAccent.withAlpha(60)),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withAlpha(isDark ? 40 : 15), blurRadius: 12, offset: const Offset(0, 5))
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.flag_rounded, color: Colors.redAccent, size: 22),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              "$courseName (الفرقة $levelId)",
+                              style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.purple),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.redAccent.withAlpha(30),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              isAr ? "بلاغ جديد" : "Report",
+                              style: GoogleFonts.cairo(color: Colors.redAccent, fontSize: 11, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 20),
+                      Text(
+                        isAr ? "الرسالة المخالفة:" : "Offensive Message:",
+                        style: GoogleFonts.cairo(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.black26 : Colors.red.withAlpha(10),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.redAccent.withAlpha(30)),
+                        ),
+                        child: Text(
+                          msgContent,
+                          style: GoogleFonts.cairo(fontSize: 14, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Icon(Icons.person_outline, size: 16, color: Colors.grey.shade600),
+                          const SizedBox(width: 4),
+                          Text(
+                            isAr ? "صاحب الرسالة: " : "Author: ",
+                            style: GoogleFonts.cairo(fontSize: 12, color: Colors.grey),
+                          ),
+                          Text(
+                            authorName,
+                            style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(Icons.report_problem_outlined, size: 16, color: Colors.grey.shade600),
+                          const SizedBox(width: 4),
+                          Text(
+                            isAr ? "المُبَلّغ: " : "Reporter: ",
+                            style: GoogleFonts.cairo(fontSize: 12, color: Colors.grey),
+                          ),
+                          Text(
+                            reporterName,
+                            style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                      if (reason.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          "${isAr ? "سبب الإبلاغ: " : "Reason: "}$reason",
+                          style: GoogleFonts.cairo(fontSize: 12, color: Colors.orange, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                      const SizedBox(height: 15),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.redAccent,
+                                side: const BorderSide(color: Colors.redAccent),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                              icon: const Icon(Icons.delete_forever_rounded, size: 18),
+                              label: Text(isAr ? "حذف الرسالة" : "Delete Msg", style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold)),
+                              onPressed: () => _deleteMessageAndResolve(collegeId, levelId, courseId, msgDocId, reportDocId, isAr),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                              icon: const Icon(Icons.block_rounded, size: 18),
+                              label: Text(isAr ? "حظر الطالب" : "Ban User", style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold)),
+                              onPressed: () => _banUserAndResolve(collegeId, levelId, courseId, authorId, reportDocId, isAr),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton(
+                            icon: const Icon(Icons.check_circle_outline, color: Colors.grey),
+                            tooltip: isAr ? "تجاهل / إغلاق البلاغ" : "Dismiss",
+                            onPressed: () => _dismissReport(collegeId, reportDocId, isAr),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
 }
