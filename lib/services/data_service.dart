@@ -279,36 +279,17 @@ class DataService extends ChangeNotifier {
         );
       } catch (authError) {
         debugPrint("Auth sign-in error: $authError. Attempting Firestore fallback...");
-        String hashedPass = hashPassword(password.trim());
-        var collegeRef = _firestore.collection('colleges').doc(selectedInstituteId!);
-
-        var studentQuery = await collegeRef.collection('students')
-            .where('id', isEqualTo: cleanCode)
-            .get();
-
-        if (studentQuery.docs.isEmpty) {
-          studentQuery = await collegeRef.collection('students')
-              .where('email', isEqualTo: email)
-              .get();
-        }
-
-        if (studentQuery.docs.isNotEmpty) {
-          var studData = studentQuery.docs.first.data();
-          String docPass = studData['password']?.toString() ?? '';
-          if (docPass == hashedPass || docPass == password.trim()) {
-            // Firestore password matches! Try creating or updating Auth user
+        var matched = await _findFirestoreUserAndVerifyPassword(cleanCode, email, password);
+        if (matched != null) {
+          try {
+            userCredential = await _auth.signInWithEmailAndPassword(email: email, password: password.trim());
+          } catch (_) {
             try {
+              await _secureCreateUser(email, password.trim());
               userCredential = await _auth.signInWithEmailAndPassword(email: email, password: password.trim());
             } catch (_) {
-              try {
-                await _secureCreateUser(email, password.trim());
-                userCredential = await _auth.signInWithEmailAndPassword(email: email, password: password.trim());
-              } catch (_) {
-                // Ignore if auth creation fails due to existing user with different pass
-              }
+              // Ignore if auth creation fails due to existing user with different pass
             }
-          } else {
-            throw isArabic ? "كلمة المرور غير صحيحة" : "Incorrect password";
           }
         } else {
           rethrow;
@@ -372,6 +353,45 @@ class DataService extends ChangeNotifier {
     }
   }
 
+  Future<Map<String, dynamic>?> _findFirestoreUserAndVerifyPassword(String cleanCode, String email, String password) async {
+    if (selectedInstituteId == null) return null;
+    String hashedPass = hashPassword(password.trim());
+    var collegeRef = _firestore.collection('colleges').doc(selectedInstituteId!);
+    List<String> collectionsToCheck = ['students', 'doctors', 'tas', 'super_admins', 'managers', 'super_admin', 'manager'];
+
+    for (var coll in collectionsToCheck) {
+      try {
+        var doc = await collegeRef.collection(coll).doc(cleanCode).get();
+        if (!doc.exists) doc = await collegeRef.collection(coll).doc("STD_$cleanCode").get();
+        if (!doc.exists) doc = await collegeRef.collection(coll).doc("DOC_$cleanCode").get();
+        if (!doc.exists && email.isNotEmpty) {
+          var q = await collegeRef.collection(coll).where('email', isEqualTo: email).get();
+          if (q.docs.isNotEmpty) doc = q.docs.first;
+        }
+        if (!doc.exists && cleanCode.isNotEmpty) {
+          var qCode = await collegeRef.collection(coll).where('code', isEqualTo: cleanCode).get();
+          if (qCode.docs.isEmpty) qCode = await collegeRef.collection(coll).where('id', isEqualTo: cleanCode).get();
+          if (qCode.docs.isNotEmpty) doc = qCode.docs.first;
+        }
+
+        if (doc.exists && doc.data() != null) {
+          var data = Map<String, dynamic>.from(doc.data() as Map);
+          String docPass = data['password']?.toString() ?? '';
+          if (docPass == hashedPass || docPass == password.trim()) {
+            return {'doc': doc, 'data': data, 'collection': coll};
+          } else {
+            throw isArabic ? "كلمة المرور غير صحيحة" : "Incorrect password";
+          }
+        }
+      } catch (e) {
+        if (e.toString().contains("كلمة المرور غير صحيحة") || e.toString().contains("Incorrect password")) {
+          rethrow;
+        }
+      }
+    }
+    return null;
+  }
+
   Future<String?> _findAndLoadUser(String uid, {String? userEmail}) async {
     debugPrint("🕵️ Checking user UID: $uid (Email: $userEmail) in current college: $selectedInstituteId");
 
@@ -379,18 +399,12 @@ class DataService extends ChangeNotifier {
     if (selectedInstituteId != null) {
       role = await _checkUserInCollege(selectedInstituteId!, uid, userEmail: userEmail);
       if (role != null) return role;
-      
-      // If we are currently selected in 'testers' faculty, strictly DO NOT search other colleges or root doctors/TAs!
-      if (selectedInstituteId == 'testers') {
-        return null;
-      }
     }
 
     try {
       var colleges = await _firestore.collection('colleges').get();
       for (var colDoc in colleges.docs) {
         if (colDoc.id == selectedInstituteId) continue;
-        if (colDoc.id == 'testers') continue; // Do not check testers from other colleges
         role = await _checkUserInCollege(colDoc.id, uid, userEmail: userEmail);
         if (role != null) {
           await setInstitute(colDoc.id);
@@ -519,11 +533,6 @@ class DataService extends ChangeNotifier {
         }
       }
     } catch (_) {}
-
-    // If collegeId is 'testers', ONLY test students are allowed. Do not check doctors, TAs, or managers!
-    if (collegeId == 'testers') {
-      return null;
-    }
 
     // 2. فحص الدكاترة
     try {
