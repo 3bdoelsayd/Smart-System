@@ -603,13 +603,19 @@ class DataService extends ChangeNotifier {
     }
 
     // 3. فحص الإدارة والمديرين
-    List<String> adminColls = ['managers', 'manager', 'super_admins', 'super_admin'];
+    List<String> adminColls = ['super_admins', 'super_admin', 'managers', 'manager'];
     for (var c in adminColls) {
       try {
         var doc = await collegeRef.collection(c).doc(uid).get();
+        if (!doc.exists) doc = await collegeRef.collection(c).doc(cleanCode).get();
         if (!doc.exists && userEmail != null) {
           var q = await collegeRef.collection(c).where('email', isEqualTo: userEmail).get();
           if (q.docs.isNotEmpty) doc = q.docs.first;
+        }
+        if (!doc.exists && cleanCode.isNotEmpty) {
+          var qId = await collegeRef.collection(c).where('code', isEqualTo: cleanCode).get();
+          if (qId.docs.isEmpty) qId = await collegeRef.collection(c).where('id', isEqualTo: cleanCode).get();
+          if (qId.docs.isNotEmpty) doc = qId.docs.first;
         }
         if (doc.exists && doc.data() != null) {
           var data = Map<String, dynamic>.from(doc.data() as Map);
@@ -661,6 +667,45 @@ class DataService extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       debugPrint("❌ Create college error: $e");
+      rethrow;
+    }
+  }
+
+  Future<void> createSuperAdminForCollege({
+    required String collegeId,
+    required String name,
+    required String code,
+    required String password,
+  }) async {
+    try {
+      String cleanCode = code.trim().toLowerCase();
+      if (cleanCode.isEmpty) throw isArabic ? 'كود المستخدم لا يمكن أن يكون فارغاً' : 'Code cannot be empty';
+      if (name.trim().isEmpty) throw isArabic ? 'الاسم لا يمكن أن يكون فارغاً' : 'Name cannot be empty';
+      if (password.trim().isEmpty) throw isArabic ? 'كلمة السر لا يمكن أن تكون فارغة' : 'Password cannot be empty';
+
+      var collegeRef = _firestore.collection('colleges').doc(collegeId);
+      await collegeRef.collection('super_admins').doc(cleanCode).set({
+        'id': cleanCode,
+        'code': cleanCode,
+        'name': name.trim(),
+        'password': password.trim(),
+        'role': 'super_admin',
+        'collegeId': collegeId,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      notifyListeners();
+    } catch (e) {
+      debugPrint("❌ Create super admin error: $e");
+      rethrow;
+    }
+  }
+
+  Future<void> deleteSuperAdminForCollege(String collegeId, String adminDocId) async {
+    try {
+      await _firestore.collection('colleges').doc(collegeId).collection('super_admins').doc(adminDocId).delete();
+      notifyListeners();
+    } catch (e) {
+      debugPrint("❌ Delete super admin error: $e");
       rethrow;
     }
   }

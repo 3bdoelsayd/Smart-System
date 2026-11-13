@@ -2865,6 +2865,224 @@ class _CollegesManagementViewState extends State<CollegesManagementView> {
     );
   }
 
+  void _showAddSuperAdminDialog(BuildContext context, String collegeId, String collegeName, bool isAr) {
+    final nameController = TextEditingController();
+    final codeController = TextEditingController();
+    final passController = TextEditingController();
+    bool isLoading = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              const Icon(Icons.admin_panel_settings_rounded, color: Color(0xFF673AB7)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  isAr ? 'إضافة سوبر أدمن لكلية "$collegeName"' : 'Add Super Admin to "$collegeName"',
+                  style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: InputDecoration(
+                    labelText: isAr ? 'اسم السوبر أدمن' : 'Super Admin Name',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    prefixIcon: const Icon(Icons.person_outline),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: codeController,
+                  decoration: InputDecoration(
+                    labelText: isAr ? 'الكود / اسم المستخدم (مثل: admin_eng)' : 'Code / Username (e.g. admin_eng)',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    prefixIcon: const Icon(Icons.badge_outlined),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: passController,
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    labelText: isAr ? 'كلمة السر' : 'Password',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    prefixIcon: const Icon(Icons.lock_outline),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isLoading ? null : () => Navigator.pop(ctx),
+              child: Text(isAr ? 'إلغاء' : 'Cancel', style: GoogleFonts.cairo()),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF673AB7),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: isLoading
+                  ? null
+                  : () async {
+                      if (nameController.text.trim().isEmpty ||
+                          codeController.text.trim().isEmpty ||
+                          passController.text.trim().isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(isAr ? 'يرجى تعبئة كافة الحقول' : 'Please fill all fields')),
+                        );
+                        return;
+                      }
+                      setDialogState(() => isLoading = true);
+                      try {
+                        await _ds.createSuperAdminForCollege(
+                          collegeId: collegeId,
+                          name: nameController.text.trim(),
+                          code: codeController.text.trim(),
+                          password: passController.text.trim(),
+                        );
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(isAr
+                                  ? 'تم تعيين السوبر أدمن للكلية بنجاح 👑'
+                                  : 'Super Admin assigned successfully 👑'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        setDialogState(() => isLoading = false);
+                        if (ctx.mounted) {
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                          );
+                        }
+                      }
+                    },
+              child: isLoading
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : Text(isAr ? 'إضافة السوبر أدمن' : 'Add Super Admin', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showManageSuperAdminsDialog(BuildContext context, String collegeId, String collegeName, bool isAr) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(Icons.shield_outlined, color: Color(0xFF673AB7)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                isAr ? 'مشرفو كلية "$collegeName"' : 'Super Admins of "$collegeName"',
+                style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: FirebaseFirestore.instance
+                .collection('colleges')
+                .doc(collegeId)
+                .collection('super_admins')
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator(color: Color(0xFF673AB7)));
+              }
+              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Center(
+                    child: Text(
+                      isAr ? 'لا يوجد سوبر أدمن مخصص لهذه الكلية حالياً' : 'No Super Admins for this college yet',
+                      style: GoogleFonts.cairo(color: Colors.grey),
+                    ),
+                  ),
+                );
+              }
+              var docs = snapshot.data!.docs;
+              return ListView.builder(
+                shrinkWrap: true,
+                itemCount: docs.length,
+                itemBuilder: (context, index) {
+                  var adminData = docs[index].data();
+                  String docId = docs[index].id;
+                  String adminName = adminData['name'] ?? docId;
+                  String adminCode = adminData['code'] ?? docId;
+
+                  return Card(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    margin: const EdgeInsets.symmetric(vertical: 6),
+                    child: ListTile(
+                      leading: const CircleAvatar(
+                        backgroundColor: Color(0xFF673AB7),
+                        child: Icon(Icons.person_rounded, color: Colors.white, size: 20),
+                      ),
+                      title: Text(adminName, style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+                      subtitle: Text("Code: $adminCode", style: GoogleFonts.cairo(fontSize: 12, color: Colors.grey)),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete_outline, color: Colors.red),
+                        onPressed: () async {
+                          await _ds.deleteSuperAdminForCollege(collegeId, docId);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(isAr ? 'تم حذف السوبر أدمن' : 'Super Admin deleted')),
+                            );
+                          }
+                        },
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(isAr ? 'إغلاق' : 'Close', style: GoogleFonts.cairo()),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF673AB7),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            icon: const Icon(Icons.add, size: 18),
+            label: Text(isAr ? 'إضافة جديد' : 'Add New', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _showAddSuperAdminDialog(context, collegeId, collegeName, isAr);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _confirmDeleteCollege(BuildContext context, String collegeId, String collegeName, bool isAr) async {
     bool confirm = await showDialog(
       context: context,
@@ -2995,6 +3213,11 @@ class _CollegesManagementViewState extends State<CollegesManagementView> {
                             ),
                           ],
                         ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.admin_panel_settings_rounded, color: Color(0xFF8E24AA)),
+                        tooltip: isAr ? 'إدارة سوبر أدمن الكلية' : 'Manage College Super Admin',
+                        onPressed: () => _showManageSuperAdminsDialog(context, id, isAr ? nameAr : nameEn, isAr),
                       ),
                       IconButton(
                         icon: const Icon(Icons.login_rounded, color: Color(0xFF673AB7)),
