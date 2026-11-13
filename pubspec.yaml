@@ -2,7 +2,7 @@ name: smart_university
 description: "A professional Smart University System."
 publish_to: 'none'
 
-version: 1.0.0+2
+version: 1.0.0+3
 
 environment:
   sdk: ^3.8.1
