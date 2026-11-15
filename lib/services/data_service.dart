@@ -1097,11 +1097,18 @@ class DataService extends ChangeNotifier {
     } catch (_) {}
 
     try {
-      String fileName = 'research_${studentId}_${DateTime.now().millisecondsSinceEpoch}.pdf';
+      if (file.size > 15 * 1024 * 1024) {
+        throw isArabic ? "حجم الملف يتجاوز الحد المسموح (15 ميجابايت)" : "File size exceeds limit (15MB)";
+      }
+
+      String safeName = file.name.replaceAll(RegExp(r'[^a-zA-Z0-9_\-.]'), '_');
+      String fileName = 'research_${studentId}_${DateTime.now().millisecondsSinceEpoch}_$safeName';
 
       if (kIsWeb) {
+        if (file.bytes == null) throw isArabic ? "ملف فارغ أو تالف" : "Empty or corrupted file";
         await supabase.storage.from('research-pdfs').uploadBinary(fileName, file.bytes!);
       } else {
+        if (file.path == null) throw isArabic ? "مسار الملف غير موجود" : "File path not found";
         await supabase.storage.from('research-pdfs').upload(fileName, io.File(file.path!));
       }
 

@@ -102,8 +102,20 @@ class _CollegeSelectionScreenState extends State<CollegeSelectionScreen> {
                       color: Colors.transparent,
                       child: InkWell(
                         onTap: () async {
-                          await _ds.setInstitute(id);
-                          if (mounted) Navigator.pushNamed(context, '/login');
+                          try {
+                            await _ds.setInstitute(id).timeout(const Duration(seconds: 10));
+                            if (mounted) Navigator.pushNamed(context, '/login');
+                          } catch (e) {
+                            debugPrint("Institute selection error: $e");
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(isAr ? "فشل اختيار الكلية: $e" : "Failed to select college: $e", style: GoogleFonts.cairo()),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          }
                         },
                         borderRadius: BorderRadius.circular(22),
                         child: Padding(
