@@ -1636,13 +1636,7 @@ class DataService extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('session_id', id);
     await prefs.setString('session_type', type);
-    if (currentStudent != null) {
-      await prefs.setString('session_user_map', jsonEncode(currentStudent));
-    } else if (currentDoctor != null) {
-      await prefs.setString('session_user_map', jsonEncode(currentDoctor));
-    } else if (currentAdmin != null) {
-      await prefs.setString('session_user_map', jsonEncode(currentAdmin));
-    }
+    await prefs.remove('session_user_map');
   }
   Future<void> loadSettings() async { final prefs = await SharedPreferences.getInstance(); isArabic = prefs.getBool('persist_v3_arabic') ?? true; isDarkMode = prefs.getBool('persist_v3_dark') ?? false; notifyListeners(); }
   Future<void> toggleLanguage(bool v) async { isArabic = v; final prefs = await SharedPreferences.getInstance(); await prefs.setBool('persist_v3_arabic', v); notifyListeners(); }
