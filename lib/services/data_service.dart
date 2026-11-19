@@ -1589,7 +1589,6 @@ class DataService extends ChangeNotifier {
     String? storedId = prefs.getString('selected_institute_id');
     if (storedId != null) {
       selectedInstituteId = storedId;
-      await setInstitute(storedId);
     } else {
       selectedInstituteId = 'commerce';
     }
@@ -1598,10 +1597,11 @@ class DataService extends ChangeNotifier {
     String? type = prefs.getString('session_type');
 
     if (id != null && type != null) {
+      userRole = type;
       try {
-        await loadUserData(id, type);
+        await loadUserData(id, type).timeout(const Duration(seconds: 4), onTimeout: () {});
       } catch (e) {
-        debugPrint("Load session user error: $e");
+        debugPrint("Load session user timeout/error: $e");
       }
       return type;
     }
