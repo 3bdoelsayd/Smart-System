@@ -1156,32 +1156,44 @@ class DataService extends ChangeNotifier {
     }
   }
 
-  Future<void> updateResearchStatus(String id, String stat, {bool markAsSeen = false, String? grade, String? comment}) async {
+  Future<void> updateResearchStatus(
+    String id, 
+    String stat, {
+    bool markAsSeen = false, 
+    String? grade, 
+    String? comment,
+    bool? isPublished,
+    bool? isDraft,
+  }) async {
     Map<String, dynamic> data = {'status': stat};
     if (markAsSeen) data['isSeen'] = true;
     if (grade != null) data['grade'] = grade;
     if (comment != null) data['comment'] = comment;
+    if (isPublished != null) data['isPublished'] = isPublished;
+    if (isDraft != null) data['isDraft'] = isDraft;
     
     if (grade != null || comment != null) {
       data['evaluatedAt'] = FieldValue.serverTimestamp();
       data['evaluatedBy'] = currentDoctor?['name'] ?? 'Doctor';
 
-      // جلب بيانات البحث لإرسال إشعار للطالب
-      var doc = await submissionsColl.doc(id).get();
-      var subData = doc.data() as Map<String, dynamic>?;
+      if (isPublished == true) {
+        // جلب بيانات البحث لإرسال إشعار للطالب عند النشر فقط
+        var doc = await submissionsColl.doc(id).get();
+        var subData = doc.data() as Map<String, dynamic>?;
 
-      if (subData != null) {
-        await notificationsColl.add({
-          'title': isArabic ? 'تم تقييم بحثك' : 'Research Evaluated',
-          'body': isArabic 
-              ? 'قام الدكتور بتقييم بحثك في مادة ${subData['subject']}. الدرجة: $grade' 
-              : 'Doctor evaluated your research in ${subData['subject']}. Grade: $grade',
-          'targetType': 'student',
-          'targetId': subData['studentId'],
-          'timestamp': FieldValue.serverTimestamp(),
-          'instituteId': selectedInstituteId,
-          'isRead': false,
-        });
+        if (subData != null) {
+          await notificationsColl.add({
+            'title': isArabic ? 'تم نشر تقييم بحثك' : 'Research Evaluated',
+            'body': isArabic 
+                ? 'قام الدكتور بنشر تقييم بحثك في مادة ${subData['subject']}. الدرجة: $grade' 
+                : 'Doctor published your evaluation in ${subData['subject']}. Grade: $grade',
+            'targetType': 'student',
+            'targetId': subData['studentId'],
+            'timestamp': FieldValue.serverTimestamp(),
+            'instituteId': selectedInstituteId,
+            'isRead': false,
+          });
+        }
       }
     }
     await submissionsColl.doc(id).update(data);

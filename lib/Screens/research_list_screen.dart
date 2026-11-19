@@ -65,7 +65,11 @@ class ResearchListScreen extends StatelessWidget {
                     
                     final String recipientStr = r['recipientName'] ?? (r['recipientType'] == 'ta' ? (isAr ? 'المعيد' : 'TA') : (isAr ? 'الدكتور' : 'Doctor'));
 
-                    Color statusColor = status == 'Accepted' || status == 'Graded'
+                    bool isPublished = r['isPublished'] == true;
+                    String grade = r['grade']?.toString() ?? '';
+                    String comment = r['comment']?.toString() ?? '';
+
+                    Color statusColor = isPublished
                         ? (isDark ? Colors.greenAccent : Colors.green) 
                         : (status == 'Rejected' ? (isDark ? Colors.redAccent : Colors.red) : primaryColor);
 
@@ -115,14 +119,34 @@ class ResearchListScreen extends StatelessWidget {
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Text(
-                                    status == 'Accepted' || status == 'Graded' 
-                                        ? (isAr ? 'تم التقييم' : 'Graded') 
+                                    isPublished 
+                                        ? (isAr ? 'تم النشر والتقييم 🟢' : 'Evaluated & Published 🟢') 
                                         : (status == 'Rejected' ? (isAr ? 'مرفوض' : 'Rejected') : (isAr ? 'في انتظار المراجعة' : 'Pending')),
                                     style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 11),
                                   ),
                                 ),
                               ],
                             ),
+                            if (isPublished && (grade.isNotEmpty || comment.isNotEmpty)) ...[
+                              const SizedBox(height: 8),
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.withAlpha(15),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: Colors.green.withAlpha(40)),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (grade.isNotEmpty)
+                                      Text("${isAr ? 'الدرجة:' : 'Grade:'} $grade", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green, fontSize: 12)),
+                                    if (comment.isNotEmpty)
+                                      Text("${isAr ? 'ملاحظات المحاضر:' : 'Feedback:'} $comment", style: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontSize: 11)),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                         trailing: IconButton(

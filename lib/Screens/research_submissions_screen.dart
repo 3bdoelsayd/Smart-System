@@ -19,6 +19,9 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = "";
 
+  // 0: لم تُراجع, 1: تحت المراجعة (مسودة), 2: تمت المراجعة والنشر, 3: المقيّمة
+  int _selectedCategoryIndex = 0;
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -31,6 +34,31 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
     normalized = normalized.replaceAll('ة', 'ه');
     normalized = normalized.replaceAll('ى', 'ي');
     return normalized;
+  }
+
+  String _formatTimestamp(dynamic timestamp, bool isAr) {
+    if (timestamp == null) return isAr ? "غير محدد" : "N/A";
+    DateTime dt;
+    if (timestamp is Timestamp) {
+      dt = timestamp.toDate();
+    } else if (timestamp is DateTime) {
+      dt = timestamp;
+    } else if (timestamp is int) {
+      dt = DateTime.fromMillisecondsSinceEpoch(timestamp);
+    } else {
+      dt = DateTime.tryParse(timestamp.toString()) ?? DateTime.now();
+    }
+
+    String year = dt.year.toString();
+    String month = dt.month.toString().padLeft(2, '0');
+    String day = dt.day.toString().padLeft(2, '0');
+    int hour = dt.hour;
+    String minute = dt.minute.toString().padLeft(2, '0');
+    String period = hour >= 12 ? (isAr ? "م" : "PM") : (isAr ? "ص" : "AM");
+    int hour12 = hour % 12;
+    if (hour12 == 0) hour12 = 12;
+
+    return "$year/$month/$day - ${hour12.toString().padLeft(2, '0')}:$minute $period";
   }
 
   Future<void> _launchURL(String url) async {
@@ -82,7 +110,7 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
               elevation: 0,
               centerTitle: true,
               title: Text(_selectedSubject ?? _ds.translate('research_review'), 
-                  style: const TextStyle(fontWeight: FontWeight.bold)),
+                  style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 18)),
               backgroundColor: isDark ? const Color(0xFF1A1A1A) : const Color(0xFF673AB7),
               foregroundColor: Colors.white,
               leading: IconButton(
@@ -97,7 +125,7 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
               ),
             ),
             body: _ds.currentDoctor == null
-                ? const Center(child: Text('يرجى تسجيل الدخول'))
+                ? Center(child: Text(isAr ? 'يرجى تسجيل الدخول' : 'Please login', style: GoogleFonts.cairo()))
                 : _selectedSubject == null
                     ? _buildSubjectSelection(primaryColor, isDark)
                     : _buildMainContent(primaryColor, isDark),
@@ -114,7 +142,7 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
     final teachingLevels = List<String>.from(_ds.currentDoctor?['teachingLevels'] ?? ['level_1', 'level_2', 'level_3', 'level_4']);
 
     if (teachingLevels.isEmpty) {
-      return Center(child: Padding(padding: const EdgeInsets.all(40), child: Text(_ds.isArabic ? "لم يتم إسناد فرق دراسية لك بعد" : "No levels assigned")));
+      return Center(child: Padding(padding: const EdgeInsets.all(40), child: Text(_ds.isArabic ? "لم يتم إسناد فرق دراسية لك بعد" : "No levels assigned", style: GoogleFonts.cairo())));
     }
 
     return StreamBuilder<List<QuerySnapshot>>(
@@ -140,7 +168,7 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
         }).toList() ?? [];
         
         if (allDocs.isEmpty) {
-          return Center(child: Padding(padding: const EdgeInsets.all(40), child: Text(_ds.translate('no_subjects_assigned'))));
+          return Center(child: Padding(padding: const EdgeInsets.all(40), child: Text(_ds.translate('no_subjects_assigned'), style: GoogleFonts.cairo())));
         }
 
         return ListView.builder(
@@ -165,8 +193,8 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
                   backgroundColor: color.withAlpha(26), 
                   child: Icon(Icons.folder_shared_rounded, color: color)
                 ),
-                title: Text(name, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: isDark ? Colors.white : Colors.black87)),
-                subtitle: Text("${_ds.isArabic ? 'الفرقة:' : 'Lvl:'} $level", style: TextStyle(color: isDark ? Colors.white54 : Colors.grey)),
+                title: Text(name, style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 16, color: isDark ? Colors.white : Colors.black87)),
+                subtitle: Text("${_ds.isArabic ? 'الفرقة:' : 'Lvl:'} $level", style: GoogleFonts.cairo(color: isDark ? Colors.white54 : Colors.grey)),
                 trailing: Icon(Icons.arrow_forward_ios_rounded, size: 16, color: color),
                 onTap: () => setState(() => _selectedSubject = name),
               ),
@@ -182,13 +210,13 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(15, 10, 15, 0),
+          padding: const EdgeInsets.fromLTRB(15, 12, 15, 8),
           child: TextField(
             controller: _searchController,
-            style: TextStyle(color: isDark ? Colors.white : Colors.black),
+            style: GoogleFonts.cairo(color: isDark ? Colors.white : Colors.black),
             decoration: InputDecoration(
               hintText: isAr ? "ابحث باسم الطالب..." : "Search by student name...",
-              hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.grey),
+              hintStyle: GoogleFonts.cairo(color: isDark ? Colors.white38 : Colors.grey),
               prefixIcon: Icon(Icons.search_rounded, color: color),
               suffixIcon: _searchQuery.isNotEmpty ? IconButton(icon: const Icon(Icons.close_rounded), onPressed: () {
                 _searchController.clear();
@@ -202,8 +230,65 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
             onChanged: (v) => setState(() => _searchQuery = v),
           ),
         ),
+        _buildCategoryTabs(color, isDark),
         Expanded(child: _buildSubmissionsList(_selectedSubject!, color, isDark)),
       ],
+    );
+  }
+
+  Widget _buildCategoryTabs(Color primaryColor, bool isDark) {
+    bool isAr = _ds.isArabic;
+    final List<Map<String, dynamic>> categories = [
+      {'title': isAr ? 'لم تُراجع' : 'Unreviewed', 'icon': Icons.pending_actions_rounded},
+      {'title': isAr ? 'تحت المراجعة (مسودة)' : 'Under Review', 'icon': Icons.edit_note_rounded},
+      {'title': isAr ? 'تمت المراجعة والنشر' : 'Published', 'icon': Icons.published_with_changes_rounded},
+      {'title': isAr ? 'المقيّمة (الكل)' : 'All Evaluated', 'icon': Icons.grading_rounded},
+    ];
+
+    return Container(
+      height: 48,
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 15),
+        itemCount: categories.length,
+        itemBuilder: (context, index) {
+          bool isSelected = _selectedCategoryIndex == index;
+          return Padding(
+            padding: const EdgeInsets.only(left: 8, right: 8),
+            child: ChoiceChip(
+              showCheckmark: false,
+              avatar: Icon(
+                categories[index]['icon'],
+                size: 18,
+                color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+              ),
+              label: Text(
+                categories[index]['title'],
+                style: GoogleFonts.cairo(
+                  fontSize: 12,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                ),
+              ),
+              selected: isSelected,
+              selectedColor: const Color(0xFF673AB7),
+              backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(
+                  color: isSelected ? const Color(0xFF673AB7) : (isDark ? Colors.white12 : Colors.grey.shade300),
+                ),
+              ),
+              onSelected: (selected) {
+                if (selected) {
+                  setState(() => _selectedCategoryIndex = index);
+                }
+              },
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -234,10 +319,56 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
           return true;
         }).toList();
 
-        if (filteredSubmissions.isEmpty) return Center(child: Text(isAr ? 'لا توجد أبحاث مرفوعة لهذه المادة' : 'No submissions', style: TextStyle(color: isDark ? Colors.white38 : Colors.grey)));
+        if (filteredSubmissions.isEmpty) {
+          return Center(
+            child: Text(
+              isAr ? 'لا توجد أبحاث مرفوعة لهذه المادة' : 'No submissions',
+              style: GoogleFonts.cairo(color: isDark ? Colors.white38 : Colors.grey),
+            ),
+          );
+        }
 
-        List<QueryDocumentSnapshot> submissions = filteredSubmissions;
+        // TERTIB: الترتيب بحسب وقت الاستلام (من الأحدث للأقدم)
+        filteredSubmissions.sort((a, b) {
+          var dataA = a.data() as Map<String, dynamic>;
+          var dataB = b.data() as Map<String, dynamic>;
+          dynamic tA = dataA['date'] ?? dataA['timestamp'];
+          dynamic tB = dataB['date'] ?? dataB['timestamp'];
 
+          int msA = 0;
+          int msB = 0;
+          if (tA is Timestamp) msA = tA.millisecondsSinceEpoch;
+          else if (tA is int) msA = tA;
+
+          if (tB is Timestamp) msB = tB.millisecondsSinceEpoch;
+          else if (tB is int) msB = tB;
+
+          return msB.compareTo(msA);
+        });
+
+        // FILTER: التصفية بحسب التبويب المختار (الخانات الأربع)
+        List<QueryDocumentSnapshot> submissions = filteredSubmissions.where((doc) {
+          final r = doc.data() as Map<String, dynamic>;
+          bool isPublished = r['isPublished'] == true;
+          bool isDraft = r['isDraft'] == true;
+          bool hasGrade = r['grade'] != null && r['grade'].toString().trim().isNotEmpty;
+
+          if (_selectedCategoryIndex == 0) {
+            // 0: لم تُراجع (ليس لها درجة وليست مسودة وليست منشورة)
+            return !isPublished && !isDraft && !hasGrade;
+          } else if (_selectedCategoryIndex == 1) {
+            // 1: تحت المراجعة (مسودة) (لها درجة/تعليق لكن لم تُنشر للطالب بعد)
+            return isDraft || (!isPublished && hasGrade);
+          } else if (_selectedCategoryIndex == 2) {
+            // 2: تمت المراجعة والنشر للطالب
+            return isPublished;
+          } else {
+            // 3: المقيّمة (جميع الأبحاث المقيّمة سواء مسودة أو منشورة)
+            return hasGrade || isDraft || isPublished;
+          }
+        }).toList();
+
+        // SEARCH: التصفية بالاسم
         if (_searchQuery.isNotEmpty) {
           String q = _normalizeArabic(_searchQuery);
           submissions = submissions.where((doc) {
@@ -247,19 +378,40 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
           }).toList();
         }
 
+        if (submissions.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.inbox_rounded, size: 60, color: Colors.grey.withAlpha(80)),
+                const SizedBox(height: 12),
+                Text(
+                  isAr ? 'لا توجد أبحاث في هذه الخانة حالياً' : 'No submissions in this category',
+                  style: GoogleFonts.cairo(color: Colors.grey),
+                ),
+              ],
+            ),
+          );
+        }
+
         return Column(
           children: [
             Padding(
-              padding: const EdgeInsets.all(15),
+              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
               child: Row(
                 children: [
-                  _statCard(isAr ? "إجمالي الأبحاث" : "Total", submissions.length, color, isDark),
+                  _statCard(
+                    _getCategoryTitle(_selectedCategoryIndex, isAr),
+                    submissions.length,
+                    color,
+                    isDark,
+                  ),
                 ],
               ),
             ),
             Expanded(
               child: ListView.builder(
-                padding: const EdgeInsets.fromLTRB(15, 0, 15, 20),
+                padding: const EdgeInsets.fromLTRB(15, 4, 15, 20),
                 itemCount: submissions.length,
                 itemBuilder: (ctx, i) {
                   final String docId = submissions[i].id;
@@ -270,73 +422,162 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
                     _ds.updateResearchStatus(docId, r['status'], markAsSeen: true);
                   }
 
+                  bool isPublished = r['isPublished'] == true;
+                  bool isDraft = r['isDraft'] == true;
+                  bool hasGrade = r['grade'] != null && r['grade'].toString().trim().isNotEmpty;
+
+                  String statusBadgeText = isAr ? "لم تُراجع بعد" : "Unreviewed";
+                  Color statusBadgeColor = Colors.grey;
+
+                  if (isPublished) {
+                    statusBadgeText = isAr ? "تمت المراجعة والنشر 🟢" : "Published 🟢";
+                    statusBadgeColor = Colors.green;
+                  } else if (isDraft || hasGrade) {
+                    statusBadgeText = isAr ? "قيد المراجعة (مسودة)" : "Under Review (Draft)";
+                    statusBadgeColor = Colors.orange;
+                  }
+
+                  String dateFormatted = _formatTimestamp(r['date'] ?? r['timestamp'], isAr);
+
                   return Container(
-                    margin: const EdgeInsets.only(bottom: 12),
+                    margin: const EdgeInsets.only(bottom: 14),
                     decoration: BoxDecoration(
                       color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                       borderRadius: BorderRadius.circular(18),
                       boxShadow: [BoxShadow(color: isDark ? Colors.black54 : Colors.black.withAlpha(8), blurRadius: 10)],
                     ),
-                    child: IntrinsicHeight(
-                      child: Row(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            width: 6,
-                            decoration: BoxDecoration(
-                              color: color.withAlpha(128),
-                              borderRadius: BorderRadius.only(
-                                topRight: isAr ? const Radius.circular(18) : Radius.zero,
-                                bottomRight: isAr ? const Radius.circular(18) : Radius.zero,
-                                topLeft: !isAr ? const Radius.circular(18) : Radius.zero,
-                                bottomLeft: !isAr ? const Radius.circular(18) : Radius.zero,
-                              ),
-                            ),
-                          ),
-                          Expanded(
-                            child: ListTile(
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-                              leading: CircleAvatar(
-                                radius: 20,
-                                backgroundColor: Colors.red.withAlpha(26),
+                          Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 22,
+                                backgroundColor: color.withAlpha(26),
                                 backgroundImage: _ds.getAvatarImageProvider(r['photoUrl']),
                                 child: (r['photoUrl'] ?? '').toString().isEmpty
-                                    ? const Icon(Icons.list_alt, color: Colors.red, size: 22)
+                                    ? Icon(Icons.picture_as_pdf_rounded, color: color, size: 22)
                                     : null,
                               ),
-                              title: Text(r['studentName'] ?? 'Student', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: isDark ? Colors.white : Colors.black87)),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const SizedBox(height: 4),
-                                  Text(r['fileName'] ?? 'file', style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.grey.shade600), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    isAr 
-                                        ? "المادة: ${r['subject']} (${r['recipientName'] ?? (r['recipientType'] == 'ta' ? 'المعيد' : 'الدكتور')})" 
-                                        : "Course: ${r['subject']} (${r['recipientName'] ?? (r['recipientType'] == 'ta' ? 'TA' : 'Doctor')})", 
-                                    style: const TextStyle(fontSize: 10, color: Colors.grey)
-                                  ),
-                                ],
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      r['studentName'] ?? 'Student',
+                                      style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 16, color: isDark ? Colors.white : Colors.black87),
+                                    ),
+                                    Text(
+                                      r['fileName'] ?? 'file',
+                                      style: GoogleFonts.cairo(fontSize: 12, color: isDark ? Colors.white54 : Colors.grey.shade600),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
                               ),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: statusBadgeColor.withAlpha(30),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: statusBadgeColor.withAlpha(80)),
+                                ),
+                                child: Text(
+                                  statusBadgeText,
+                                  style: GoogleFonts.cairo(color: statusBadgeColor, fontSize: 11, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const Divider(height: 20),
+                          Row(
+                            children: [
+                              Icon(Icons.access_time_rounded, size: 14, color: Colors.grey.shade600),
+                              const SizedBox(width: 6),
+                              Text(
+                                "${isAr ? 'وقت الاستلام:' : 'Submitted:'} $dateFormatted",
+                                style: GoogleFonts.cairo(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.w600),
+                              ),
+                            ],
+                          ),
+                          if (hasGrade) ...[
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: (isPublished ? Colors.green : Colors.orange).withAlpha(15),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: (isPublished ? Colors.green : Colors.orange).withAlpha(40)),
+                              ),
+                              child: Row(
                                 children: [
-                                  IconButton(
-                                    icon: const Icon(Icons.star_rate_rounded, color: Colors.orange, size: 22),
-                                    onPressed: () => _showEvaluationDialog(docId, r),
-                                    tooltip: isAr ? "تقييم" : "Evaluate",
+                                  Icon(
+                                    isPublished ? Icons.check_circle_outline_rounded : Icons.edit_note_rounded,
+                                    size: 18,
+                                    color: isPublished ? Colors.green : Colors.orange,
                                   ),
-                                  IconButton(
-                                    icon: const Icon(Icons.open_in_new_rounded, color: Colors.blue, size: 22),
-                                    onPressed: () => _launchURL(fileUrl),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    "${isAr ? 'الدرجة:' : 'Grade:'} ${r['grade']}",
+                                    style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 13, color: isPublished ? Colors.green : Colors.orange),
                                   ),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 22),
-                                    onPressed: () => _ds.deleteResearch(docId),
-                                  ),
+                                  if ((r['comment'] ?? '').toString().isNotEmpty) ...[
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        "${isAr ? 'الملاحظات:' : 'Notes:'} ${r['comment']}",
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: GoogleFonts.cairo(fontSize: 12, color: isDark ? Colors.white70 : Colors.black87),
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),
+                          ],
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF673AB7),
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                  ),
+                                  icon: const Icon(Icons.rate_review_rounded, size: 18),
+                                  label: Text(
+                                    hasGrade ? (isAr ? 'تعديل التقييم' : 'Edit Evaluation') : (isAr ? 'تقييم البحث' : 'Evaluate Research'),
+                                    style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 13),
+                                  ),
+                                  onPressed: () => _showEvaluationDialog(docId, r),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: Colors.blue,
+                                  side: const BorderSide(color: Colors.blue),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                ),
+                                icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                                label: Text(isAr ? 'فتح الملف' : 'Open', style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.bold)),
+                                onPressed: () => _launchURL(fileUrl),
+                              ),
+                              const SizedBox(width: 6),
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
+                                tooltip: isAr ? 'حذف' : 'Delete',
+                                onPressed: () => _ds.deleteResearch(docId),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -351,56 +592,147 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
     );
   }
 
+  String _getCategoryTitle(int index, bool isAr) {
+    switch (index) {
+      case 0:
+        return isAr ? "الأبحاث غير المراجعة" : "Unreviewed Submissions";
+      case 1:
+        return isAr ? "الأبحاث تحت المراجعة (مسودات)" : "Under Review (Drafts)";
+      case 2:
+        return isAr ? "الأبحاث المنشورة للطلاب" : "Published Submissions";
+      case 3:
+      default:
+        return isAr ? "جميع الأبحاث المقيّمة" : "All Evaluated Submissions";
+    }
+  }
+
   void _showEvaluationDialog(String docId, Map<String, dynamic> data) {
     final gradeController = TextEditingController(text: data['grade']?.toString() ?? '');
     final commentController = TextEditingController(text: data['comment']?.toString() ?? '');
+    bool publishToStudent = data['isPublished'] == true;
     bool isAr = _ds.isArabic;
     bool isDark = _ds.isDarkMode;
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(isAr ? "تقييم البحث" : "Evaluate Research", style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: gradeController,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: isAr ? "الدرجة" : "Grade",
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+          title: Row(
+            children: [
+              const Icon(Icons.rate_review_rounded, color: Color(0xFF673AB7)),
+              const SizedBox(width: 10),
+              Text(isAr ? "تقييم وتقويم البحث" : "Evaluate Research", style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 18)),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "${isAr ? 'الطالب:' : 'Student:'} ${data['studentName'] ?? ''}",
+                  style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: Colors.purple),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: gradeController,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: isAr ? "الدرجة / التقييم" : "Grade / Score",
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    prefixIcon: const Icon(Icons.grade_rounded, color: Colors.orange),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: commentController,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    labelText: isAr ? "ملاحظات وتوجيهات الدكتور" : "Doctor Feedback / Notes",
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    prefixIcon: const Icon(Icons.comment_outlined, color: Colors.blue),
+                  ),
+                ),
+                const SizedBox(height: 15),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: (publishToStudent ? Colors.green : Colors.orange).withAlpha(15),
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(color: (publishToStudent ? Colors.green : Colors.orange).withAlpha(40)),
+                  ),
+                  child: CheckboxListTile(
+                    activeColor: Colors.green,
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      isAr ? "نشر التقييم والنتيجة للطالب" : "Publish result to student",
+                      style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 13, color: publishToStudent ? Colors.green : Colors.orange),
+                    ),
+                    subtitle: Text(
+                      publishToStudent
+                          ? (isAr ? "سيتم إظهار التقييم للطالب وإرسال إشعار له" : "Grade will be published to student")
+                          : (isAr ? "حفظ كمسودة خاصة تحت المراجعة (لن يراها الطالب بعد)" : "Save as draft (Hidden from student)"),
+                      style: GoogleFonts.cairo(fontSize: 10, color: Colors.grey),
+                    ),
+                    value: publishToStudent,
+                    onChanged: (val) {
+                      setDialogState(() => publishToStudent = val ?? false);
+                    },
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 15),
-            TextField(
-              controller: commentController,
-              maxLines: 3,
-              decoration: InputDecoration(
-                labelText: isAr ? "تعليقك" : "Comment",
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(isAr ? "إلغاء" : "Cancel", style: GoogleFonts.cairo()),
+            ),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: publishToStudent ? Colors.green : const Color(0xFF673AB7),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               ),
+              icon: Icon(publishToStudent ? Icons.send_rounded : Icons.save_rounded, size: 18),
+              label: Text(
+                publishToStudent ? (isAr ? "نشر للطالب" : "Publish") : (isAr ? "حفظ كمسودة" : "Save Draft"),
+                style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
+              ),
+              onPressed: () async {
+                bool isDraft = !publishToStudent;
+                String statusName = publishToStudent ? 'Reviewed' : 'Under Review';
+
+                await _ds.updateResearchStatus(
+                  docId, 
+                  statusName, 
+                  grade: gradeController.text.trim(), 
+                  comment: commentController.text.trim(),
+                  isPublished: publishToStudent,
+                  isDraft: isDraft,
+                );
+
+                if (mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        publishToStudent
+                            ? (isAr ? "تم نشر تقييم البحث للطالب بنجاح 🎉" : "Evaluation published 🎉")
+                            : (isAr ? "تم حفظ التقييم كمسودة خاصة تحت المراجعة 📝" : "Saved as draft 📝"),
+                        style: GoogleFonts.cairo(),
+                      ),
+                      backgroundColor: publishToStudent ? Colors.green : Colors.orange,
+                    ),
+                  );
+                }
+              },
             ),
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(isAr ? "إلغاء" : "Cancel")),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF673AB7)),
-            onPressed: () async {
-              await _ds.updateResearchStatus(
-                docId, 
-                'Graded', 
-                grade: gradeController.text, 
-                comment: commentController.text
-              );
-              if (mounted) Navigator.pop(ctx);
-            },
-            child: Text(isAr ? "حفظ" : "Save", style: const TextStyle(color: Colors.white)),
-          ),
-        ],
       ),
     );
   }
@@ -408,17 +740,21 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
   Widget _statCard(String label, int count, Color color, bool isDark) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: color.withAlpha(26),
           borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: color.withAlpha(26)),
+          border: Border.all(color: color.withAlpha(40)),
         ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text("$label: ", style: TextStyle(color: isDark ? Colors.white70 : color.withAlpha(204), fontSize: 14, fontWeight: FontWeight.bold)),
-            Text("$count", style: TextStyle(color: color, fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(label, style: GoogleFonts.cairo(color: isDark ? Colors.white70 : color, fontSize: 13, fontWeight: FontWeight.bold)),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(10)),
+              child: Text("$count", style: GoogleFonts.cairo(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+            ),
           ],
         ),
       ),
