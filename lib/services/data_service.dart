@@ -1588,19 +1588,23 @@ class DataService extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     String? storedId = prefs.getString('selected_institute_id');
     if (storedId != null) {
+      selectedInstituteId = storedId;
       await setInstitute(storedId);
+    } else {
+      selectedInstituteId = 'commerce';
     }
 
     String? id = prefs.getString('session_id');
     String? type = prefs.getString('session_type');
-    if (type == 'super_admin_plus' && id != null) {
-      await loadUserData(id, type!);
+
+    if (id != null && type != null) {
+      try {
+        await loadUserData(id, type);
+      } catch (e) {
+        debugPrint("Load session user error: $e");
+      }
       return type;
     }
-
-    if (selectedInstituteId == null) return null;
-
-    if (id != null && type != null) { await loadUserData(id, type!); return type; }
     return null;
   }
 

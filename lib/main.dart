@@ -85,23 +85,7 @@ void main() async {
 
     String initialRoute = '/start';
 
-    // على الويب: استنى حالة الـ Auth تتحمّل بشكل صحيح
-    final User? currentUser = kIsWeb
-        ? await FirebaseAuth.instance
-        .authStateChanges()
-        .first
-        .timeout(const Duration(seconds: 8), onTimeout: () => null)
-        : FirebaseAuth.instance.currentUser;
-    log('5.5 auth state: ${currentUser?.uid}');
-
-    if (currentUser != null && savedRole != null) {
-      // متستناش loadUserData: خليها تشتغل في الخلفية
-      ds.loadUserData(currentUser.uid, savedRole).then((_) {
-        log('6 userData done (background)');
-      }).catchError((e) {
-        log('loadUserData error: $e');
-      });
-
+    if (savedRole != null) {
       if (savedRole == 'student') {
         initialRoute = '/student/home';
       } else if (savedRole == 'doctor' || savedRole == 'ta') {
