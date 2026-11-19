@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../services/data_service.dart';
@@ -177,12 +178,19 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           {'icon': Icons.calendar_today_rounded, 'title': isAr ? 'إدارة الجدول الدراسي' : 'Timetable Management', 'widget': const ScheduleManagementView(), 'color': Colors.indigo, 'subtitle': isAr ? 'جداول المحاضرات الرسمية' : 'Official lecture timetables'},
         ]);
 
-        return Directionality(
-          textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
-          child: Scaffold(
-        backgroundColor: isDark ? const Color(0xFF0F0F12) : const Color(0xFFF8F9FE),
-        drawer: AppDrawer(name: adminName, role: _ds.translate('super_admin')),
-        body: CustomScrollView(
+        return PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, result) {
+            if (!didPop) {
+              SystemNavigator.pop();
+            }
+          },
+          child: Directionality(
+            textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
+            child: Scaffold(
+              backgroundColor: isDark ? const Color(0xFF0F0F12) : const Color(0xFFF8F9FE),
+              drawer: AppDrawer(name: adminName, role: _ds.translate('super_admin')),
+              body: CustomScrollView(
           physics: const BouncingScrollPhysics(),
           slivers: [
             SliverToBoxAdapter(
@@ -283,7 +291,8 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           ],
         ),
       ),
-    );
+    ),
+  );
   },
 );
 }

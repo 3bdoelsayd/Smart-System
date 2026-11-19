@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../widgets/dashboard_card.dart';
@@ -102,12 +103,19 @@ class DoctorHomeScreen extends StatelessWidget {
           // {'icon': Icons.settings_rounded, 'title': ds.translate('settings'), 'route': '/settings', 'color': Colors.purple},
         ];
 
-        return Directionality(
-          textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
-          child: Scaffold(
-            backgroundColor: isDark ? const Color(0xFF121212) : Colors.grey.shade50,
-            drawer: AppDrawer(name: doctorName, role: ds.userRole == 'ta' ? (isAr ? 'معيد السكشن' : 'Teaching Assistant') : ds.translate('faculty_member')),
-            body: CustomScrollView(
+        return PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, result) {
+            if (!didPop) {
+              SystemNavigator.pop();
+            }
+          },
+          child: Directionality(
+            textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
+            child: Scaffold(
+              backgroundColor: isDark ? const Color(0xFF121212) : Colors.grey.shade50,
+              drawer: AppDrawer(name: doctorName, role: ds.userRole == 'ta' ? (isAr ? 'معيد السكشن' : 'Teaching Assistant') : ds.translate('faculty_member')),
+              body: CustomScrollView(
               slivers: [
                 SliverToBoxAdapter(
                   child: Container(
@@ -254,8 +262,9 @@ class DoctorHomeScreen extends StatelessWidget {
               ],
             ),
           ),
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}
 }

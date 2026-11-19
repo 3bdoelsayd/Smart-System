@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/data_service.dart';
 import '../utils/debouncer.dart';
@@ -74,12 +75,19 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
           return Scaffold(body: Center(child: Text('لا توجد فرق دراسية مسندة إليك', style: GoogleFonts.cairo(fontSize: 18, color: Colors.grey))));
         }
 
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        backgroundColor: theme.scaffoldBackgroundColor,
-        drawer: AppDrawer(name: managerName, role: _ds.isArabic ? 'مدير النظام' : 'System Manager'),
-        body: NestedScrollView(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          SystemNavigator.pop();
+        }
+      },
+      child: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
+          backgroundColor: theme.scaffoldBackgroundColor,
+          drawer: AppDrawer(name: managerName, role: _ds.isArabic ? 'مدير النظام' : 'System Manager'),
+          body: NestedScrollView(
           headerSliverBuilder: (context, innerBoxIsScrolled) => [
             SliverToBoxAdapter(
               child: Container(
@@ -171,6 +179,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
         ),
         floatingActionButton: _buildFAB(),
       ),
+    )
     );
       },
     );

@@ -43,18 +43,18 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     Timer(const Duration(seconds: 3), () {
       if (mounted) {
         if (type == 'student') {
-          Navigator.pushReplacementNamed(context, '/student/home');
-        } else if (type == 'doctor') {
-          Navigator.pushReplacementNamed(context, '/doctor/home');
+          Navigator.pushNamedAndRemoveUntil(context, '/student/home', (r) => false);
+        } else if (type == 'doctor' || type == 'ta') {
+          Navigator.pushNamedAndRemoveUntil(context, '/doctor/home', (r) => false);
         } else if (type == 'super_admin' || type == 'super_admin_plus') {
-          Navigator.pushReplacementNamed(context, '/super-admin/dashboard');
+          Navigator.pushNamedAndRemoveUntil(context, '/super-admin/dashboard', (r) => false);
         } else if (type == 'manager') {
-          Navigator.pushReplacementNamed(context, '/manager/dashboard');
+          Navigator.pushNamedAndRemoveUntil(context, '/manager/dashboard', (r) => false);
         } else if (type == 'admin') {
           // للتوافق مع الإصدارات القديمة إذا وجد
-          Navigator.pushReplacementNamed(context, '/admin/home');
+          Navigator.pushNamedAndRemoveUntil(context, '/admin/home', (r) => false);
         } else {
-          Navigator.pushReplacementNamed(context, '/start');
+          Navigator.pushNamedAndRemoveUntil(context, '/start', (r) => false);
         }
       }
     });

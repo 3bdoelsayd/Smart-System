@@ -1211,49 +1211,7 @@ class DataService extends ChangeNotifier {
   Stream<QuerySnapshot> getStudentGradesStream(String sId) => gradesColl.where('studentId', isEqualTo: sId).snapshots();
 
   Future<void> initNotifications() async {
-    if (kIsWeb) return;
-    tz.initializeTimeZones();
-    // ضبط المنطقة الزمنية الافتراضية للقاهرة كمثال لو فشل التعرف التلقائي
-    try {
-      tz.setLocalLocation(tz.getLocation('Africa/Cairo'));
-    } catch (e) {
-      debugPrint("Timezone error: $e");
-    }
-
-    const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('@mipmap/launcher_icon');
-
-    const DarwinInitializationSettings initializationSettingsDarwin =
-        DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-      requestSoundPermission: true,
-    );
-
-    const InitializationSettings initializationSettings = InitializationSettings(
-      android: initializationSettingsAndroid,
-      iOS: initializationSettingsDarwin,
-    );
-
-    await flutterLocalNotificationsPlugin.initialize(
-      initializationSettings,
-    );
-
-    // Request permissions for Android 13+
-    await flutterLocalNotificationsPlugin
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
-        ?.requestNotificationsPermission();
-
-    // Check for exact alarm permission on Android 13+
-    if (io.Platform.isAndroid) {
-      final androidImplementation = flutterLocalNotificationsPlugin
-          .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>();
-      if (androidImplementation != null) {
-        await androidImplementation.requestExactAlarmsPermission();
-      }
-    }
+    return;
   }
 
   Future<void> scheduleLectureNotification({
@@ -1586,26 +1544,7 @@ class DataService extends ChangeNotifier {
   }
 
   Future<void> syncScheduleNotifications() async {
-    if (kIsWeb || currentStudent == null) return;
-    try {
-      // إلغاء كل الإشعارات القديمة لتجنب التكرار
-      await flutterLocalNotificationsPlugin.cancelAll();
-      
-      var snap = await studentsColl.doc(currentStudent!['uid']).collection('my_schedule').get();
-      for (var doc in snap.docs) {
-        final item = doc.data();
-        await scheduleLectureNotification(
-          docId: doc.id,
-          subject: item['subject'] ?? '',
-          dayName: item['dayName'] ?? '',
-          timeStr: item['time'] ?? '',
-          type: item['type'] ?? '',
-        );
-      }
-      debugPrint("🔄 Synced ${snap.docs.length} schedule notifications");
-    } catch (e) {
-      debugPrint("❌ Sync notifications error: $e");
-    }
+    return;
   }
 
   Future<void> loadUserData(String uid, String role) async {

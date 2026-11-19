@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -107,14 +108,22 @@ class _StudentHomeScreenState extends State<_StudentHomeScreenContent> {
         final studentName = _ds.currentStudent?['name'] ?? _ds.translate('welcome');
         final scaffoldBg = isDark ? const Color(0xFF121212) : const Color(0xFFF8F9FE);
 
-        return Directionality(
-          textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
-          child: Scaffold(
-            extendBody: true,
-            backgroundColor: scaffoldBg,
-            drawer: AppDrawer(name: studentName, role: isAr ? 'طالب جامعي' : 'University Student'),
-            body: IndexedStack(index: _ds.studentTabIndex, children: _pages),
-            bottomNavigationBar: _buildGlassBottomBar(primaryColor, isDark, isAr),
+        return PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, result) {
+            if (!didPop) {
+              SystemNavigator.pop();
+            }
+          },
+          child: Directionality(
+            textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
+            child: Scaffold(
+              extendBody: true,
+              backgroundColor: scaffoldBg,
+              drawer: AppDrawer(name: studentName, role: isAr ? 'طالب جامعي' : 'University Student'),
+              body: IndexedStack(index: _ds.studentTabIndex, children: _pages),
+              bottomNavigationBar: _buildGlassBottomBar(primaryColor, isDark, isAr),
+            ),
           ),
         );
       }
