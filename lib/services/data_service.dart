@@ -1587,29 +1587,73 @@ class DataService extends ChangeNotifier {
   Future<String?> loadSession() async {
     final prefs = await SharedPreferences.getInstance();
     String? storedId = prefs.getString('selected_institute_id');
-    if (storedId != null) {
-      selectedInstituteId = storedId;
-    } else {
-      selectedInstituteId = 'commerce';
-    }
+    selectedInstituteId = storedId ?? 'commerce';
 
     String? id = prefs.getString('session_id');
     String? type = prefs.getString('session_type');
+    String? userMapStr = prefs.getString('session_user_map');
 
     if (id != null && type != null) {
       userRole = type;
-      try {
-        await loadUserData(id, type).timeout(const Duration(seconds: 4), onTimeout: () {});
-      } catch (e) {
-        debugPrint("Load session user timeout/error: $e");
+      if (userMapStr != null) {
+        try {
+          final map = Map<String, dynamic>.from(jsonDecode(userMapStr));
+          if (type == 'student') {
+            currentStudent = map;
+          } else if (type == 'doctor' || type == 'ta') {
+            currentDoctor = map;
+          } else {
+            currentAdmin = map;
+          }
+        } catch (e) {
+          debugPrint("Decode session user map error: $e");
+        }
       }
+
+      // Ensure user object is never null so app opens instantly without infinite loading
+      if (type == 'student' && currentStudent == null) {
+        currentStudent = {'uid': id, 'name': 'Student', 'id': id, 'level': '1'};
+      } else if ((type == 'doctor' || type == 'ta') && currentDoctor == null) {
+        currentDoctor = {'uid': id, 'name': 'Doctor'};
+      } else if (currentAdmin == null) {
+        currentAdmin = {'uid': id, 'name': 'Admin', 'role': type};
+      }
+
+      // Background refresh without blocking startup
+      loadUserData(id, type).catchError((e) {
+        debugPrint("Background loadUserData error: $e");
+      });
+
       return type;
     }
     return null;
   }
 
-  Future<void> clearSession() async { await _auth.signOut(); final prefs = await SharedPreferences.getInstance(); await prefs.remove('session_id'); await prefs.remove('session_type'); currentStudent = null; currentDoctor = null; currentAdmin = null; userRole = null; notifyListeners(); }
-  Future<void> saveSession(String id, String type) async { final prefs = await SharedPreferences.getInstance(); await prefs.setString('session_id', id); await prefs.setString('session_type', type); }
+  Future<void> clearSession() async {
+    await _auth.signOut();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('session_id');
+    await prefs.remove('session_type');
+    await prefs.remove('session_user_map');
+    currentStudent = null;
+    currentDoctor = null;
+    currentAdmin = null;
+    userRole = null;
+    notifyListeners();
+  }
+
+  Future<void> saveSession(String id, String type) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('session_id', id);
+    await prefs.setString('session_type', type);
+    if (currentStudent != null) {
+      await prefs.setString('session_user_map', jsonEncode(currentStudent));
+    } else if (currentDoctor != null) {
+      await prefs.setString('session_user_map', jsonEncode(currentDoctor));
+    } else if (currentAdmin != null) {
+      await prefs.setString('session_user_map', jsonEncode(currentAdmin));
+    }
+  }
   Future<void> loadSettings() async { final prefs = await SharedPreferences.getInstance(); isArabic = prefs.getBool('persist_v3_arabic') ?? true; isDarkMode = prefs.getBool('persist_v3_dark') ?? false; notifyListeners(); }
   Future<void> toggleLanguage(bool v) async { isArabic = v; final prefs = await SharedPreferences.getInstance(); await prefs.setBool('persist_v3_arabic', v); notifyListeners(); }
 
