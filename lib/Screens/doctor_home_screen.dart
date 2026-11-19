@@ -77,11 +77,18 @@ class DoctorHomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final ds = DataService();
 
-    if ((ds.userRole != 'doctor' && ds.userRole != 'ta') || ds.currentDoctor == null) {
+    if (ds.userRole == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         Navigator.pushNamedAndRemoveUntil(context, '/start', (r) => false);
       });
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    if (ds.currentDoctor == null && ds.userRole != 'super_admin_plus') {
+      return Scaffold(
+        backgroundColor: ds.isDarkMode ? const Color(0xFF121212) : Colors.grey.shade50,
+        body: const Center(child: CircularProgressIndicator()),
+      );
     }
     
     return ListenableBuilder(

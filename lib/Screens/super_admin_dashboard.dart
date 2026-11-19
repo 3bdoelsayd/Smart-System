@@ -135,11 +135,18 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    if (_ds.userRole != 'super_admin' && _ds.userRole != 'super_admin_plus' || _ds.currentAdmin == null) {
+    if (_ds.userRole == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         Navigator.pushNamedAndRemoveUntil(context, '/start', (r) => false);
       });
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    if (_ds.currentAdmin == null && _ds.userRole != 'super_admin_plus') {
+      return Scaffold(
+        backgroundColor: _ds.isDarkMode ? const Color(0xFF0F0F12) : const Color(0xFFF8F9FE),
+        body: const Center(child: CircularProgressIndicator()),
+      );
     }
 
     return ListenableBuilder(

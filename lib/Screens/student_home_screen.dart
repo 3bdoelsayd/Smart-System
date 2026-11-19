@@ -91,11 +91,18 @@ class _StudentHomeScreenState extends State<_StudentHomeScreenContent> {
 
   @override
   Widget build(BuildContext context) {
-    if (_ds.userRole != 'student' || _ds.currentStudent == null) {
+    if (_ds.userRole == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) Navigator.pushNamedAndRemoveUntil(context, '/start', (r) => false);
       });
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    if (_ds.currentStudent == null) {
+      return Scaffold(
+        backgroundColor: _ds.isDarkMode ? const Color(0xFF121212) : const Color(0xFFF8F9FE),
+        body: const Center(child: CircularProgressIndicator()),
+      );
     }
 
     return ListenableBuilder(

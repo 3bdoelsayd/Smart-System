@@ -57,11 +57,18 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
 
   @override
   Widget build(BuildContext context) {
-    if (_ds.userRole != 'manager' || _ds.currentAdmin == null) {
+    if (_ds.userRole == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         Navigator.pushNamedAndRemoveUntil(context, '/start', (r) => false);
       });
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    if (_ds.currentAdmin == null) {
+      return Scaffold(
+        backgroundColor: _ds.isDarkMode ? const Color(0xFF121212) : const Color(0xFFF8F9FE),
+        body: const Center(child: CircularProgressIndicator()),
+      );
     }
 
     return ListenableBuilder(
