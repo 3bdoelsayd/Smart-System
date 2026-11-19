@@ -42,6 +42,9 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
   void initState() {
     super.initState();
     _managedLevels = List<String>.from(_ds.currentAdmin?['managedLevels'] ?? []);
+    if (_managedLevels.isEmpty) {
+      _managedLevels = ['level_1', 'level_2', 'level_3', 'level_4'];
+    }
     _selectedLevel = _managedLevels.isNotEmpty ? _managedLevels.first : null;
     _tabController = TabController(length: 9, vsync: this);
     _tabController.addListener(() {
@@ -71,16 +74,16 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
       );
     }
 
+    if (_managedLevels.isEmpty) {
+      _managedLevels = ['level_1', 'level_2', 'level_3', 'level_4'];
+    }
+
     return ListenableBuilder(
       listenable: _ds,
       builder: (context, _) {
         final theme = Theme.of(context);
         bool isDark = _ds.isDarkMode;
         final managerName = _ds.currentAdmin?['name'] ?? 'المدير';
-
-        if (_managedLevels.isEmpty) {
-          return Scaffold(body: Center(child: Text('لا توجد فرق دراسية مسندة إليك', style: GoogleFonts.cairo(fontSize: 18, color: Colors.grey))));
-        }
 
     return PopScope(
       canPop: false,

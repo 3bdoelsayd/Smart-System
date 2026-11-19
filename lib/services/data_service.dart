@@ -316,26 +316,16 @@ class DataService extends ChangeNotifier {
       }
 
       if (role != null) {
-        // التحقق من ربط الجهاز للطلاب فقط لزيادة الأمان ومنع تبادل الحسابات
         if (role == 'student' && currentStudent != null) {
-          String? storedDeviceId = currentStudent!['deviceId'];
           String firestoreDocId = currentStudent!['uid'] ?? uid;
-          if (storedDeviceId == null || storedDeviceId.isEmpty) {
-            // ربط الجهاز لأول مرة بهذا الهاتف
+          try {
+            await studentsColl.doc(firestoreDocId).update({'deviceId': localDeviceId});
+          } catch (_) {
             try {
-              await studentsColl.doc(firestoreDocId).update({'deviceId': localDeviceId});
-            } catch (_) {
-              try {
-                await getCommerceStudentsColl('level_' + (currentStudent!['level'] ?? '1')).doc(firestoreDocId).update({'deviceId': localDeviceId});
-              } catch (_) {}
-            }
-            currentStudent!['deviceId'] = localDeviceId;
-          } else if (storedDeviceId != localDeviceId) {
-            await _auth.signOut();
-            throw isArabic 
-              ? "عذراً، هذا الحساب مرتبط بجهاز آخر. يرجى مراجعة شؤون الطلاب لإعادة ضبط الجهاز." 
-              : "Account bound to another device. Contact Student Affairs.";
+              await getCommerceStudentsColl('level_' + (currentStudent!['level'] ?? '1')).doc(firestoreDocId).update({'deviceId': localDeviceId});
+            } catch (_) {}
           }
+          currentStudent!['deviceId'] = localDeviceId;
         }
 
         await saveSession(uid, role);
