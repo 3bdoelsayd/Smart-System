@@ -60,7 +60,7 @@ class DataService extends ChangeNotifier {
   List<String> studentSubjects = [];
 
   Future<void> playClickSound() async {
-    debugPrint("Action triggered");
+    // Sound feedback placeholder
   }
 
   String translate(String key) {
@@ -200,12 +200,10 @@ class DataService extends ChangeNotifier {
       selectedInstituteId = doc.id;
       await prefs.setString('selected_institute_id', selectedInstituteId!);
       instituteData = doc.data() != null ? Map<String, dynamic>.from(doc.data() as Map) : {};
-      debugPrint("✅ Institute Set: $selectedInstituteId (Doc ID: ${doc.id})");
     } else {
       // Fallback: preserve cleanId so offline/temporary connection issues don't wipe out the selection
       selectedInstituteId = cleanId;
       await prefs.setString('selected_institute_id', selectedInstituteId!);
-      debugPrint("⚠️ Institute Set with offline fallback: $selectedInstituteId");
     }
     notifyListeners();
   }
@@ -273,7 +271,6 @@ class DataService extends ChangeNotifier {
           .trim();
 
       String email = loginInput.contains('@') ? loginInput.trim() : _formatEmail(cleanCode);
-      debugPrint("🔑 Login: code=$cleanCode | email=$email");
 
       // 2. Try Firebase Auth first
       UserCredential? userCredential;
@@ -282,10 +279,7 @@ class DataService extends ChangeNotifier {
           email: email,
           password: password.trim(),
         );
-        debugPrint("✅ Firebase Auth success");
       } on FirebaseAuthException catch (authError) {
-        debugPrint("⚠️ Auth failed: ${authError.code}");
-
         // 3. Fallback: Check Firestore with correct password
         if (authError.code == 'user-not-found' ||
             authError.code == 'wrong-password' ||
@@ -294,16 +288,14 @@ class DataService extends ChangeNotifier {
           var firestoreMatch = await _findFirestoreUserAndVerifyPassword(cleanCode, email, password);
 
           if (firestoreMatch != null) {
-            debugPrint("✅ Found in Firestore - creating Auth user");
             try {
               await _secureCreateUser(email, password.trim());
               userCredential = await _auth.signInWithEmailAndPassword(
                 email: email,
                 password: password.trim(),
               );
-              debugPrint("✅ Auth user created");
             } catch (createError) {
-              debugPrint("⚠️ Auth creation failed: $createError");
+              debugPrint("⚠️ Auth user creation failed: $createError");
               // Continue with Firestore-only login
             }
           } else {
@@ -357,7 +349,6 @@ class DataService extends ChangeNotifier {
     if (localDeviceId == null || localDeviceId.isEmpty) {
       localDeviceId = "DEV-${DateTime.now().millisecondsSinceEpoch}-${uid.hashCode.abs()}";
       await prefs.setString('app_device_fingerprint', localDeviceId);
-      debugPrint("📱 Generated device ID: $localDeviceId");
     }
 
     String? storedDeviceId = currentStudent!['deviceId'];
@@ -365,7 +356,6 @@ class DataService extends ChangeNotifier {
 
     if (storedDeviceId == null || storedDeviceId.isEmpty) {
       // First login - bind device atomically to both locations
-      debugPrint("🔗 Binding device for first time");
       try {
         WriteBatch batch = _firestore.batch();
         batch.set(
@@ -380,7 +370,6 @@ class DataService extends ChangeNotifier {
         );
         await batch.commit();
         currentStudent!['deviceId'] = localDeviceId;
-        debugPrint("✅ Device bound successfully");
       } catch (e) {
         debugPrint("⚠️ Device binding error: $e");
       }
@@ -390,8 +379,6 @@ class DataService extends ChangeNotifier {
       throw isArabic
           ? "عذراً، هذا الحساب مرتبط بجهاز آخر. يرجى مراجعة شؤون الطلاب لإعادة ضبط الجهاز."
           : "Account bound to another device. Contact Student Affairs.";
-    } else {
-      debugPrint("✅ Device ID matches - login allowed");
     }
   }
 
@@ -436,8 +423,6 @@ class DataService extends ChangeNotifier {
   }
 
   Future<String?> _findAndLoadUser(String uid, {String? userEmail}) async {
-    debugPrint("🕵️ Checking user UID: $uid (Email: $userEmail) in current college: $selectedInstituteId");
-
     String? role;
     if (selectedInstituteId != null) {
       role = await _checkUserInCollege(selectedInstituteId!, uid, userEmail: userEmail);
@@ -715,7 +700,6 @@ class DataService extends ChangeNotifier {
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      debugPrint("✅ College created successfully: $cleanId");
       notifyListeners();
     } catch (e) {
       debugPrint("❌ Create college error: $e");
@@ -1191,8 +1175,6 @@ class DataService extends ChangeNotifier {
         'instituteId': selectedInstituteId,
         'isRead': false,
       });
-
-      debugPrint("✅ Research uploaded & $recipientType notified");
     } catch (e) {
       debugPrint("❌ Error uploading research: $e");
       rethrow;
