@@ -347,7 +347,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
       _buildInputField(idC, 'كود الطالب', Icons.badge, isNumber: true),
       _buildInputField(passC, 'كلمة المرور', Icons.lock, isPass: true),
       StreamBuilder<QuerySnapshot>(
-        stream: _ds.getCommerceSectionsColl(_selectedLevel!).snapshots(),
+        stream: _ds.getInstituteSectionsColl(_selectedLevel!).snapshots(),
         builder: (ctx, snap) {
           if (!snap.hasData) return const LinearProgressIndicator();
           return _buildDropdown('اختر الشعبة', Icons.grid_view, snap.data!.docs.map((d) => DropdownMenuItem(value: d['name'].toString(), child: Text(d['name']))).toList(), (v) => selDiv = v);
@@ -366,9 +366,9 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
     final lecturesC = TextEditingController(text: "12");
     String? selDiv; String? selSem; String? selDoc;
     List<String> selectedTaIds = [];
-    var semSnap = await _ds.commerceSemestersColl.where('isActive', isEqualTo: true).get(); 
-    var docSnap = await _ds.commerceDoctorsColl.get();
-    var taSnap = await _ds.commerceTasColl.get();
+    var semSnap = await _ds.instituteSemestersColl.where('isActive', isEqualTo: true).get(); 
+    var docSnap = await _ds.instituteDoctorsColl.get();
+    var taSnap = await _ds.instituteTasColl.get();
 
     _showStyledBS(title: 'إضافة مادة ودكتور ومعيدين', icon: Icons.book, color: Colors.deepPurple, children: [
       _buildInputField(nameC, 'اسم المادة', Icons.book_outlined),
@@ -425,8 +425,8 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
     String? selDoc = data['doctor_id'];
     List<String> selectedTaIds = List<String>.from(data['ta_ids'] ?? (data['ta_id'] != null ? [data['ta_id']] : []));
     
-    var docSnap = await _ds.commerceDoctorsColl.get();
-    var taSnap = await _ds.commerceTasColl.get();
+    var docSnap = await _ds.instituteDoctorsColl.get();
+    var taSnap = await _ds.instituteTasColl.get();
 
     _showStyledBS(
       title: 'تعديل بيانات المادة', 
@@ -544,7 +544,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
       children: [
         _buildSearchField(),
         StreamBuilder<QuerySnapshot>(
-          stream: _ds.getCommerceSectionsColl(_selectedLevel!).snapshots(),
+          stream: _ds.getInstituteSectionsColl(_selectedLevel!).snapshots(),
           builder: (ctx, secSnap) {
             List<Map<String, String>> sectionsList = [{'id': 'all', 'name': 'جميع الشعب'}];
             if (secSnap.hasData) {
@@ -698,7 +698,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
 
   Widget _buildCoursesTab() {
     return StreamBuilder<QuerySnapshot>(
-      stream: _ds.getCommerceCoursesColl(_selectedLevel!).snapshots(),
+      stream: _ds.getInstituteCoursesColl(_selectedLevel!).snapshots(),
       builder: (ctx, snap) {
         if (!snap.hasData) return const Center(child: CircularProgressIndicator());
         var courses = snap.data!.docs;
@@ -722,7 +722,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
 
   Widget _buildDoctorsTab() {
     return StreamBuilder<QuerySnapshot>(
-      stream: _ds.commerceDoctorsColl.snapshots(),
+      stream: _ds.instituteDoctorsColl.snapshots(),
       builder: (ctx, snap) {
         if (!snap.hasData) return const Center(child: CircularProgressIndicator());
         var docs = snap.data!.docs;
@@ -752,7 +752,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
 
   Widget _buildTAsTab() {
     return StreamBuilder<QuerySnapshot>(
-      stream: _ds.commerceTasColl.snapshots(),
+      stream: _ds.instituteTasColl.snapshots(),
       builder: (ctx, snap) {
         if (!snap.hasData) return const Center(child: CircularProgressIndicator());
         var docs = snap.data!.docs;
@@ -788,7 +788,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
     String levelId = _selectedLevel!;
 
     return StreamBuilder<QuerySnapshot>(
-      stream: _ds.getCommerceCoursesColl(levelId).snapshots(),
+      stream: _ds.getInstituteCoursesColl(levelId).snapshots(),
       builder: (ctx, snap) {
         if (!snap.hasData) return const Center(child: CircularProgressIndicator());
         var courses = snap.data!.docs;
@@ -888,7 +888,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
   Widget _buildAttendanceTab() {
     if (_selectedAttCourseData == null) {
       return StreamBuilder<QuerySnapshot>(
-        stream: _ds.getCommerceCoursesColl(_selectedLevel!).snapshots(),
+        stream: _ds.getInstituteCoursesColl(_selectedLevel!).snapshots(),
         builder: (ctx, snap) {
           if (!snap.hasData) return const Center(child: CircularProgressIndicator());
           var courses = snap.data!.docs;
@@ -993,7 +993,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
 
   Widget _buildSemestersTab() {
     return StreamBuilder<QuerySnapshot>(
-      stream: _ds.commerceSemestersColl.snapshots(),
+      stream: _ds.instituteSemestersColl.snapshots(),
       builder: (ctx, snap) {
         if (!snap.hasData) return const Center(child: CircularProgressIndicator());
         var docs = snap.data!.docs;
@@ -1583,14 +1583,14 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
     }
 
     try {
-      var coursesSnap = await _ds.getCommerceCoursesColl(levelId).get();
+      var coursesSnap = await _ds.getInstituteCoursesColl(levelId).get();
       coursesList = coursesSnap.docs.map((c) => {'id': c.id, ...c.data() as Map<String, dynamic>}).toList();
     } catch (e) {
       debugPrint("Error fetching courses: $e");
     }
 
     try {
-      var docsSnap = await _ds.commerceDoctorsColl.get();
+      var docsSnap = await _ds.instituteDoctorsColl.get();
       for (var doc in docsSnap.docs) {
         var data = doc.data() as Map<String, dynamic>;
         String formatted = cleanInstructor(data['name'] ?? '', 'د.');
@@ -1603,7 +1603,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
     }
 
     try {
-      var taSnap = await _ds.commerceTasColl.get();
+      var taSnap = await _ds.instituteTasColl.get();
       for (var doc in taSnap.docs) {
         var data = doc.data() as Map<String, dynamic>;
         String formatted = cleanInstructor(data['name'] ?? '', 'م.');
@@ -1618,7 +1618,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
     instructorsList.add({'id': 'other', 'name': 'أخرى (إدخال يدوي)'});
 
     try {
-      var secSnap = await _ds.getCommerceSectionsColl(levelId).get();
+      var secSnap = await _ds.getInstituteSectionsColl(levelId).get();
       for (var doc in secSnap.docs) {
         var data = doc.data() as Map<String, dynamic>;
         sectionsList.add({'id': data['id'] ?? doc.id, 'name': data['name'] ?? 'شعبة'});

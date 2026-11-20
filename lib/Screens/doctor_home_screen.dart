@@ -32,7 +32,7 @@ class DoctorHomeScreen extends StatelessWidget {
             const SizedBox(height: 20),
             StreamBuilder<List<QuerySnapshot>>(
               stream: Stream.fromFuture(Future.wait(
-                teachingLevels.map((lvlId) => ds.getCommerceCoursesColl(lvlId).where(ds.userRole == 'ta' ? 'ta_id' : 'doctor_id', isEqualTo: doctorId).get())
+                teachingLevels.map((lvlId) => ds.getInstituteCoursesColl(lvlId).where(ds.userRole == 'ta' ? 'ta_id' : 'doctor_id', isEqualTo: doctorId).get())
               )),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
@@ -184,7 +184,7 @@ class DoctorHomeScreen extends StatelessWidget {
                 ? SliverToBoxAdapter(child: Center(child: Padding(padding: const EdgeInsets.all(40), child: Text(isAr ? "لم يتم إسناد فرق دراسية لك بعد" : "No levels assigned"))))
                 : StreamBuilder<List<QuerySnapshot>>(
                   stream: Stream.fromFuture(Future.wait(
-                    teachingLevels.map((lvlId) => ds.getCommerceCoursesColl(lvlId).where(ds.userRole == 'ta' ? 'ta_id' : 'doctor_id', isEqualTo: doctorId).get())
+                    teachingLevels.map((lvlId) => ds.getInstituteCoursesColl(lvlId).where(ds.userRole == 'ta' ? 'ta_id' : 'doctor_id', isEqualTo: doctorId).get())
                   )),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) return const SliverToBoxAdapter(child: Center(child: CircularProgressIndicator()));

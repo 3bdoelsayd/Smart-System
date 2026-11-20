@@ -26,7 +26,7 @@ class ApiService {
 
   /// Fetch all doctors for an institute
   Future<List<Map<String, dynamic>>> getDoctors() async {
-    var snap = await _ds.commerceDoctorsColl.get();
+    var snap = await _ds.instituteDoctorsColl.get();
     return snap.docs.map((d) => d.data() as Map<String, dynamic>).toList();
   }
 

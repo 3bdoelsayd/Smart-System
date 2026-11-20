@@ -121,7 +121,7 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
           ],
         ),
         body: StreamBuilder<QuerySnapshot>(
-          stream: _ds.getCommerceLecturesColl(widget.levelId, widget.courseId).orderBy('number').snapshots(),
+          stream: _ds.getInstituteLecturesColl(widget.levelId, widget.courseId).orderBy('number').snapshots(),
           builder: (context, snapshot) {
             if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
             var lectures = snapshot.data!.docs;

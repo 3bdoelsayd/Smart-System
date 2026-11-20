@@ -326,7 +326,7 @@ class DataService extends ChangeNotifier {
             try {
               WriteBatch batch = _firestore.batch();
               DocumentReference ref1 = studentsColl.doc(firestoreDocId);
-              DocumentReference ref2 = getCommerceStudentsColl('level_' + (currentStudent!['level'] ?? '1')).doc(firestoreDocId);
+              DocumentReference ref2 = getInstituteStudentsColl('level_' + (currentStudent!['level'] ?? '1')).doc(firestoreDocId);
               batch.set(ref1, {'deviceId': localDeviceId}, SetOptions(merge: true));
               batch.set(ref2, {'deviceId': localDeviceId}, SetOptions(merge: true));
               await batch.commit();
@@ -779,21 +779,21 @@ class DataService extends ChangeNotifier {
   CollectionReference get examResultsColl => _firestore.collection('exam_results');
   CollectionReference get notificationsColl => _firestore.collection('notifications');
 
-  CollectionReference get commerceDoctorsColl => instituteRef.collection('doctors');
-  CollectionReference get commerceTasColl => instituteRef.collection('tas');
-  CollectionReference get commerceManagersColl => instituteRef.collection('managers');
-  CollectionReference get commerceSuperAdminsColl => instituteRef.collection('super_admins');
-  CollectionReference get commerceLevelsColl => instituteRef.collection('levels');
-  CollectionReference get commerceSemestersColl => instituteRef.collection('semesters');
+  CollectionReference get instituteDoctorsColl => instituteRef.collection('doctors');
+  CollectionReference get instituteTasColl => instituteRef.collection('tas');
+  CollectionReference get instituteManagersColl => instituteRef.collection('managers');
+  CollectionReference get instituteSuperAdminsColl => instituteRef.collection('super_admins');
+  CollectionReference get instituteLevelsColl => instituteRef.collection('levels');
+  CollectionReference get instituteSemestersColl => instituteRef.collection('semesters');
 
-  CollectionReference getCommerceStudentsColl(String levelId) => commerceLevelsColl.doc(levelId).collection('students');
-  CollectionReference getCommerceCoursesColl(String levelId) => commerceLevelsColl.doc(levelId).collection('courses');
-  CollectionReference getCommerceSectionsColl(String levelId) => commerceLevelsColl.doc(levelId).collection('sections');
-  CollectionReference getCommerceLecturesColl(String levelId, String courseId) => getCommerceCoursesColl(levelId).doc(courseId).collection('lectures');
+  CollectionReference getInstituteStudentsColl(String levelId) => instituteLevelsColl.doc(levelId).collection('students');
+  CollectionReference getInstituteCoursesColl(String levelId) => instituteLevelsColl.doc(levelId).collection('courses');
+  CollectionReference getInstituteSectionsColl(String levelId) => instituteLevelsColl.doc(levelId).collection('sections');
+  CollectionReference getInstituteLecturesColl(String levelId, String courseId) => getInstituteCoursesColl(levelId).doc(courseId).collection('lectures');
 
-  Future<void> addLevel(String id, String name, String? mId) async { await commerceLevelsColl.doc(id).set({'id': id, 'name': name, 'managerId': mId, 'createdAt': FieldValue.serverTimestamp()}); notifyListeners(); }
-  Future<void> deleteLevel(String id) async { await commerceLevelsColl.doc(id).delete(); notifyListeners(); }
-  Future<void> addSection(String levelId, String name) async { String sid = _firestore.collection('tmp').doc().id; await getCommerceSectionsColl(levelId).doc(sid).set({'id': sid, 'name': name, 'isActive': true, 'createdAt': FieldValue.serverTimestamp()}); notifyListeners(); }
+  Future<void> addLevel(String id, String name, String? mId) async { await instituteLevelsColl.doc(id).set({'id': id, 'name': name, 'managerId': mId, 'createdAt': FieldValue.serverTimestamp()}); notifyListeners(); }
+  Future<void> deleteLevel(String id) async { await instituteLevelsColl.doc(id).delete(); notifyListeners(); }
+  Future<void> addSection(String levelId, String name) async { String sid = _firestore.collection('tmp').doc().id; await getInstituteSectionsColl(levelId).doc(sid).set({'id': sid, 'name': name, 'isActive': true, 'createdAt': FieldValue.serverTimestamp()}); notifyListeners(); }
 
   Future<void> addStudentManual(String levelId, String studentCode, String name, String emailInput, String division, String password, {bool notify = true}) async {
     try {
@@ -811,7 +811,7 @@ class DataService extends ChangeNotifier {
       };
 
       await studentsColl.doc(uid).set(studentData);
-      await getCommerceStudentsColl(levelId).doc(uid).set(studentData);
+      await getInstituteStudentsColl(levelId).doc(uid).set(studentData);
 
       if (notify) notifyListeners();
     } catch (e) {
@@ -823,28 +823,28 @@ class DataService extends ChangeNotifier {
   Future<void> addDoctor(String id, String name, String emailInput, List<String> teachingLevels, List<String> subjects, [String? password]) async {
     String email = _formatEmail(id);
     String uid = await _secureCreateUser(email, password ?? "123456");
-    await commerceDoctorsColl.doc(uid).set({'uid': uid, 'id': id, 'name': name, 'email': email, 'teachingLevels': teachingLevels, 'subjects': subjects, 'isActive': true, 'role': 'doctor', 'password': hashPassword(password ?? "123456"), 'instituteId': selectedInstituteId});
+    await instituteDoctorsColl.doc(uid).set({'uid': uid, 'id': id, 'name': name, 'email': email, 'teachingLevels': teachingLevels, 'subjects': subjects, 'isActive': true, 'role': 'doctor', 'password': hashPassword(password ?? "123456"), 'instituteId': selectedInstituteId});
     notifyListeners();
   }
 
   Future<void> addTA(String id, String name, String emailInput, List<String> teachingLevels, List<String> subjects, [String? password]) async {
     String email = _formatEmail(id);
     String uid = await _secureCreateUser(email, password ?? "123456");
-    await commerceTasColl.doc(uid).set({'uid': uid, 'id': id, 'name': name, 'email': email, 'teachingLevels': teachingLevels, 'subjects': subjects, 'isActive': true, 'role': 'ta', 'password': hashPassword(password ?? "123456"), 'instituteId': selectedInstituteId});
+    await instituteTasColl.doc(uid).set({'uid': uid, 'id': id, 'name': name, 'email': email, 'teachingLevels': teachingLevels, 'subjects': subjects, 'isActive': true, 'role': 'ta', 'password': hashPassword(password ?? "123456"), 'instituteId': selectedInstituteId});
     notifyListeners();
   }
 
   Future<void> addManager(String name, String emailInput, String password, {List<String> managedLevels = const []}) async {
     String email = _formatEmail(emailInput);
     String uid = await _secureCreateUser(email, password);
-    await commerceManagersColl.doc(uid).set({'uid': uid, 'name': name, 'email': email, 'managedLevels': managedLevels, 'isActive': true, 'role': 'manager', 'password': hashPassword(password), 'instituteId': selectedInstituteId});
+    await instituteManagersColl.doc(uid).set({'uid': uid, 'name': name, 'email': email, 'managedLevels': managedLevels, 'isActive': true, 'role': 'manager', 'password': hashPassword(password), 'instituteId': selectedInstituteId});
     notifyListeners();
   }
 
   Future<void> addCourseToLevel(String levelId, String name, String division, String semesterId, String doctorId, {int lecturesCount = 12, String? taId, List<String>? taIds}) async {
     String cid = _firestore.collection('tmp').doc().id;
     List<String> finalTaIds = taIds ?? (taId != null ? [taId] : []);
-    await getCommerceCoursesColl(levelId).doc(cid).set({
+    await getInstituteCoursesColl(levelId).doc(cid).set({
       'id': cid,
       'name': name,
       'division': division,
@@ -860,7 +860,7 @@ class DataService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> addLectureToCourse(String levelId, String courseId, String title, int number) async { String lecId = _firestore.collection('tmp').doc().id; await getCommerceLecturesColl(levelId, courseId).doc(lecId).set({'id': lecId, 'title': title, 'number': number, 'createdAt': FieldValue.serverTimestamp()}); notifyListeners(); }
+  Future<void> addLectureToCourse(String levelId, String courseId, String title, int number) async { String lecId = _firestore.collection('tmp').doc().id; await getInstituteLecturesColl(levelId, courseId).doc(lecId).set({'id': lecId, 'title': title, 'number': number, 'createdAt': FieldValue.serverTimestamp()}); notifyListeners(); }
 
   Future<void> changeStudentPasswordByAdmin({
     required String studentUid,
@@ -871,7 +871,7 @@ class DataService extends ChangeNotifier {
     await studentsColl.doc(studentUid).set({'password': hashedPass}, SetOptions(merge: true));
     if (levelId != null && levelId.isNotEmpty) {
       String normLvl = normalizeLevel(levelId);
-      await getCommerceStudentsColl('level_$normLvl').doc(studentUid).set({'password': hashedPass}, SetOptions(merge: true));
+      await getInstituteStudentsColl('level_$normLvl').doc(studentUid).set({'password': hashedPass}, SetOptions(merge: true));
     }
     notifyListeners();
   }
@@ -883,7 +883,7 @@ class DataService extends ChangeNotifier {
       final String? studentId = data?['id']?.toString();
 
       await studentsColl.doc(uid).delete();
-      await getCommerceStudentsColl('level_$level').doc(uid).delete();
+      await getInstituteStudentsColl('level_$level').doc(uid).delete();
 
       if (studentId != null) {
         final attDocs = await attendanceColl.where('studentId', isEqualTo: studentId).get();
@@ -945,21 +945,21 @@ class DataService extends ChangeNotifier {
     }
   }
 
-  Future<void> deleteDoctor(String uid) async { await commerceDoctorsColl.doc(uid).delete(); notifyListeners(); }
-  Future<void> deleteTA(String uid) async { await commerceTasColl.doc(uid).delete(); notifyListeners(); }
-  Future<void> deleteManager(String uid) async { await commerceManagersColl.doc(uid).delete(); notifyListeners(); }
+  Future<void> deleteDoctor(String uid) async { await instituteDoctorsColl.doc(uid).delete(); notifyListeners(); }
+  Future<void> deleteTA(String uid) async { await instituteTasColl.doc(uid).delete(); notifyListeners(); }
+  Future<void> deleteManager(String uid) async { await instituteManagersColl.doc(uid).delete(); notifyListeners(); }
 
   Future<void> updateDoctorByAdmin(String docId, {required String name, String? email}) async {
     Map<String, dynamic> data = {'name': name};
     if (email != null && email.isNotEmpty) data['email'] = email;
-    await commerceDoctorsColl.doc(docId).set(data, SetOptions(merge: true));
+    await instituteDoctorsColl.doc(docId).set(data, SetOptions(merge: true));
     notifyListeners();
   }
 
   Future<void> updateTAByAdmin(String taId, {required String name, String? email}) async {
     Map<String, dynamic> data = {'name': name};
     if (email != null && email.isNotEmpty) data['email'] = email;
-    await commerceTasColl.doc(taId).set(data, SetOptions(merge: true));
+    await instituteTasColl.doc(taId).set(data, SetOptions(merge: true));
     notifyListeners();
   }
 
@@ -969,9 +969,9 @@ class DataService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> addSemester(String id, String name, int order) async { await commerceSemestersColl.doc(id).set({'id': id, 'name': name, 'order': order, 'isActive': false, 'createdAt': FieldValue.serverTimestamp()}); notifyListeners(); }
-  Future<void> toggleSemesterStatus(String id, bool isActive) async { if (isActive) { var query = await commerceSemestersColl.get(); for (var doc in query.docs) { if (doc.id != id) { await doc.reference.update({'isActive': false}); } } } await commerceSemestersColl.doc(id).update({'isActive': isActive}); notifyListeners(); }
-  Future<void> deleteSemester(String id) async { await commerceSemestersColl.doc(id).delete(); notifyListeners(); }
+  Future<void> addSemester(String id, String name, int order) async { await instituteSemestersColl.doc(id).set({'id': id, 'name': name, 'order': order, 'isActive': false, 'createdAt': FieldValue.serverTimestamp()}); notifyListeners(); }
+  Future<void> toggleSemesterStatus(String id, bool isActive) async { if (isActive) { var query = await instituteSemestersColl.get(); for (var doc in query.docs) { if (doc.id != id) { await doc.reference.update({'isActive': false}); } } } await instituteSemestersColl.doc(id).update({'isActive': isActive}); notifyListeners(); }
+  Future<void> deleteSemester(String id) async { await instituteSemestersColl.doc(id).delete(); notifyListeners(); }
 
   Future<void> recordAttendanceCloud({
     required String subject,
@@ -988,7 +988,7 @@ class DataService extends ChangeNotifier {
     String resolvedSessionType = sessionType;
     try {
       String cleanLvl = level.replaceAll('level_', '');
-      var coursesSnap = await getCommerceCoursesColl("level_$cleanLvl")
+      var coursesSnap = await getInstituteCoursesColl("level_$cleanLvl")
           .where('name', isEqualTo: subject.trim())
           .get();
       if (coursesSnap.docs.isNotEmpty) {
@@ -1084,7 +1084,7 @@ class DataService extends ChangeNotifier {
     String? assignedId;
     try {
       String studentLvl = currentStudent?['level']?.toString() ?? '1';
-      var coursesSnap = await getCommerceCoursesColl("level_$studentLvl")
+      var coursesSnap = await getInstituteCoursesColl("level_$studentLvl")
           .where('name', isEqualTo: subject.trim())
           .get();
       if (coursesSnap.docs.isNotEmpty) {
@@ -1524,8 +1524,8 @@ class DataService extends ChangeNotifier {
       var q = await studentsColl.where('id', isEqualTo: id).get();
       for (var d in q.docs) { await d.reference.update({'password': hashPassword(newPass)}); }
     } else {
-      await commerceDoctorsColl.doc(id).update({'password': hashPassword(newPass)}).catchError((_){});
-      await commerceManagersColl.doc(id).update({'password': hashPassword(newPass)}).catchError((_){});
+      await instituteDoctorsColl.doc(id).update({'password': hashPassword(newPass)}).catchError((_){});
+      await instituteManagersColl.doc(id).update({'password': hashPassword(newPass)}).catchError((_){});
     }
 
     if (_auth.currentUser != null) {
@@ -1556,10 +1556,10 @@ class DataService extends ChangeNotifier {
             }
           }
         } else if (currentDoctor != null) {
-          await commerceDoctorsColl.doc(uid).set({'password': hashedPass}, SetOptions(merge: true));
-          await commerceTasColl.doc(uid).set({'password': hashedPass}, SetOptions(merge: true)).catchError((_){});
+          await instituteDoctorsColl.doc(uid).set({'password': hashedPass}, SetOptions(merge: true));
+          await instituteTasColl.doc(uid).set({'password': hashedPass}, SetOptions(merge: true)).catchError((_){});
         } else if (currentAdmin != null) {
-          await commerceManagersColl.doc(uid).set({'password': hashedPass}, SetOptions(merge: true)).catchError((_){});
+          await instituteManagersColl.doc(uid).set({'password': hashedPass}, SetOptions(merge: true)).catchError((_){});
         }
       } else {
         if (currentStudent != null) {
@@ -1568,8 +1568,8 @@ class DataService extends ChangeNotifier {
         } else if (currentDoctor != null) {
           String uid = currentDoctor!['uid'] ?? '';
           if (uid.isNotEmpty) {
-            await commerceDoctorsColl.doc(uid).set({'password': hashedPass}, SetOptions(merge: true));
-            await commerceTasColl.doc(uid).set({'password': hashedPass}, SetOptions(merge: true)).catchError((_){});
+            await instituteDoctorsColl.doc(uid).set({'password': hashedPass}, SetOptions(merge: true));
+            await instituteTasColl.doc(uid).set({'password': hashedPass}, SetOptions(merge: true)).catchError((_){});
           }
         }
       }
@@ -1768,7 +1768,7 @@ class DataService extends ChangeNotifier {
       // 1. محاولة تحديد الفصل الدراسي النشط
       String? activeSemesterId;
       try {
-        var semSnap = await commerceSemestersColl.where('isActive', isEqualTo: true).get();
+        var semSnap = await instituteSemestersColl.where('isActive', isEqualTo: true).get();
         if (semSnap.docs.isNotEmpty) {
           activeSemesterId = semSnap.docs.first.id;
           debugPrint("⏳ Active Semester Detected: $activeSemesterId");
@@ -1871,7 +1871,7 @@ class DataService extends ChangeNotifier {
     updateData['privacy'] = currentPrivacy;
 
     try {
-      await commerceDoctorsColl.doc(uid).set(updateData, SetOptions(merge: true));
+      await instituteDoctorsColl.doc(uid).set(updateData, SetOptions(merge: true));
     } catch (e) {
       debugPrint("Update doctor failed: $e");
     }

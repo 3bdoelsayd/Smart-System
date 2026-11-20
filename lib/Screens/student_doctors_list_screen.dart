@@ -120,7 +120,7 @@ class _StudentDoctorsListScreenState extends State<StudentDoctorsListScreen> {
 
   Widget _buildDoctorsTab(bool isAr, bool isDark, Color primaryColor) {
     return StreamBuilder<QuerySnapshot>(
-      stream: _ds.commerceDoctorsColl.snapshots(),
+      stream: _ds.instituteDoctorsColl.snapshots(),
       builder: (context, snap) {
         if (!snap.hasData) return const Center(child: CircularProgressIndicator());
         var docs = snap.data!.docs;
@@ -170,7 +170,7 @@ class _StudentDoctorsListScreenState extends State<StudentDoctorsListScreen> {
 
   Widget _buildTAsTab(bool isAr, bool isDark, Color primaryColor) {
     return StreamBuilder<QuerySnapshot>(
-      stream: _ds.commerceTasColl.snapshots(),
+      stream: _ds.instituteTasColl.snapshots(),
       builder: (context, snap) {
         if (!snap.hasData) return const Center(child: CircularProgressIndicator());
         var docs = snap.data!.docs;
@@ -219,7 +219,7 @@ class _StudentDoctorsListScreenState extends State<StudentDoctorsListScreen> {
 
   Widget _buildManagersTab(bool isAr, bool isDark, Color primaryColor) {
     return StreamBuilder<QuerySnapshot>(
-      stream: _ds.commerceManagersColl.snapshots(),
+      stream: _ds.instituteManagersColl.snapshots(),
       builder: (context, snap) {
         if (!snap.hasData) return const Center(child: CircularProgressIndicator());
         var docs = snap.data!.docs;

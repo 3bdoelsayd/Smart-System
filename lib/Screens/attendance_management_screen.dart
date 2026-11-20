@@ -246,7 +246,7 @@ class _AttendanceManagementScreenState extends State<AttendanceManagementScreen>
     final bool isStaff = _ds.userRole == 'doctor' || _ds.userRole == 'ta';
 
     return StreamBuilder<QuerySnapshot>(
-      stream: _ds.commerceLevelsColl.snapshots(),
+      stream: _ds.instituteLevelsColl.snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
         
@@ -304,7 +304,7 @@ class _AttendanceManagementScreenState extends State<AttendanceManagementScreen>
     
     final levelDocId = 'level_$_selectedLevel';
 
-    Query query = _ds.getCommerceCoursesColl(levelDocId);
+    Query query = _ds.getInstituteCoursesColl(levelDocId);
     if (_ds.userRole == 'ta') {
       query = query.where('ta_id', isEqualTo: doctorId);
     } else if (_ds.userRole == 'doctor') {

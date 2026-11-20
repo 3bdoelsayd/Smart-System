@@ -73,7 +73,7 @@ class _ExamEditorScreenState extends State<ExamEditorScreen> {
     final List<Map<String, dynamic>> courses = [];
 
     for (var lvlId in teachingLevels) {
-      final snap = await _ds.getCommerceCoursesColl(lvlId)
+      final snap = await _ds.getInstituteCoursesColl(lvlId)
           .where(_ds.userRole == 'ta' ? 'ta_id' : 'doctor_id', isEqualTo: doctorId)
           .get();
 

@@ -25,15 +25,15 @@ void showRichDoctorProfileModal({
     );
 
     try {
-      var docSnap = await ds.commerceDoctorsColl.doc(doctorUidOrEmail.trim()).get();
+      var docSnap = await ds.instituteDoctorsColl.doc(doctorUidOrEmail.trim()).get();
       if (docSnap.exists && docSnap.data() != null) {
         doctorData = docSnap.data() as Map<String, dynamic>;
       }
 
       if (doctorData == null) {
-        var snap = await ds.commerceDoctorsColl.where('email', isEqualTo: doctorUidOrEmail.trim()).get();
+        var snap = await ds.instituteDoctorsColl.where('email', isEqualTo: doctorUidOrEmail.trim()).get();
         if (snap.docs.isEmpty) {
-          snap = await ds.commerceDoctorsColl.where('uid', isEqualTo: doctorUidOrEmail.trim()).get();
+          snap = await ds.instituteDoctorsColl.where('uid', isEqualTo: doctorUidOrEmail.trim()).get();
         }
         if (snap.docs.isNotEmpty) {
           doctorData = snap.docs.first.data() as Map<String, dynamic>;
@@ -41,7 +41,7 @@ void showRichDoctorProfileModal({
       }
 
       if (doctorData == null) {
-        var allSnap = await ds.commerceDoctorsColl.get();
+        var allSnap = await ds.instituteDoctorsColl.get();
         for (var d in allSnap.docs) {
           var data = d.data() as Map<String, dynamic>;
           String dName = (data['name'] ?? '').toString().trim();

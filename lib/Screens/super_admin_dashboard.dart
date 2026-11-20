@@ -1442,7 +1442,7 @@ class _ManagersManagementViewState extends State<ManagersManagementView> {
     final idC = TextEditingController();
     final passC = TextEditingController();
     List<String> selectedLvls = [];
-    var lvlsSnap = await _ds.commerceLevelsColl.get();
+    var lvlsSnap = await _ds.instituteLevelsColl.get();
 
     _showStyledBS(
       context: context,
@@ -1526,7 +1526,7 @@ class _ManagersManagementViewState extends State<ManagersManagementView> {
         ),
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
-            stream: _ds.commerceManagersColl.snapshots(),
+            stream: _ds.instituteManagersColl.snapshots(),
             builder: (ctx, snap) {
               if (!snap.hasData) return const Center(child: CircularProgressIndicator());
               var docs = snap.data!.docs.where((d) {
@@ -1694,7 +1694,7 @@ class _LevelsManagementViewState extends State<LevelsManagementView> {
         ),
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
-            stream: _ds.commerceLevelsColl.orderBy('createdAt', descending: true).snapshots(),
+            stream: _ds.instituteLevelsColl.orderBy('createdAt', descending: true).snapshots(),
             builder: (ctx, snap) {
               if (!snap.hasData) return const Center(child: CircularProgressIndicator());
               return ListView.builder(
@@ -1754,7 +1754,7 @@ class _SectionsManagementViewState extends State<SectionsManagementView> {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<QuerySnapshot>(
-      stream: _ds.commerceLevelsColl.snapshots(),
+      stream: _ds.instituteLevelsColl.snapshots(),
       builder: (context, snap) {
         if (!snap.hasData) return const Center(child: CircularProgressIndicator());
         return ListView.builder(
@@ -1772,7 +1772,7 @@ class _SectionsManagementViewState extends State<SectionsManagementView> {
                 title: Text('شعب ${lvl['name']}', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
                 children: [
                   StreamBuilder<QuerySnapshot>(
-                    stream: _ds.getCommerceSectionsColl(lvl.id).snapshots(),
+                    stream: _ds.getInstituteSectionsColl(lvl.id).snapshots(),
                     builder: (ctx, sSnap) {
                       if (!sSnap.hasData) return const LinearProgressIndicator();
                       return Column(children: [
@@ -1814,7 +1814,7 @@ class _StudentsManagementViewState extends State<StudentsManagementView> {
   Widget _buildStudentContent(bool isDark) {
     if (_selectedLevelId == null) {
       return FutureBuilder<QuerySnapshot>(
-        future: _ds.commerceLevelsColl.get(),
+        future: _ds.instituteLevelsColl.get(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
           var levels = snapshot.data!.docs;
@@ -1851,7 +1851,7 @@ class _StudentsManagementViewState extends State<StudentsManagementView> {
       );
     } else if (_selectedSection == null) {
       return StreamBuilder<QuerySnapshot>(
-        stream: _ds.getCommerceSectionsColl(_selectedLevelId!).snapshots(),
+        stream: _ds.getInstituteSectionsColl(_selectedLevelId!).snapshots(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
           var sections = snapshot.data!.docs;
@@ -2001,11 +2001,11 @@ class _StudentsManagementViewState extends State<StudentsManagementView> {
     List<String> divs = [];
     
     if (selLvl != null) {
-      var sSnap = await _ds.getCommerceSectionsColl(selLvl).get();
+      var sSnap = await _ds.getInstituteSectionsColl(selLvl).get();
       divs = sSnap.docs.map((d) => d['name'].toString()).toList();
     }
     
-    var lvls = await _ds.commerceLevelsColl.get();
+    var lvls = await _ds.instituteLevelsColl.get();
 
     if (!mounted) return;
 
@@ -2020,7 +2020,7 @@ class _StudentsManagementViewState extends State<StudentsManagementView> {
           if (_selectedLevelId == null) ...[
             _buildDropdown(_ds.isDarkMode, 'اختر الفرقة الدراسية', Icons.layers_outlined, lvls.docs.map((l) => DropdownMenuItem(value: l.id, child: Text(l['name']))).toList(), (v) async {
               setS(() => selLvl = v);
-              var sSnap = await _ds.getCommerceSectionsColl(v!).get();
+              var sSnap = await _ds.getInstituteSectionsColl(v!).get();
               setS(() => divs = sSnap.docs.map((d) => d['name'].toString()).toList());
             }, value: selLvl),
             const SizedBox(height: 15),
@@ -2416,7 +2416,7 @@ class _DoctorsManagementViewState extends State<DoctorsManagementView> {
     final idC = TextEditingController(text: data?['id']);
     final passC = TextEditingController();
     List<String> selectedLvls = List<String>.from(data?['teachingLevels'] ?? []);
-    var lvlsSnap = await _ds.commerceLevelsColl.get();
+    var lvlsSnap = await _ds.instituteLevelsColl.get();
 
     _showStyledBS(
       context: context,
@@ -2508,7 +2508,7 @@ class _DoctorsManagementViewState extends State<DoctorsManagementView> {
         ),
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
-            stream: _ds.commerceDoctorsColl.snapshots(),
+            stream: _ds.instituteDoctorsColl.snapshots(),
             builder: (ctx, snap) {
               if (!snap.hasData) return const Center(child: CircularProgressIndicator());
               var docs = snap.data!.docs.where((d) => (d.data() as Map)['name'].toString().toLowerCase().contains(_searchQuery.toLowerCase())).toList();
@@ -2603,7 +2603,7 @@ class _SemestersManagementViewState extends State<SemestersManagementView> {
         ),
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
-            stream: _ds.commerceSemestersColl.snapshots(),
+            stream: _ds.instituteSemestersColl.snapshots(),
             builder: (ctx, snap) {
               if (!snap.hasData) return const Center(child: CircularProgressIndicator());
               return ListView.builder(
@@ -2645,7 +2645,7 @@ class _TAsManagementViewState extends State<TAsManagementView> {
     final idC = TextEditingController(text: data?['id']);
     final passC = TextEditingController();
     List<String> selectedLvls = List<String>.from(data?['teachingLevels'] ?? []);
-    var lvlsSnap = await _ds.commerceLevelsColl.get();
+    var lvlsSnap = await _ds.instituteLevelsColl.get();
 
     _showStyledBS(
       context: context,
@@ -2737,7 +2737,7 @@ class _TAsManagementViewState extends State<TAsManagementView> {
         ),
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
-            stream: _ds.commerceTasColl.snapshots(),
+            stream: _ds.instituteTasColl.snapshots(),
             builder: (ctx, snap) {
               if (!snap.hasData) return const Center(child: CircularProgressIndicator());
               var docs = snap.data!.docs.where((d) => (d.data() as Map)['name'].toString().toLowerCase().contains(_searchQuery.toLowerCase())).toList();

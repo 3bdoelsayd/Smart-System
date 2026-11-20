@@ -397,7 +397,7 @@ class ExamService {
     } catch (_) {}
 
     final cleanLvl = _ds.normalizeLevel(level);
-    final studentsSnap = await _ds.getCommerceStudentsColl('level_$cleanLvl').get();
+    final studentsSnap = await _ds.getInstituteStudentsColl('level_$cleanLvl').get();
 
     final submissionsSnap = await _examsColl
         .doc(examId)

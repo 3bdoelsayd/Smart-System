@@ -148,7 +148,7 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
     return StreamBuilder<List<QuerySnapshot>>(
       stream: Stream.fromFuture(Future.wait(
         teachingLevels.map((lvlId) => 
-          _ds.getCommerceCoursesColl(lvlId.startsWith('level_') ? lvlId : 'level_$lvlId').get()
+          _ds.getInstituteCoursesColl(lvlId.startsWith('level_') ? lvlId : 'level_$lvlId').get()
         )
       )),
       builder: (context, snapshot) {
