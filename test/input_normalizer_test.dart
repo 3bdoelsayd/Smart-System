@@ -33,7 +33,7 @@ void main() {
     group('cleanPasswordVariant tests', () {
       test('1. Preserves exact password characters and symbols', () {
         expect(InputNormalizer.cleanPasswordVariant(' Pass@123! '), 'Pass@123!');
-        expect(InputNormalizer.cleanPasswordVariant('My\$Secret#Pass9'), 'My\$Secret#Pass9');
+        expect(InputNormalizer.cleanPasswordVariant(r'My$Secret#Pass9'), r'My$Secret#Pass9');
       });
 
       test('2. Converts Arabic numerals in password without dropping characters', () {
