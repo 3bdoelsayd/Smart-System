@@ -1725,7 +1725,54 @@ class DataService extends ChangeNotifier {
       await prefs.setString('selected_institute_id', selectedInstituteId!);
     }
   }
-  Future<void> loadSettings() async { final prefs = await SharedPreferences.getInstance(); isArabic = prefs.getBool('persist_v3_arabic') ?? true; isDarkMode = prefs.getBool('persist_v3_dark') ?? false; notifyListeners(); }
+  Future<void> loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    isArabic = prefs.getBool('persist_v3_arabic') ?? true;
+    isDarkMode = prefs.getBool('persist_v3_dark') ?? false;
+
+    // Auto-purge dummy 'commerce' college from Firestore if it exists
+    try {
+      _deleteCommerceCollegePermanently();
+    } catch (_) {}
+
+    notifyListeners();
+  }
+
+  Future<void> _deleteCommerceCollegePermanently() async {
+    try {
+      var collegeRef = _firestore.collection('colleges').doc('commerce');
+      var docSnap = await collegeRef.get();
+      if (!docSnap.exists) return;
+
+      var subcollections = ['levels', 'students', 'doctors', 'tas', 'super_admins', 'managers', 'courses', 'exams', 'notifications', 'private_chats', 'reports'];
+      for (var sub in subcollections) {
+        try {
+          var snap = await collegeRef.collection(sub).get();
+          for (var doc in snap.docs) {
+            if (sub == 'levels') {
+              try {
+                var levelsStudents = await doc.reference.collection('students').get();
+                for (var sDoc in levelsStudents.docs) {
+                  await sDoc.reference.delete();
+                }
+              } catch (_) {}
+              try {
+                var coursesSnap = await doc.reference.collection('courses').get();
+                for (var cDoc in coursesSnap.docs) {
+                  await cDoc.reference.delete();
+                }
+              } catch (_) {}
+            }
+            await doc.reference.delete();
+          }
+        } catch (_) {}
+      }
+      await collegeRef.delete();
+      debugPrint("🔥 Successfully purged and deleted dummy college 'commerce' from Firestore.");
+    } catch (e) {
+      debugPrint("Purge commerce error: $e");
+    }
+  }
   Future<void> toggleLanguage(bool v) async { isArabic = v; final prefs = await SharedPreferences.getInstance(); await prefs.setBool('persist_v3_arabic', v); notifyListeners(); }
 
   Future<void> toggleDarkMode(bool v) async {
