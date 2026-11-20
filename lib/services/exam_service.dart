@@ -8,7 +8,7 @@ class ExamService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final DataService _ds = DataService();
 
-  String get _collegeId => _ds.selectedInstituteId ?? 'commerce';
+  String get _collegeId => _ds.selectedInstituteId ?? '';
 
   CollectionReference get _examsColl => _firestore
       .collection('colleges')

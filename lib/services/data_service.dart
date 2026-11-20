@@ -244,10 +244,10 @@ class DataService extends ChangeNotifier {
             if (colSnap.docs.isNotEmpty) {
               selectedInstituteId = colSnap.docs.first.id;
             } else {
-              selectedInstituteId = 'commerce';
+              selectedInstituteId = '';
             }
           } catch (_) {
-            selectedInstituteId = 'commerce';
+            selectedInstituteId = '';
           }
         }
 
@@ -1622,10 +1622,10 @@ class DataService extends ChangeNotifier {
             if (colSnap.docs.isNotEmpty) {
               selectedInstituteId = colSnap.docs.first.id;
             } else {
-              selectedInstituteId = 'commerce';
+              selectedInstituteId = '';
             }
           } catch (_) {
-            selectedInstituteId = 'commerce';
+            selectedInstituteId = '';
           }
         }
       } else {

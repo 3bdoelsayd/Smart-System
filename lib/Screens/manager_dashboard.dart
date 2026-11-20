@@ -1970,7 +1970,7 @@ class _ReportsManagementViewState extends State<ReportsManagementView> {
   Widget build(BuildContext context) {
     bool isAr = _ds.isArabic;
     bool isDark = _ds.isDarkMode;
-    String collegeId = _ds.selectedInstituteId ?? 'commerce';
+    String collegeId = _ds.selectedInstituteId ?? '';
 
     Query<Map<String, dynamic>> query = FirebaseFirestore.instance
         .collection('colleges')

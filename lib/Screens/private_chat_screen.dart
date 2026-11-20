@@ -59,7 +59,7 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
 
   DocumentReference get _chatRef => FirebaseFirestore.instance
       .collection('colleges')
-      .doc(_ds.selectedInstituteId ?? 'commerce')
+      .doc(_ds.selectedInstituteId ?? '')
       .collection('private_chats')
       .doc(_chatId);
 
@@ -90,7 +90,7 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
       String targetType = widget.otherUserRole == 'student' ? 'student' : 'doctor';
       await FirebaseFirestore.instance
           .collection('colleges')
-          .doc(_ds.selectedInstituteId ?? 'commerce')
+          .doc(_ds.selectedInstituteId ?? '')
           .collection('notifications')
           .add({
         'title': _ds.isArabic ? 'رسالة جديدة من $_currentUserName' : 'New message from $_currentUserName',
@@ -99,7 +99,7 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
         'targetUserId': widget.otherUserId,
         'targetDoctorId': widget.otherUserRole == 'doctor' ? widget.otherUserId : null,
         'timestamp': FieldValue.serverTimestamp(),
-        'instituteId': _ds.selectedInstituteId ?? 'commerce',
+        'instituteId': _ds.selectedInstituteId ?? '',
         'isRead': false,
       });
 
@@ -156,7 +156,7 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                     child: FutureBuilder<DocumentSnapshot>(
                       future: FirebaseFirestore.instance
                           .collection('colleges')
-                          .doc(_ds.selectedInstituteId ?? 'commerce')
+                          .doc(_ds.selectedInstituteId ?? '')
                           .collection(widget.otherUserRole == 'student' ? 'students' : (widget.otherUserRole == 'ta' ? 'tas' : 'doctors'))
                           .doc(widget.otherUserId)
                           .get(),

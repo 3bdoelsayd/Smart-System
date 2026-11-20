@@ -289,7 +289,7 @@ class _DiscussionForumScreenState extends State<DiscussionForumScreen> {
                 }
 
                 await _ds.reportForumMessage(
-                  collegeId: _ds.selectedInstituteId ?? 'commerce',
+                  collegeId: _ds.selectedInstituteId ?? '',
                   levelId: widget.levelId,
                   courseId: widget.courseId,
                   courseName: widget.courseName,
