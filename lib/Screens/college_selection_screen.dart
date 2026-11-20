@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/data_service.dart';
+import '../services/firestore_constants.dart';
 
 class CollegeSelectionScreen extends StatefulWidget {
   const CollegeSelectionScreen({super.key});
@@ -80,7 +81,8 @@ class _CollegeSelectionScreenState extends State<CollegeSelectionScreen> {
                     }
                   } catch (_) {}
                   String id = colleges[index].id;
-                  if (id.toLowerCase() == 'commerce' || id.toLowerCase().contains('commerce')) {
+                  if (id.toLowerCase() == FirestoreConstants.dummyCommerceId ||
+                      id.toLowerCase().contains(FirestoreConstants.dummyCommerceId)) {
                     return const SizedBox.shrink();
                   }
                   bool isTest = college['isTestFaculty'] == true || college['hidden'] == true;

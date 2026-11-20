@@ -17,6 +17,7 @@ import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:io' as io;
+import 'firestore_constants.dart';
 
 class DataService extends ChangeNotifier {
   static final DataService _instance = DataService._internal();
@@ -1751,7 +1752,7 @@ class DataService extends ChangeNotifier {
     isArabic = prefs.getBool('persist_v3_arabic') ?? true;
     isDarkMode = prefs.getBool('persist_v3_dark') ?? false;
 
-    // Auto-purge dummy 'commerce' college from Firestore if it exists
+    // Auto-purge dummy college from Firestore if it exists
     try {
       _deleteCommerceCollegePermanently();
     } catch (_) {}
@@ -1761,7 +1762,8 @@ class DataService extends ChangeNotifier {
 
   Future<void> _deleteCommerceCollegePermanently() async {
     try {
-      var collegeRef = _firestore.collection('colleges').doc('commerce');
+      var collegeRef = _firestore.collection(FirestoreConstants.collegesCollection)
+          .doc(FirestoreConstants.dummyCommerceId);
       var docSnap = await collegeRef.get();
       if (!docSnap.exists) return;
 
@@ -1789,7 +1791,7 @@ class DataService extends ChangeNotifier {
         } catch (_) {}
       }
       await collegeRef.delete();
-      debugPrint("🔥 Successfully purged and deleted dummy college 'commerce' from Firestore.");
+      debugPrint("🔥 Successfully purged and deleted dummy college from Firestore.");
     } catch (e) {
       debugPrint("Purge commerce error: $e");
     }
