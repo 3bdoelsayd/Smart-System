@@ -80,6 +80,9 @@ class _CollegeSelectionScreenState extends State<CollegeSelectionScreen> {
                     }
                   } catch (_) {}
                   String id = colleges[index].id;
+                  if (id.toLowerCase() == 'commerce' || id.toLowerCase().contains('commerce')) {
+                    return const SizedBox.shrink();
+                  }
                   bool isTest = college['isTestFaculty'] == true || college['hidden'] == true;
                   String name = isAr ? (college['nameAr'] ?? id) : (college['nameEn'] ?? id);
                   String? logo = college['logoUrl'];
