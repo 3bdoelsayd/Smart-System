@@ -25,6 +25,13 @@ migrate_working_dir/
 
 # Firebase related
 .firebase/
+auth_users_export.json
+audit_report.json
+audit_report.csv
+firestore_docs_dump.json
+serviceAccountKey*.json
+*.secret.json
+
 
 # Flutter/Dart/Pub related
 **/doc/api/
