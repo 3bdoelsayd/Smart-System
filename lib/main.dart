@@ -76,14 +76,6 @@ void main() async {
 
     String initialRoute = '/';
 
-    if (!kIsWeb) {
-      try {
-        await ds.initNotifications().timeout(const Duration(seconds: 10));
-      } catch (e) {
-        log('Notifications Init Error: $e');
-      }
-    }
-
     runApp(UniversityApp(initialRoute: initialRoute));
     log('7 runApp');
   } catch (e) {

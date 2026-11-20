@@ -1251,22 +1251,6 @@ class DataService extends ChangeNotifier {
     await flutterLocalNotificationsPlugin.initialize(
       initializationSettings,
     );
-
-    // Request permissions for Android 13+
-    await flutterLocalNotificationsPlugin
-        .resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>()
-        ?.requestNotificationsPermission();
-
-    // Check for exact alarm permission on Android 13+
-    if (io.Platform.isAndroid) {
-      final androidImplementation = flutterLocalNotificationsPlugin
-          .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>();
-      if (androidImplementation != null) {
-        await androidImplementation.requestExactAlarmsPermission();
-      }
-    }
   }
 
   Future<void> scheduleLectureNotification({
@@ -1733,7 +1717,14 @@ class DataService extends ChangeNotifier {
     studentSubjects = [];
     notifyListeners();
   }
-  Future<void> saveSession(String id, String type) async { final prefs = await SharedPreferences.getInstance(); await prefs.setString('session_id', id); await prefs.setString('session_type', type); }
+  Future<void> saveSession(String id, String type) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('session_id', id);
+    await prefs.setString('session_type', type);
+    if (selectedInstituteId != null) {
+      await prefs.setString('selected_institute_id', selectedInstituteId!);
+    }
+  }
   Future<void> loadSettings() async { final prefs = await SharedPreferences.getInstance(); isArabic = prefs.getBool('persist_v3_arabic') ?? true; isDarkMode = prefs.getBool('persist_v3_dark') ?? false; notifyListeners(); }
   Future<void> toggleLanguage(bool v) async { isArabic = v; final prefs = await SharedPreferences.getInstance(); await prefs.setBool('persist_v3_arabic', v); notifyListeners(); }
 
