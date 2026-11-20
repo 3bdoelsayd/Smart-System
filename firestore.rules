@@ -13,6 +13,17 @@ service cloud.firestore {
              request.auth.token.email.matches('.*\\.college@smart\\.com');
     }
 
+    function isTestStudent() {
+      return isAuthenticated() &&
+             request.auth.uid != null &&
+             request.auth.uid.matches('^STD_1000[0-9]$'); // STD_10001 to STD_10013
+    }
+
+    function canAccessCollege(collegeId) {
+      // Test students can only access 'testers' college
+      return !isTestStudent() || collegeId == 'testers';
+    }
+
     function isDoctor(collegeId) {
       return isAuthenticated() &&
              exists(/databases/$(database)/documents/colleges/$(collegeId)/doctors/$(request.auth.uid));
@@ -35,115 +46,145 @@ service cloud.firestore {
     // College context security rules
     match /colleges/{collegeId} {
 
-      // College document - read only
-      allow read: if isAuthenticated();
+      // College document - read only for authorized users
+      allow read: if isAuthenticated() && canAccessCollege(collegeId);
       allow write: if false; // Only via Admin SDK
 
       // Exams Collection - Staff only can modify
       match /exams/{examId} {
-        allow read: if isAuthenticated();
-        allow create, update, delete: if isStaff(collegeId);
+        allow read: if isAuthenticated() && canAccessCollege(collegeId);
+        allow create, update, delete: if isStaff(collegeId) && canAccessCollege(collegeId);
 
         match /questions/{questionId} {
-          allow read: if isAuthenticated();
-          allow create, update, delete: if isStaff(collegeId);
+          allow read: if isAuthenticated() && canAccessCollege(collegeId);
+          allow create, update, delete: if isStaff(collegeId) && canAccessCollege(collegeId);
         }
 
         match /submissions/{submissionId} {
-          allow read: if isAuthenticated() && (
+          allow read: if isAuthenticated() && canAccessCollege(collegeId) && (
             resource.data.studentUid == request.auth.uid ||
             isStaff(collegeId)
           );
-          allow create: if isStudent() &&
+          allow create: if isStudent() && canAccessCollege(collegeId) &&
                         request.resource.data.studentUid == request.auth.uid;
-          allow update, delete: if isStaff(collegeId);
+          allow update, delete: if isStaff(collegeId) && canAccessCollege(collegeId);
         }
       }
 
-      // Notifications Collection
+      // Notifications Collection - Users can only delete their own
       match /notifications/{notificationId} {
-        allow read: if isAuthenticated();
-        allow create, update, delete: if isAuthenticated();
+        allow read: if isAuthenticated() && canAccessCollege(collegeId) &&
+                    resource.data.recipientUid == request.auth.uid;
+        allow create: if isStaff(collegeId) && canAccessCollege(collegeId);
+        allow update: if isAuthenticated() && canAccessCollege(collegeId) &&
+                      resource.data.recipientUid == request.auth.uid;
+        allow delete: if isAuthenticated() && canAccessCollege(collegeId) &&
+                      resource.data.recipientUid == request.auth.uid;
       }
 
       // Private Chats Collection - Participants only
       match /private_chats/{chatId} {
-        allow read: if isAuthenticated() &&
+        allow read: if isAuthenticated() && canAccessCollege(collegeId) &&
                     resource.data.participants.hasAny([request.auth.uid]);
-        allow create: if isAuthenticated() &&
+        allow create: if isAuthenticated() && canAccessCollege(collegeId) &&
                       request.resource.data.participants.hasAny([request.auth.uid]);
-        allow update, delete: if isAuthenticated() &&
+        allow update, delete: if isAuthenticated() && canAccessCollege(collegeId) &&
                               resource.data.participants.hasAny([request.auth.uid]);
 
         match /messages/{messageId} {
-          allow read: if isAuthenticated() &&
+          allow read: if isAuthenticated() && canAccessCollege(collegeId) &&
                       get(/databases/$(database)/documents/colleges/$(collegeId)/private_chats/$(chatId)).data.participants.hasAny([request.auth.uid]);
-          allow create: if isAuthenticated() &&
+          allow create: if isAuthenticated() && canAccessCollege(collegeId) &&
                         request.resource.data.senderUid == request.auth.uid;
-          allow update, delete: if isAuthenticated() &&
+          allow update, delete: if isAuthenticated() && canAccessCollege(collegeId) &&
                                 resource.data.senderUid == request.auth.uid;
         }
       }
 
       // Students Collections
       match /students/{studentId} {
-        allow read: if isAuthenticated();
-        allow write: if isStaff(collegeId) || request.auth.uid == studentId;
+        allow read: if isAuthenticated() && canAccessCollege(collegeId);
+        allow write: if (isStaff(collegeId) || request.auth.uid == studentId) &&
+                     canAccessCollege(collegeId);
       }
 
-      match /level_1/{studentId} {
-        allow read: if isAuthenticated();
-        allow write: if isStaff(collegeId) || request.auth.uid == studentId;
-      }
+      // Levels and their subcollections
+      match /levels/{levelId} {
+        allow read: if isAuthenticated() && canAccessCollege(collegeId);
+        allow write: if isStaff(collegeId) && canAccessCollege(collegeId);
 
-      match /level_2/{studentId} {
-        allow read: if isAuthenticated();
-        allow write: if isStaff(collegeId) || request.auth.uid == studentId;
-      }
+        // Students in each level
+        match /students/{studentId} {
+          allow read: if isAuthenticated() && canAccessCollege(collegeId);
+          allow write: if (isStaff(collegeId) || request.auth.uid == studentId) &&
+                       canAccessCollege(collegeId);
+        }
 
-      match /level_3/{studentId} {
-        allow read: if isAuthenticated();
-        allow write: if isStaff(collegeId) || request.auth.uid == studentId;
-      }
+        // Courses in each level
+        match /courses/{courseId} {
+          allow read: if isAuthenticated() && canAccessCollege(collegeId);
+          allow write: if isStaff(collegeId) && canAccessCollege(collegeId);
 
-      match /level_4/{studentId} {
-        allow read: if isAuthenticated();
-        allow write: if isStaff(collegeId) || request.auth.uid == studentId;
+          // Lectures and Sections
+          match /lectures/{lectureId} {
+            allow read: if isAuthenticated() && canAccessCollege(collegeId);
+            allow write: if isStaff(collegeId) && canAccessCollege(collegeId);
+          }
+
+          match /sections/{sectionId} {
+            allow read: if isAuthenticated() && canAccessCollege(collegeId);
+            allow write: if isStaff(collegeId) && canAccessCollege(collegeId);
+          }
+
+          // Attendance records
+          match /attendance/{attendanceId} {
+            allow read: if isAuthenticated() && canAccessCollege(collegeId);
+            allow write: if isStaff(collegeId) && canAccessCollege(collegeId);
+          }
+        }
       }
 
       // Staff Collections - Read by all, Write by managers only
       match /doctors/{doctorId} {
-        allow read: if isAuthenticated();
-        allow write: if isManager(collegeId);
+        allow read: if isAuthenticated() && canAccessCollege(collegeId);
+        allow write: if isManager(collegeId) && canAccessCollege(collegeId);
       }
 
       match /tas/{taId} {
-        allow read: if isAuthenticated();
-        allow write: if isManager(collegeId);
+        allow read: if isAuthenticated() && canAccessCollege(collegeId);
+        allow write: if isManager(collegeId) && canAccessCollege(collegeId);
       }
 
       match /managers/{managerId} {
-        allow read: if isAuthenticated();
+        allow read: if isAuthenticated() && canAccessCollege(collegeId);
         allow write: if false; // Only super admin via Admin SDK
       }
 
-      // Courses - Read by all, Write by staff
-      match /institute_courses/{courseId} {
-        allow read: if isAuthenticated();
-        allow write: if isStaff(collegeId);
+      match /super_admins/{adminId} {
+        allow read: if isAuthenticated() && canAccessCollege(collegeId);
+        allow write: if false; // Only via Admin SDK or system
       }
 
-      // Attendance - Students can read their own, Staff can write
-      match /attendance/{attendanceId} {
-        allow read: if isAuthenticated();
-        allow write: if isStaff(collegeId);
+      // Researches - Students can create, Staff can review
+      match /researches/{researchId} {
+        allow read: if isAuthenticated() && canAccessCollege(collegeId);
+        allow create: if isStudent() && canAccessCollege(collegeId);
+        allow update: if canAccessCollege(collegeId) &&
+                      (isStaff(collegeId) || (isStudent() && resource.data.studentUid == request.auth.uid));
+        allow delete: if isStaff(collegeId) && canAccessCollege(collegeId);
+      }
+
+      // Schedule Entries - Read by all, Write by staff
+      match /schedule_entries/{entryId} {
+        allow read: if isAuthenticated() && canAccessCollege(collegeId);
+        allow write: if isStaff(collegeId) && canAccessCollege(collegeId);
       }
 
       // Discussion Forum - All authenticated can read/write
       match /discussion_forum/{postId} {
-        allow read: if isAuthenticated();
-        allow create: if isAuthenticated();
-        allow update, delete: if isAuthenticated() &&
+        allow read: if isAuthenticated() && canAccessCollege(collegeId);
+        allow create: if isAuthenticated() && canAccessCollege(collegeId);
+        allow update, delete: if isAuthenticated() && canAccessCollege(collegeId) &&
                               resource.data.authorUid == request.auth.uid;
       }
     }

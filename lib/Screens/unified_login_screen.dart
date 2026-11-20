@@ -45,13 +45,13 @@ class _UnifiedLoginScreenState extends State<UnifiedLoginScreen> with SingleTick
     try {
       final prefs = await SharedPreferences.getInstance();
       String? savedUser = prefs.getString('saved_login_user');
-      String? savedPass = prefs.getString('saved_login_pass');
+      // ⚠️ SECURITY FIX: Never load saved passwords - removed 'saved_login_pass'
       bool remember = prefs.getBool('saved_remember_me') ?? true;
-      if (remember && savedUser != null && savedPass != null) {
+      if (remember && savedUser != null) {
         if (mounted) {
           setState(() {
             _emailController.text = savedUser;
-            _passController.text = savedPass;
+            // Password field stays empty - user must re-enter
             _rememberMe = true;
           });
         }
@@ -81,14 +81,16 @@ class _UnifiedLoginScreenState extends State<UnifiedLoginScreen> with SingleTick
 
       final prefs = await SharedPreferences.getInstance();
       if (_rememberMe) {
+        // ✅ SECURITY FIX: Only save username, NEVER password
         await prefs.setString('saved_login_user', _emailController.text.trim());
-        await prefs.setString('saved_login_pass', _passController.text.trim());
         await prefs.setBool('saved_remember_me', true);
       } else {
         await prefs.remove('saved_login_user');
-        await prefs.remove('saved_login_pass');
         await prefs.setBool('saved_remember_me', false);
       }
+
+      // Clean up any old saved passwords from previous versions
+      await prefs.remove('saved_login_pass');
 
       switch (role) {
         case 'super_admin':

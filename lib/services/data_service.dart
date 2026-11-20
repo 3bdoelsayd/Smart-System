@@ -256,41 +256,60 @@ class DataService extends ChangeNotifier {
         return 'super_admin_plus';
       }
 
+      // ♻️ REFACTORED: Simplified main login logic (was 95 lines, now ~60)
       if (selectedInstituteId == null) {
         throw isArabic ? "يرجى اختيار الكلية أولاً" : "Please select college first";
       }
 
-      String input = loginInput.trim().toLowerCase();
-      String cleanCode = input
-          .replaceAll('std_', '')
-          .replaceAll('doc_', '')
+      // 1. Clean and normalize input
+      String cleanCode = loginInput
+          .trim()
+          .toLowerCase()
           .replaceAll('.college@smart.com', '')
           .replaceAll('@smart.edu', '')
           .replaceAll('@smart.com', '')
+          .replaceAll('std_', '')
+          .replaceAll('doc_', '')
           .trim();
 
-      String email = input.contains('@') && !input.endsWith('@smart.edu') ? input : _formatEmail(cleanCode);
-      debugPrint("Login Attempt: Code=$cleanCode | Email=$email");
+      String email = loginInput.contains('@') ? loginInput.trim() : _formatEmail(cleanCode);
+      debugPrint("🔑 Login: code=$cleanCode | email=$email");
 
+      // 2. Try Firebase Auth first
       UserCredential? userCredential;
       try {
         userCredential = await _auth.signInWithEmailAndPassword(
-            email: email,
-            password: password.trim()
+          email: email,
+          password: password.trim(),
         );
-      } catch (authError) {
-        debugPrint("Auth sign-in error: $authError. Attempting Firestore fallback...");
-        var matched = await _findFirestoreUserAndVerifyPassword(cleanCode, email, password);
-        if (matched != null) {
-          try {
-            userCredential = await _auth.signInWithEmailAndPassword(email: email, password: password.trim());
-          } catch (_) {
+        debugPrint("✅ Firebase Auth success");
+      } on FirebaseAuthException catch (authError) {
+        debugPrint("⚠️ Auth failed: ${authError.code}");
+
+        // 3. Fallback: Check Firestore with correct password
+        if (authError.code == 'user-not-found' ||
+            authError.code == 'wrong-password' ||
+            authError.code == 'invalid-credential') {
+
+          var firestoreMatch = await _findFirestoreUserAndVerifyPassword(cleanCode, email, password);
+
+          if (firestoreMatch != null) {
+            debugPrint("✅ Found in Firestore - creating Auth user");
             try {
               await _secureCreateUser(email, password.trim());
-              userCredential = await _auth.signInWithEmailAndPassword(email: email, password: password.trim());
-            } catch (_) {
-              // Ignore if auth creation fails due to existing user with different pass
+              userCredential = await _auth.signInWithEmailAndPassword(
+                email: email,
+                password: password.trim(),
+              );
+              debugPrint("✅ Auth user created");
+            } catch (createError) {
+              debugPrint("⚠️ Auth creation failed: $createError");
+              // Continue with Firestore-only login
             }
+          } else {
+            throw isArabic
+                ? "كلمة المرور غير صحيحة أو الحساب غير موجود"
+                : "Incorrect password or account not found";
           }
         } else {
           rethrow;
@@ -300,62 +319,82 @@ class DataService extends ChangeNotifier {
       String uid = userCredential?.user?.uid ?? "STD_$cleanCode";
       String? userEmail = userCredential?.user?.email ?? email;
 
-      // --- نظام الأمان المحسن: بصمة داتئمة للهاتف/المتصفح نفسه ---
-      final prefs = await SharedPreferences.getInstance();
-      String? localDeviceId = prefs.getString('app_device_fingerprint');
-      if (localDeviceId == null || localDeviceId.isEmpty) {
-        localDeviceId = "DEVICE-${DateTime.now().millisecondsSinceEpoch}-${(uid.hashCode.abs() + 1000)}";
-        await prefs.setString('app_device_fingerprint', localDeviceId);
-      }
-      // --------------------------------------------------------
-
+      // 4. Load user data from Firestore
       String? role = await _findAndLoadUser(uid, userEmail: userEmail);
 
+      role ??= await _checkUserInCollege(selectedInstituteId!, cleanCode, userEmail: userEmail);
+
+
       if (role == null) {
-        // Search by clean code directly
-        role = await _checkUserInCollege(selectedInstituteId!, cleanCode, userEmail: userEmail);
-      }
-
-      if (role != null) {
-        // التحقق من ربط الجهاز للطلاب فقط لزيادة الأمان ومنع تبادل الحسابات
-        if (role == 'student' && currentStudent != null) {
-          String? storedDeviceId = currentStudent!['deviceId'];
-          String firestoreDocId = currentStudent!['uid'] ?? uid;
-          if (storedDeviceId == null || storedDeviceId.isEmpty) {
-            // ربط الجهاز لأول مرة بشكل ذري على الموضعين
-            try {
-              WriteBatch batch = _firestore.batch();
-              DocumentReference ref1 = studentsColl.doc(firestoreDocId);
-              DocumentReference ref2 = getInstituteStudentsColl('level_' + (currentStudent!['level'] ?? '1')).doc(firestoreDocId);
-              batch.set(ref1, {'deviceId': localDeviceId}, SetOptions(merge: true));
-              batch.set(ref2, {'deviceId': localDeviceId}, SetOptions(merge: true));
-              await batch.commit();
-            } catch (e) {
-              debugPrint("Atomic deviceId update error: $e");
-            }
-            currentStudent!['deviceId'] = localDeviceId;
-          } else if (storedDeviceId != localDeviceId) {
-            await clearSession();
-            throw isArabic
-                ? "عذراً، هذا الحساب مرتبط بجهاز آخر. يرجى مراجعة شؤون الطلاب لإعادة ضبط الجهاز."
-                : "Account bound to another device. Contact Student Affairs.";
-          }
-        }
-
-        await saveSession(uid, role);
-        notifyListeners();
-        return role;
-      } else {
         await clearSession();
         throw isArabic
-            ? "عذراً، هذا الحساب غير مسجل في هذه الكلية أو بيانات الدخول غير صحيحة."
-            : "Account not registered in this college or incorrect credentials.";
+            ? "عذراً، هذا الحساب غير مسجل في هذه الكلية"
+            : "Account not registered in this college";
       }
+
+      // 5. Handle student device binding (security)
+      if (role == 'student' && currentStudent != null) {
+        await _handleStudentDeviceBinding(uid);
+      }
+
+      // 6. Save session and return
+      await saveSession(uid, role);
+      notifyListeners();
+      return role;
     } catch (e) {
       debugPrint("Login error: $e");
       rethrow;
     }
   }
+
+  /// 🔐 Handle device binding for students (prevents account sharing)
+  /// Extracted from unifiedLogin to reduce complexity
+  Future<void> _handleStudentDeviceBinding(String uid) async {
+    final prefs = await SharedPreferences.getInstance();
+    String? localDeviceId = prefs.getString('app_device_fingerprint');
+
+    // Generate device fingerprint if not exists
+    if (localDeviceId == null || localDeviceId.isEmpty) {
+      localDeviceId = "DEV-${DateTime.now().millisecondsSinceEpoch}-${uid.hashCode.abs()}";
+      await prefs.setString('app_device_fingerprint', localDeviceId);
+      debugPrint("📱 Generated device ID: $localDeviceId");
+    }
+
+    String? storedDeviceId = currentStudent!['deviceId'];
+    String firestoreDocId = currentStudent!['uid'] ?? uid;
+
+    if (storedDeviceId == null || storedDeviceId.isEmpty) {
+      // First login - bind device atomically to both locations
+      debugPrint("🔗 Binding device for first time");
+      try {
+        WriteBatch batch = _firestore.batch();
+        batch.set(
+          studentsColl.doc(firestoreDocId),
+          {'deviceId': localDeviceId},
+          SetOptions(merge: true)
+        );
+        batch.set(
+          getInstituteStudentsColl('level_${currentStudent!['level']}').doc(firestoreDocId),
+          {'deviceId': localDeviceId},
+          SetOptions(merge: true)
+        );
+        await batch.commit();
+        currentStudent!['deviceId'] = localDeviceId;
+        debugPrint("✅ Device bound successfully");
+      } catch (e) {
+        debugPrint("⚠️ Device binding error: $e");
+      }
+    } else if (storedDeviceId != localDeviceId) {
+      // Different device detected - reject login
+      await clearSession();
+      throw isArabic
+          ? "عذراً، هذا الحساب مرتبط بجهاز آخر. يرجى مراجعة شؤون الطلاب لإعادة ضبط الجهاز."
+          : "Account bound to another device. Contact Student Affairs.";
+    } else {
+      debugPrint("✅ Device ID matches - login allowed");
+    }
+  }
+
 
   Future<Map<String, dynamic>?> _findFirestoreUserAndVerifyPassword(String cleanCode, String email, String password) async {
     if (selectedInstituteId == null) return null;
@@ -1836,7 +1875,7 @@ class DataService extends ChangeNotifier {
       String normStudDiv = normalizeDivision(division);
 
       for (var doc in query.docs) {
-        final data = doc.data() as Map<String, dynamic>;
+        final data = doc.data();
         String itemName = data['name']?.toString() ?? 'Unknown';
         String itemDiv = normalizeDivision(data['division']?.toString() ?? 'all');
         String itemSemester = data['semester_id']?.toString() ?? '';
