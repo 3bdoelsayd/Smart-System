@@ -1730,6 +1730,7 @@ class DataService extends ChangeNotifier {
     currentDoctor = null;
     currentAdmin = null;
     userRole = null;
+    studentSubjects = [];
     notifyListeners();
   }
   Future<void> saveSession(String id, String type) async { final prefs = await SharedPreferences.getInstance(); await prefs.setString('session_id', id); await prefs.setString('session_type', type); }
