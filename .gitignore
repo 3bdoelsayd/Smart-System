@@ -32,6 +32,16 @@ firestore_docs_dump.json
 serviceAccountKey*.json
 *.secret.json
 
+# Secrets and API Keys
+lib/config/secrets.dart
+lib/config/secrets_*.dart
+lib/firebase_options_real.dart
+.env
+.env.local
+.env.*.local
+google-services.json
+GoogleService-Info.plist
+
 
 # Flutter/Dart/Pub related
 **/doc/api/

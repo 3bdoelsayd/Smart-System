@@ -54,11 +54,22 @@ void main() async {
       log('2.5 firestore settings');
     }
 
-    // Supabase مع timeout
+    // ⚠️ SECURITY WARNING:
+    // Supabase keys are currently hardcoded.
+    //
+    // To fix:
+    // 1. Copy lib/config/secrets_template.dart → lib/config/secrets.dart
+    // 2. Fill your keys in secrets.dart
+    // 3. Uncomment the lines below and remove the hardcoded values
+    //
+    // See SECRETS_SETUP.md for full instructions.
+
+    // import 'config/secrets.dart'; // ← Uncomment this
+
     try {
       await Supabase.initialize(
-        url: 'https://dwkbyhyzkjzmynznilta.supabase.co',
-        publishableKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR3a2J5aHl6a2p6bXluem5pbHRhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0NDc0MzEsImV4cCI6MjA5OTAyMzQzMX0.s_si7MkVvB9SuLWHQQMmoUbOOes5enaAW2Jq7oaTcNw',
+        url: 'https://dwkbyhyzkjzmynznilta.supabase.co', // ⚠️ TODO: Use Secrets.supabaseUrl
+        publishableKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR3a2J5aHl6a2p6bXluem5pbHRhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0NDc0MzEsImV4cCI6MjA5OTAyMzQzMX0.s_si7MkVvB9SuLWHQQMmoUbOOes5enaAW2Jq7oaTcNw', // ⚠️ TODO: Use Secrets.supabaseAnonKey
       ).timeout(const Duration(seconds: 8));
     } catch (e) {
       log('supabase error: $e');

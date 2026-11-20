@@ -15,8 +15,9 @@ class AttendanceScanScreen extends StatefulWidget {
 }
 
 class _AttendanceScanScreenState extends State<AttendanceScanScreen> with WidgetsBindingObserver {
-  // إلغاء التحقق من الموقع الجغرافي والامتار نهائياً للسماح بتسجيل الحضور من أي مكان
-  static const bool enableLocationCheck = false;
+  // GPS Security - تفعيل التحقق من الموقع
+  static const bool enableLocationCheck = true;
+  static const double maxDistanceMeters = 100.0; // نطاق 100 متر من قاعة المحاضرة
 
   final DataService _ds = DataService();
   late MobileScannerController _scannerController;
@@ -217,19 +218,18 @@ class _AttendanceScanScreenState extends State<AttendanceScanScreen> with Widget
               }
             }
             
-            // 4. فحص المسافة (محدد بـ 50 متر للاختبار)
+            // 4. فحص المسافة (100 متر من قاعة المحاضرة)
             if (enableLocationCheck && hallLocStr != "0,0") {
               List<String> latLng = hallLocStr.split(',');
               if (latLng.length == 2) {
                 double hallLat = double.tryParse(latLng[0]) ?? 0.0;
                 double hallLng = double.tryParse(latLng[1]) ?? 0.0;
                 double distance = Geolocator.distanceBetween(pos.latitude, pos.longitude, hallLat, hallLng);
-                double allowedRadius = 1.0; // مخصص لمسافة 1 متر للاختبار من البيت
 
-                if (distance > allowedRadius) {
-                  throw _ds.isArabic 
-                    ? "أنت خارج نطاق القاعة. المسافة الحالية: ${distance.toStringAsFixed(1)} متر (الحد المسموح: ${allowedRadius.toInt()} متر)." 
-                    : "Too far from hall (${distance.toStringAsFixed(1)}m / ${allowedRadius.toInt()}m max).";
+                if (distance > maxDistanceMeters) {
+                  throw _ds.isArabic
+                    ? "عذراً، يجب أن تكون داخل قاعة المحاضرة لتسجيل الحضور.\nالمسافة الحالية: ${distance.toStringAsFixed(1)} متر (الحد المسموح: ${maxDistanceMeters.toInt()} متر)."
+                    : "You must be inside the lecture hall to record attendance.\nCurrent distance: ${distance.toStringAsFixed(1)}m (Max allowed: ${maxDistanceMeters.toInt()}m).";
                 }
               }
             }
