@@ -38,26 +38,35 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   }
 
   Future<void> _checkSession() async {
-    String? type = await _ds.loadSession();
-    
-    Timer(const Duration(seconds: 3), () {
-      if (mounted) {
-        if (type == 'student') {
-          Navigator.pushNamedAndRemoveUntil(context, '/student/home', (r) => false);
-        } else if (type == 'doctor' || type == 'ta') {
-          Navigator.pushNamedAndRemoveUntil(context, '/doctor/home', (r) => false);
-        } else if (type == 'super_admin' || type == 'super_admin_plus') {
-          Navigator.pushNamedAndRemoveUntil(context, '/super-admin/dashboard', (r) => false);
-        } else if (type == 'manager') {
-          Navigator.pushNamedAndRemoveUntil(context, '/manager/dashboard', (r) => false);
-        } else if (type == 'admin') {
-          // للتوافق مع الإصدارات القديمة إذا وجد
-          Navigator.pushNamedAndRemoveUntil(context, '/admin/home', (r) => false);
-        } else {
-          Navigator.pushNamedAndRemoveUntil(context, '/start', (r) => false);
-        }
+    final startTime = DateTime.now();
+    String? type;
+    try {
+      type = await _ds.loadSession();
+    } catch (e) {
+      debugPrint("Session load error on splash: $e");
+    }
+
+    final elapsed = DateTime.now().difference(startTime).inMilliseconds;
+    final remaining = 1500 - elapsed;
+    if (remaining > 0) {
+      await Future.delayed(Duration(milliseconds: remaining));
+    }
+
+    if (mounted) {
+      if (type == 'student') {
+        Navigator.pushNamedAndRemoveUntil(context, '/student/home', (r) => false);
+      } else if (type == 'doctor' || type == 'ta') {
+        Navigator.pushNamedAndRemoveUntil(context, '/doctor/home', (r) => false);
+      } else if (type == 'super_admin' || type == 'super_admin_plus') {
+        Navigator.pushNamedAndRemoveUntil(context, '/super-admin/dashboard', (r) => false);
+      } else if (type == 'manager') {
+        Navigator.pushNamedAndRemoveUntil(context, '/manager/dashboard', (r) => false);
+      } else if (type == 'admin') {
+        Navigator.pushNamedAndRemoveUntil(context, '/admin/home', (r) => false);
+      } else {
+        Navigator.pushNamedAndRemoveUntil(context, '/start', (r) => false);
       }
-    });
+    }
   }
 
   @override

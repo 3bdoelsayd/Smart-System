@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:supabase_flutter/supabase_flutter.dart' hide User;
@@ -75,27 +74,7 @@ void main() async {
     }
     log('4 settings done');
 
-    String? savedRole;
-    try {
-      savedRole = await ds.loadSession().timeout(const Duration(seconds: 10));
-    } catch (e) {
-      log('loadSession error/timeout: $e');
-    }
-    log('5 session done');
-
-    String initialRoute = '/start';
-
-    if (savedRole != null) {
-      if (savedRole == 'student') {
-        initialRoute = '/student/home';
-      } else if (savedRole == 'doctor' || savedRole == 'ta') {
-        initialRoute = '/doctor/home';
-      } else if (savedRole == 'super_admin' || savedRole == 'super_admin_plus') {
-        initialRoute = '/super-admin/dashboard';
-      } else if (savedRole == 'manager') {
-        initialRoute = '/manager/dashboard';
-      }
-    }
+    String initialRoute = '/';
 
     if (!kIsWeb) {
       try {

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -50,7 +51,7 @@ class DataService extends ChangeNotifier {
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  
+
   // نغير دي عشان متبدأش غير لما نحتاجها فعلاً
   SupabaseClient get supabase => Supabase.instance.client;
 
@@ -298,7 +299,7 @@ class DataService extends ChangeNotifier {
 
       String uid = userCredential?.user?.uid ?? "STD_$cleanCode";
       String? userEmail = userCredential?.user?.email ?? email;
-      
+
       // --- نظام الأمان المحسن: بصمة داتئمة للهاتف/المتصفح نفسه ---
       final prefs = await SharedPreferences.getInstance();
       String? localDeviceId = prefs.getString('app_device_fingerprint');
@@ -316,26 +317,39 @@ class DataService extends ChangeNotifier {
       }
 
       if (role != null) {
+        // التحقق من ربط الجهاز للطلاب فقط لزيادة الأمان ومنع تبادل الحسابات
         if (role == 'student' && currentStudent != null) {
+          String? storedDeviceId = currentStudent!['deviceId'];
           String firestoreDocId = currentStudent!['uid'] ?? uid;
-          try {
-            await studentsColl.doc(firestoreDocId).update({'deviceId': localDeviceId});
-          } catch (_) {
+          if (storedDeviceId == null || storedDeviceId.isEmpty) {
+            // ربط الجهاز لأول مرة بشكل ذري على الموضعين
             try {
-              await getCommerceStudentsColl('level_' + (currentStudent!['level'] ?? '1')).doc(firestoreDocId).update({'deviceId': localDeviceId});
-            } catch (_) {}
+              WriteBatch batch = _firestore.batch();
+              DocumentReference ref1 = studentsColl.doc(firestoreDocId);
+              DocumentReference ref2 = getCommerceStudentsColl('level_' + (currentStudent!['level'] ?? '1')).doc(firestoreDocId);
+              batch.set(ref1, {'deviceId': localDeviceId}, SetOptions(merge: true));
+              batch.set(ref2, {'deviceId': localDeviceId}, SetOptions(merge: true));
+              await batch.commit();
+            } catch (e) {
+              debugPrint("Atomic deviceId update error: $e");
+            }
+            currentStudent!['deviceId'] = localDeviceId;
+          } else if (storedDeviceId != localDeviceId) {
+            await clearSession();
+            throw isArabic
+                ? "عذراً، هذا الحساب مرتبط بجهاز آخر. يرجى مراجعة شؤون الطلاب لإعادة ضبط الجهاز."
+                : "Account bound to another device. Contact Student Affairs.";
           }
-          currentStudent!['deviceId'] = localDeviceId;
         }
 
         await saveSession(uid, role);
         notifyListeners();
         return role;
       } else {
-        await _auth.signOut();
-        throw isArabic 
-          ? "عذراً، هذا الحساب غير مسجل في هذه الكلية أو بيانات الدخول غير صحيحة." 
-          : "Account not registered in this college or incorrect credentials.";
+        await clearSession();
+        throw isArabic
+            ? "عذراً، هذا الحساب غير مسجل في هذه الكلية أو بيانات الدخول غير صحيحة."
+            : "Account not registered in this college or incorrect credentials.";
       }
     } catch (e) {
       debugPrint("Login error: $e");
@@ -1022,26 +1036,26 @@ class DataService extends ChangeNotifier {
   }
 
   Future<void> manualRecordAttendance({
-    required String studentId, 
-    required String studentName, 
-    required String subject, 
-    required String level, 
+    required String studentId,
+    required String studentName,
+    required String subject,
+    required String level,
     required String lectureNumber,
     String sessionType = 'lecture',
   }) async {
     // تنظيف البيانات قبل الحفظ لضمان النجاح
     String cleanSub = subject.trim();
     String cleanLvl = level.replaceAll('level_', '').trim();
-    
+
     await attendanceColl.add({
-      'studentId': studentId.trim(), 
-      'studentName': studentName.trim(), 
-      'subject': cleanSub, 
-      'lectureNumber': lectureNumber.trim(), 
+      'studentId': studentId.trim(),
+      'studentName': studentName.trim(),
+      'subject': cleanSub,
+      'lectureNumber': lectureNumber.trim(),
       'sessionType': sessionType,
-      'level': cleanLvl, 
-      'time': FieldValue.serverTimestamp(), 
-      'instituteId': selectedInstituteId, 
+      'level': cleanLvl,
+      'time': FieldValue.serverTimestamp(),
+      'instituteId': selectedInstituteId,
       'manual': true
     });
   }
@@ -1109,18 +1123,18 @@ class DataService extends ChangeNotifier {
           : (isArabic ? 'الدكتور' : 'Doctor');
 
       await submissionsColl.add({
-        'studentId': studentId, 
-        'studentName': studentName, 
-        'subject': subject, 
+        'studentId': studentId,
+        'studentName': studentName,
+        'subject': subject,
         'doctorId': assignedId,
         'recipientType': recipientType,
         'recipientName': recipientName,
-        'fileName': file.name, 
-        'fileUrl': publicUrl, 
-        'title': title, 
-        'date': FieldValue.serverTimestamp(), 
-        'status': 'Submitted', 
-        'isSeen': false, 
+        'fileName': file.name,
+        'fileUrl': publicUrl,
+        'title': title,
+        'date': FieldValue.serverTimestamp(),
+        'status': 'Submitted',
+        'isSeen': false,
         'instituteId': selectedInstituteId,
         'level': currentStudent?['level']?.toString() ?? '1',
       });
@@ -1147,36 +1161,41 @@ class DataService extends ChangeNotifier {
   }
 
   Future<void> updateResearchStatus(
-    String id, 
-    String stat, {
-    bool markAsSeen = false, 
-    String? grade, 
-    String? comment,
-    bool? isPublished,
-    bool? isDraft,
-  }) async {
+      String id,
+      String stat, {
+        bool markAsSeen = false,
+        String? grade,
+        String? comment,
+        bool? isPublished,
+        bool? isDraft,
+      }) async {
     Map<String, dynamic> data = {'status': stat};
     if (markAsSeen) data['isSeen'] = true;
     if (grade != null) data['grade'] = grade;
     if (comment != null) data['comment'] = comment;
     if (isPublished != null) data['isPublished'] = isPublished;
     if (isDraft != null) data['isDraft'] = isDraft;
-    
-    if (grade != null || comment != null) {
+
+    final bool isEvaluation = grade != null || comment != null;
+
+    if (isEvaluation) {
       data['evaluatedAt'] = FieldValue.serverTimestamp();
       data['evaluatedBy'] = currentDoctor?['name'] ?? 'Doctor';
+    }
 
-      if (isPublished == true) {
-        // جلب بيانات البحث لإرسال إشعار للطالب عند النشر فقط
+    await submissionsColl.doc(id).update(data);
+
+    // إشعار الطالب عند النشر فقط
+    if (isEvaluation && isPublished == true) {
+      try {
         var doc = await submissionsColl.doc(id).get();
         var subData = doc.data() as Map<String, dynamic>?;
-
         if (subData != null) {
           await notificationsColl.add({
             'title': isArabic ? 'تم نشر تقييم بحثك' : 'Research Evaluated',
-            'body': isArabic 
-                ? 'قام الدكتور بنشر تقييم بحثك في مادة ${subData['subject']}. الدرجة: $grade' 
-                : 'Doctor published your evaluation in ${subData['subject']}. Grade: $grade',
+            'body': isArabic
+                ? 'قام الدكتور بنشر تقييم بحثك في مادة ${subData['subject']}. الدرجة: ${subData['grade'] ?? grade ?? ''}'
+                : 'Doctor published your evaluation in ${subData['subject']}. Grade: ${subData['grade'] ?? grade ?? ''}',
             'targetType': 'student',
             'targetId': subData['studentId'],
             'timestamp': FieldValue.serverTimestamp(),
@@ -1184,11 +1203,15 @@ class DataService extends ChangeNotifier {
             'isRead': false,
           });
         }
+      } catch (e) {
+        debugPrint("Notify student error: $e");
       }
     }
-    await submissionsColl.doc(id).update(data);
-    notifyListeners();
+
+    // مفيش داعي لإعادة بناء الواجهة لما نعمل بس "تم المشاهدة"
+    if (!markAsSeen || isEvaluation) notifyListeners();
   }
+
   Future<bool> deleteResearch(String id) async { await submissionsColl.doc(id).delete(); notifyListeners(); return true; }
 
   Future<void> saveExamResult(String sId, String sub, double cw, double fin) async { double tot = cw + fin; await examResultsColl.doc('${sId}_$sub').set({'studentId': sId, 'subject': sub, 'coursework': cw, 'final': fin, 'total': tot, 'grade': calculateGrade(tot), 'doctorName': currentDoctor?['name'] ?? 'System', 'date': FieldValue.serverTimestamp(), 'instituteId': selectedInstituteId}); }
@@ -1201,7 +1224,49 @@ class DataService extends ChangeNotifier {
   Stream<QuerySnapshot> getStudentGradesStream(String sId) => gradesColl.where('studentId', isEqualTo: sId).snapshots();
 
   Future<void> initNotifications() async {
-    return;
+    if (kIsWeb) return;
+    tz.initializeTimeZones();
+    // ضبط المنطقة الزمنية الافتراضية للقاهرة كمثال لو فشل التعرف التلقائي
+    try {
+      tz.setLocalLocation(tz.getLocation('Africa/Cairo'));
+    } catch (e) {
+      debugPrint("Timezone error: $e");
+    }
+
+    const AndroidInitializationSettings initializationSettingsAndroid =
+    AndroidInitializationSettings('@mipmap/launcher_icon');
+
+    const DarwinInitializationSettings initializationSettingsDarwin =
+    DarwinInitializationSettings(
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: true,
+    );
+
+    const InitializationSettings initializationSettings = InitializationSettings(
+      android: initializationSettingsAndroid,
+      iOS: initializationSettingsDarwin,
+    );
+
+    await flutterLocalNotificationsPlugin.initialize(
+      initializationSettings,
+    );
+
+    // Request permissions for Android 13+
+    await flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>()
+        ?.requestNotificationsPermission();
+
+    // Check for exact alarm permission on Android 13+
+    if (io.Platform.isAndroid) {
+      final androidImplementation = flutterLocalNotificationsPlugin
+          .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      if (androidImplementation != null) {
+        await androidImplementation.requestExactAlarmsPermission();
+      }
+    }
   }
 
   Future<void> scheduleLectureNotification({
@@ -1214,9 +1279,8 @@ class DataService extends ChangeNotifier {
     try {
       // 1. حساب الوقت القادم للمحاضرة
       final now = DateTime.now();
-      
+
       // تحويل الوقت من String (مثلاً "10:00 AM") إلى DateTime
-      // ملاحظة: فورمات الوقت في المشروع هو d['time']
       final timeParts = _parseTime(timeStr);
       if (timeParts == null) return;
 
@@ -1243,7 +1307,7 @@ class DataService extends ChangeNotifier {
 
       // 2. جدولة الإشعار
       int notificationId = docId.hashCode.abs();
-      
+
       await flutterLocalNotificationsPlugin.zonedSchedule(
         notificationId,
         isArabic ? "حان موعد $type" : "Time for $type",
@@ -1262,7 +1326,7 @@ class DataService extends ChangeNotifier {
         ),
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
+        UILocalNotificationDateInterpretation.absoluteTime,
         matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime, // تكرار أسبوعي
       );
       debugPrint("📅 Scheduled $type: $subject at $scheduledDate");
@@ -1306,7 +1370,7 @@ class DataService extends ChangeNotifier {
       ...item,
       'instituteId': selectedInstituteId
     });
-    
+
     // جدولة الإشعار فور الإضافة
     await scheduleLectureNotification(
       docId: docRef.id,
@@ -1442,7 +1506,7 @@ class DataService extends ChangeNotifier {
     var snap = await scheduleEntriesColl
         .where('levelId', whereIn: [levelId, 'level_$cleanLvl', cleanLvl])
         .get();
-    
+
     WriteBatch batch = _firestore.batch();
     for (var doc in snap.docs) {
       batch.update(doc.reference, {
@@ -1489,14 +1553,14 @@ class DataService extends ChangeNotifier {
     try {
       User? user = _auth.currentUser;
       String hashedPass = hashPassword(newPass.trim());
-      
+
       if (user != null) {
         try {
           await user.updatePassword(newPass.trim());
         } catch (authErr) {
           debugPrint("Auth update password notice: $authErr");
         }
-        
+
         String uid = user.uid;
         if (currentStudent != null) {
           await studentsColl.doc(uid).set({'password': hashedPass}, SetOptions(merge: true));
@@ -1534,7 +1598,26 @@ class DataService extends ChangeNotifier {
   }
 
   Future<void> syncScheduleNotifications() async {
-    return;
+    if (kIsWeb || currentStudent == null) return;
+    try {
+      // إلغاء كل الإشعارات القديمة لتجنب التكرار
+      await flutterLocalNotificationsPlugin.cancelAll();
+
+      var snap = await studentsColl.doc(currentStudent!['uid']).collection('my_schedule').get();
+      for (var doc in snap.docs) {
+        final item = doc.data();
+        await scheduleLectureNotification(
+          docId: doc.id,
+          subject: item['subject'] ?? '',
+          dayName: item['dayName'] ?? '',
+          timeStr: item['time'] ?? '',
+          type: item['type'] ?? '',
+        );
+      }
+      debugPrint("🔄 Synced ${snap.docs.length} schedule notifications");
+    } catch (e) {
+      debugPrint("❌ Sync notifications error: $e");
+    }
   }
 
   Future<void> loadUserData(String uid, String role) async {
@@ -1562,61 +1645,80 @@ class DataService extends ChangeNotifier {
           }
         }
       } else {
-        await _findAndLoadUser(uid);
+        String? foundRole = await _findAndLoadUser(uid);
+        if (foundRole == null) {
+          // السيرفر أكد إن الحساب غير موجود أو ناقص البيانات الأساسية -> مسح الجلسة فوراً
+          await clearSession();
+          throw isArabic
+              ? "حسابك غير مكتمل أو غير موجود على خوادم الكلية. يرجى مراجعة إدارة الكلية."
+              : "Account document is incomplete or missing. Contact administration.";
+        }
       }
-      
+
       // مزامنة الإشعارات بعد تحميل البيانات
       if (!kIsWeb) {
         syncScheduleNotifications();
       }
 
       notifyListeners();
-    } catch (e) { debugPrint("Load error: $e"); }
+    } catch (e) {
+      debugPrint("Load error in loadUserData: $e");
+      if (e is SocketException || e is TimeoutException || e.toString().contains('SocketException') || e.toString().contains('timeout')) {
+        // عند أخطاء الشبكة والمهلة: عدم مسح الجلسة والاحتفاظ ببيانات التخزين المحلي
+      } else {
+        await clearSession();
+        rethrow;
+      }
+    }
   }
 
   Future<String?> loadSession() async {
-    final prefs = await SharedPreferences.getInstance();
-    String? storedId = prefs.getString('selected_institute_id');
-    selectedInstituteId = storedId ?? 'commerce';
-
-    String? id = prefs.getString('session_id');
-    String? type = prefs.getString('session_type');
-    String? userMapStr = prefs.getString('session_user_map');
-
-    if (id != null && type != null) {
-      userRole = type;
-      if (userMapStr != null) {
-        try {
-          final map = Map<String, dynamic>.from(jsonDecode(userMapStr));
-          if (type == 'student') {
-            currentStudent = map;
-          } else if (type == 'doctor' || type == 'ta') {
-            currentDoctor = map;
-          } else {
-            currentAdmin = map;
-          }
-        } catch (e) {
-          debugPrint("Decode session user map error: $e");
-        }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      String? storedId = prefs.getString('selected_institute_id');
+      if (storedId != null) {
+        await setInstitute(storedId);
       }
 
-      // Ensure user object is never null so app opens instantly without infinite loading
-      if (type == 'student' && currentStudent == null) {
-        currentStudent = {'uid': id, 'name': 'Student', 'id': id, 'level': '1'};
-      } else if ((type == 'doctor' || type == 'ta') && currentDoctor == null) {
-        currentDoctor = {'uid': id, 'name': 'Doctor'};
-      } else if (currentAdmin == null) {
-        currentAdmin = {'uid': id, 'name': 'Admin', 'role': type};
+      String? id = prefs.getString('session_id');
+      String? type = prefs.getString('session_type');
+
+      if (id == null || type == null) return null;
+
+      if (type == 'super_admin_plus') {
+        await loadUserData(id, type);
+        return type;
       }
 
-      // Background refresh without blocking startup
-      loadUserData(id, type).catchError((e) {
-        debugPrint("Background loadUserData error: $e");
-      });
+      if (selectedInstituteId == null) return null;
+
+      await loadUserData(id, type);
+
+      // التأكد الصارم من أن بيانات المستخدم محملة وليست فاضية
+      if (userRole == 'student' && (currentStudent == null || (currentStudent!['name'] ?? '').toString().trim().isEmpty)) {
+        await clearSession();
+        return null;
+      }
+      if ((userRole == 'doctor' || userRole == 'ta') && (currentDoctor == null || (currentDoctor!['name'] ?? '').toString().trim().isEmpty)) {
+        await clearSession();
+        return null;
+      }
+      if ((userRole == 'super_admin' || userRole == 'manager') && (currentAdmin == null || (currentAdmin!['name'] ?? '').toString().trim().isEmpty)) {
+        await clearSession();
+        return null;
+      }
 
       return type;
+    } catch (e) {
+      debugPrint("loadSession exception: $e");
+      if (e.toString().contains('غير مكتمل') || e.toString().contains('غير موجود')) {
+        await clearSession();
+        return null;
+      }
+      // في حالة انقطاع الشبكة، إرجاع الجلسة المحفوظة حتى يفتح التطبيق أوفلاين
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString('session_type');
     }
-    return null;
   }
 
   Future<void> clearSession() async {
@@ -1624,20 +1726,13 @@ class DataService extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('session_id');
     await prefs.remove('session_type');
-    await prefs.remove('session_user_map');
     currentStudent = null;
     currentDoctor = null;
     currentAdmin = null;
     userRole = null;
     notifyListeners();
   }
-
-  Future<void> saveSession(String id, String type) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('session_id', id);
-    await prefs.setString('session_type', type);
-    await prefs.remove('session_user_map');
-  }
+  Future<void> saveSession(String id, String type) async { final prefs = await SharedPreferences.getInstance(); await prefs.setString('session_id', id); await prefs.setString('session_type', type); }
   Future<void> loadSettings() async { final prefs = await SharedPreferences.getInstance(); isArabic = prefs.getBool('persist_v3_arabic') ?? true; isDarkMode = prefs.getBool('persist_v3_dark') ?? false; notifyListeners(); }
   Future<void> toggleLanguage(bool v) async { isArabic = v; final prefs = await SharedPreferences.getInstance(); await prefs.setBool('persist_v3_arabic', v); notifyListeners(); }
 
@@ -1735,8 +1830,7 @@ class DataService extends ChangeNotifier {
     String trimmed = input.trim().toLowerCase();
     if (trimmed.contains('@')) return trimmed;
 
-    // لضمان دخول المديرين بالكود فقط، سنقوم ببناء إيميل افتراضي يتبعه النظام
-    // التنسيق المطلوب بناءً على طلبك هو: [كود].college@smart.com
+    // التنسيق: [كود].college@smart.com
     return "$trimmed.college$_domain";
   }
 
@@ -1758,10 +1852,10 @@ class DataService extends ChangeNotifier {
   }
 
   Future<void> updateDoctorProfile({
-    String? phone, 
-    String? email, 
-    String? personalEmail, 
-    String? photoUrl, 
+    String? phone,
+    String? email,
+    String? personalEmail,
+    String? photoUrl,
     Map<String, dynamic>? preferences,
     bool? hidePhone,
     bool? hideEmail,
@@ -1897,7 +1991,7 @@ class DataService extends ChangeNotifier {
       final picture = recorder.endRecording();
       final img = await picture.toImage(size.toInt(), size.toInt());
       final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
-      
+
       if (byteData != null) {
         final pngBytes = byteData.buffer.asUint8List();
         String base64Str = base64Encode(pngBytes);
