@@ -1137,6 +1137,7 @@ class DataService extends ChangeNotifier {
     required PlatformFile file,
     String title = '',
     String recipientType = 'doctor',
+    String? researchTopicId, // ✅ NEW: Link to research topic
   }) async {
     if (currentStudent == null) throw "Action not allowed";
     String studentId = currentStudent!['id'].toString();
@@ -1193,6 +1194,7 @@ class DataService extends ChangeNotifier {
         'fileName': file.name,
         'fileUrl': publicUrl,
         'title': title,
+        'researchTopicId': researchTopicId, // ✅ NEW: Save topic ID
         'date': FieldValue.serverTimestamp(),
         'status': 'Submitted',
         'isSeen': false,

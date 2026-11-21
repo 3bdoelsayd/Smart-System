@@ -118,6 +118,7 @@ class _SendResearchScreenState extends State<SendResearchScreen> {
         file: _pickedFile!,
         title: _selectedTopicTitle ?? '',
         recipientType: _selectedRecipientType ?? 'doctor',
+        researchTopicId: _selectedTopicId, // ✅ Pass topic ID
       );
 
       if (!mounted) return;
