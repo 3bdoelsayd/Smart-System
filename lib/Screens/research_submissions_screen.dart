@@ -16,11 +16,17 @@ class ResearchSubmissionsScreen extends StatefulWidget {
 class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
   final DataService _ds = DataService();
   String? _selectedSubject;
+  String? _selectedTopicId; // ✅ NEW: Selected topic to view researches
+  String? _selectedTopicTitle; // ✅ NEW: Topic title
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = "";
 
   // 0: لم تُراجع, 1: تحت المراجعة (مسودة), 2: تمت المراجعة والنشر, 3: المقيّمة
   int _selectedCategoryIndex = 0;
+
+  // ✅ NEW: For moving researches between topics
+  Set<String> _selectedResearchIds = {};
+  bool _isSelectionMode = false;
 
   @override
   void dispose() {
@@ -116,20 +122,65 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
               leading: IconButton(
                 icon: const Icon(Icons.arrow_back_ios_new_rounded),
                 onPressed: () {
-                  if (_selectedSubject != null) {
-                    setState(() { _selectedSubject = null; _searchQuery = ""; _searchController.clear(); });
+                  if (_selectedTopicId != null) {
+                    // Back from topic view to topics list
+                    setState(() {
+                      _selectedTopicId = null;
+                      _selectedTopicTitle = null;
+                      _isSelectionMode = false;
+                      _selectedResearchIds.clear();
+                    });
+                  } else if (_selectedSubject != null) {
+                    // Back from subject to subject selection
+                    setState(() {
+                      _selectedSubject = null;
+                      _searchQuery = "";
+                      _searchController.clear();
+                    });
                   } else {
                     Navigator.pop(context);
                   }
                 },
               ),
+              actions: _selectedTopicId != null && !_isSelectionMode
+                  ? [
+                      IconButton(
+                        icon: const Icon(Icons.checklist),
+                        tooltip: isAr ? 'تحديد أبحاث' : 'Select researches',
+                        onPressed: () => setState(() => _isSelectionMode = true),
+                      ),
+                    ]
+                  : _isSelectionMode
+                      ? [
+                          TextButton(
+                            onPressed: () {
+                              setState(() {
+                                _isSelectionMode = false;
+                                _selectedResearchIds.clear();
+                              });
+                            },
+                            child: Text(
+                              isAr ? 'إلغاء' : 'Cancel',
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                          ),
+                          if (_selectedResearchIds.isNotEmpty)
+                            IconButton(
+                              icon: const Icon(Icons.drive_file_move),
+                              tooltip: isAr ? 'نقل إلى عنوان آخر' : 'Move to another topic',
+                              onPressed: () => _showMoveToTopicDialog(primaryColor, isDark),
+                            ),
+                        ]
+                      : null,
             ),
             body: _ds.currentDoctor == null
                 ? Center(child: Text(isAr ? 'يرجى تسجيل الدخول' : 'Please login', style: GoogleFonts.cairo()))
                 : _selectedSubject == null
                     ? _buildSubjectSelection(primaryColor, isDark)
-                    : _buildMainContent(primaryColor, isDark),
-            floatingActionButton: _selectedSubject != null && _ds.currentDoctor != null
+                    : _selectedTopicId == null
+                        ? _buildTopicsList(primaryColor, isDark)
+                        : _buildMainContent(primaryColor, isDark),
+            floatingActionButton: _selectedSubject != null && _selectedTopicId == null && _ds.currentDoctor != null
                 ? FloatingActionButton.extended(
                     onPressed: () => _showManageTopicsDialog(primaryColor, isDark),
                     backgroundColor: primaryColor,
@@ -211,6 +262,208 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
           },
         );
       },
+    );
+  }
+
+  Widget _buildTopicsList(Color color, bool isDark) {
+    bool isAr = _ds.isArabic;
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(20),
+          child: Row(
+            children: [
+              Icon(Icons.topic, color: color, size: 28),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  isAr ? 'عناوين الأبحاث' : 'Research Topics',
+                  style: GoogleFonts.cairo(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: StreamBuilder<List<Map<String, dynamic>>>(
+            stream: _ds.getResearchTopics(subject: _selectedSubject, onlyActive: false),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.topic_outlined, size: 80, color: Colors.grey.withAlpha(128)),
+                      const SizedBox(height: 20),
+                      Text(
+                        isAr ? 'لا توجد عناوين بعد' : 'No topics yet',
+                        style: GoogleFonts.cairo(fontSize: 16, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              final topics = snapshot.data!;
+
+              return ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                itemCount: topics.length,
+                itemBuilder: (context, index) {
+                  final topic = topics[index];
+                  final topicId = topic['id'] ?? '';
+                  final title = topic['title'] ?? '';
+                  final isActive = topic['isActive'] ?? true;
+                  final deadline = topic['deadline'] != null
+                      ? DateTime.fromMillisecondsSinceEpoch(topic['deadline'])
+                      : null;
+                  final remainingDays = topic['remainingDays'];
+                  final isExpired = topic['isExpired'] ?? false;
+
+                  // Count researches for this topic
+                  return StreamBuilder<QuerySnapshot>(
+                    stream: _ds.instituteRef
+                        .collection('researches')
+                        .where('subject', isEqualTo: _selectedSubject)
+                        .where('researchTopicId', isEqualTo: topicId)
+                        .snapshots(),
+                    builder: (context, researchSnapshot) {
+                      final researchCount = researchSnapshot.hasData ? researchSnapshot.data!.docs.length : 0;
+
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 15),
+                        elevation: isDark ? 0 : 3,
+                        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                          side: isDark ? BorderSide(color: Colors.white.withAlpha(13)) : BorderSide.none,
+                        ),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(18),
+                          onTap: () {
+                            setState(() {
+                              _selectedTopicId = topicId;
+                              _selectedTopicTitle = title;
+                            });
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 60,
+                                  height: 60,
+                                  decoration: BoxDecoration(
+                                    color: (isActive && !isExpired ? color : Colors.grey).withAlpha(26),
+                                    borderRadius: BorderRadius.circular(15),
+                                  ),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        '$researchCount',
+                                        style: GoogleFonts.cairo(
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.bold,
+                                          color: isActive && !isExpired ? color : Colors.grey,
+                                        ),
+                                      ),
+                                      Text(
+                                        isAr ? 'بحث' : 'papers',
+                                        style: GoogleFonts.cairo(
+                                          fontSize: 10,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 15),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              title,
+                                              style: GoogleFonts.cairo(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                          if (!isActive)
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                              decoration: BoxDecoration(
+                                                color: Colors.grey.withAlpha(26),
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              child: Text(
+                                                isAr ? 'مخفي' : 'Hidden',
+                                                style: GoogleFonts.cairo(fontSize: 10, color: Colors.grey),
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 6),
+                                      if (deadline != null) ...[
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              isExpired ? Icons.event_busy : Icons.event,
+                                              size: 14,
+                                              color: isExpired ? Colors.red : Colors.grey,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              '${deadline.year}/${deadline.month}/${deadline.day}',
+                                              style: GoogleFonts.cairo(
+                                                fontSize: 12,
+                                                color: isExpired ? Colors.red : Colors.grey,
+                                              ),
+                                            ),
+                                            if (remainingDays != null && remainingDays > 0) ...[
+                                              Text(
+                                                ' • ',
+                                                style: TextStyle(color: Colors.grey),
+                                              ),
+                                              Text(
+                                                isAr ? 'متبقي $remainingDays يوم' : '$remainingDays days left',
+                                                style: GoogleFonts.cairo(
+                                                  fontSize: 11,
+                                                  color: remainingDays <= 3 ? Colors.red : Colors.orange,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                                Icon(Icons.arrow_forward_ios, size: 16, color: color),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
@@ -1237,5 +1490,123 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
         ],
       ),
     );
+  }
+
+  void _showMoveToTopicDialog(Color primaryColor, bool isDark) {
+    bool isAr = _ds.isArabic;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF2A2A2A) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          isAr ? 'نقل إلى عنوان آخر' : 'Move to Another Topic',
+          style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
+        ),
+        content: StreamBuilder<List<Map<String, dynamic>>>(
+          stream: _ds.getResearchTopics(subject: _selectedSubject, onlyActive: false),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const SizedBox(height: 100, child: Center(child: CircularProgressIndicator()));
+            }
+
+            if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              return Text(
+                isAr ? 'لا توجد عناوين أخرى' : 'No other topics',
+                style: GoogleFonts.cairo(),
+              );
+            }
+
+            // Filter out current topic
+            final topics = snapshot.data!.where((t) => t['id'] != _selectedTopicId).toList();
+
+            if (topics.isEmpty) {
+              return Text(
+                isAr ? 'لا توجد عناوين أخرى' : 'No other topics',
+                style: GoogleFonts.cairo(),
+              );
+            }
+
+            return SizedBox(
+              width: double.maxFinite,
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: topics.length,
+                itemBuilder: (context, index) {
+                  final topic = topics[index];
+                  final title = topic['title'] ?? '';
+                  final topicId = topic['id'] ?? '';
+
+                  return ListTile(
+                    leading: Icon(Icons.topic, color: primaryColor),
+                    title: Text(title, style: GoogleFonts.cairo()),
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      await _moveResearchesToTopic(topicId, title);
+                    },
+                  );
+                },
+              ),
+            );
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(isAr ? 'إلغاء' : 'Cancel', style: GoogleFonts.cairo()),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _moveResearchesToTopic(String newTopicId, String newTopicTitle) async {
+    bool isAr = _ds.isArabic;
+
+    try {
+      final batch = FirebaseFirestore.instance.batch();
+
+      for (final researchId in _selectedResearchIds) {
+        final docRef = _ds.instituteRef.collection('researches').doc(researchId);
+        batch.update(docRef, {
+          'researchTopicId': newTopicId,
+          'title': newTopicTitle,
+        });
+      }
+
+      await batch.commit();
+
+      if (mounted) {
+        setState(() {
+          _isSelectionMode = false;
+          _selectedResearchIds.clear();
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isAr
+                  ? 'تم نقل ${_selectedResearchIds.length} بحث بنجاح'
+                  : '${_selectedResearchIds.length} research(es) moved successfully',
+              style: GoogleFonts.cairo(),
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isAr ? 'فشل النقل' : 'Move failed',
+              style: GoogleFonts.cairo(),
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }

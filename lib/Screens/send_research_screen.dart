@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../services/data_service.dart';
 
 class SendResearchScreen extends StatefulWidget {
@@ -10,43 +11,55 @@ class SendResearchScreen extends StatefulWidget {
 }
 
 class _SendResearchScreenState extends State<SendResearchScreen> {
-  final DataService _dataService = DataService();
-  String? _selectedSubject;
-  String? _selectedTopicId; // ✅ NEW: Selected research topic
-  String? _selectedTopicTitle; // ✅ NEW: Topic title
-  String? _selectedFileName;
-  PlatformFile? _pickedFile;
-  String _recipientType = 'doctor'; // 'doctor' or 'ta'
-  bool _isLoading = false;
-  List<Map<String, dynamic>> _availableTopics = []; // ✅ NEW: Available topics
+  final DataService _ds = DataService();
 
-  /// ✅ Load available research topics when subject changes
+  // Step 1: Subject selection
+  String? _selectedSubject;
+
+  // Step 2: Recipient selection (doctor or TA)
+  String? _selectedRecipientType; // 'doctor' or 'ta'
+  String? _selectedRecipientId;
+  String? _selectedRecipientName;
+
+  // Step 3: Topic selection
+  String? _selectedTopicId;
+  String? _selectedTopicTitle;
+  List<Map<String, dynamic>> _availableTopics = [];
+
+  // Step 4: File upload
+  PlatformFile? _pickedFile;
+  String? _selectedFileName;
+  bool _isLoading = false;
+
+  int _currentStep = 0; // 0: subject, 1: recipient, 2: topic, 3: file
+
+  @override
+  void dispose() {
+    super.dispose();
+  }
+
   void _loadTopics() {
-    if (_selectedSubject == null) {
-      setState(() {
-        _availableTopics = [];
-        _selectedTopicId = null;
-        _selectedTopicTitle = null;
-      });
+    if (_selectedSubject == null || _selectedRecipientType == null) {
+      setState(() => _availableTopics = []);
       return;
     }
 
-    // Listen to topics stream
-    _dataService
-        .getResearchTopics(subject: _selectedSubject, onlyActive: true)
-        .listen((topics) {
-      // Filter out expired topics
-      final active = topics.where((t) => t['isExpired'] == false).toList();
+    _ds.getResearchTopics(subject: _selectedSubject, onlyActive: true).listen((topics) {
       if (mounted) {
-        setState(() {
-          _availableTopics = active;
-          // Reset selection if current topic is expired
-          if (_selectedTopicId != null &&
-              !active.any((t) => t['id'] == _selectedTopicId)) {
-            _selectedTopicId = null;
-            _selectedTopicTitle = null;
+        // Filter by recipient
+        final filtered = topics.where((t) {
+          final isExpired = t['isExpired'] ?? false;
+          if (isExpired) return false;
+
+          // Match doctor or TA
+          if (_selectedRecipientType == 'doctor') {
+            return t['doctorId'] == _selectedRecipientId;
+          } else {
+            return t['taId'] == _selectedRecipientId;
           }
-        });
+        }).toList();
+
+        setState(() => _availableTopics = filtered);
       }
     });
   }
@@ -60,405 +73,653 @@ class _SendResearchScreenState extends State<SendResearchScreen> {
       );
 
       if (result != null && result.files.isNotEmpty) {
-        final file = result.files.single;
         setState(() {
-          _pickedFile = file;
-          _selectedFileName = file.name;
+          _pickedFile = result.files.single;
+          _selectedFileName = result.files.single.name;
         });
       }
     } catch (e) {
-      debugPrint("File picker error: $e");
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_dataService.isArabic ? 'خطأ في اختيار الملف' : 'Error picking file')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_ds.isArabic ? 'خطأ في اختيار الملف' : 'Error picking file')),
+        );
       }
     }
   }
 
   Future<void> _submit() async {
-    final isAr = _dataService.isArabic;
+    final isAr = _ds.isArabic;
 
-    // ✅ Validate required fields
-    if (_selectedSubject == null || _pickedFile == null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(isAr ? 'يرجى اختيار المادة والملف' : 'Please select subject and file'),
-      ));
+    if (_selectedSubject == null || _pickedFile == null || _selectedTopicId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(isAr ? 'يرجى إكمال جميع الخطوات' : 'Please complete all steps')),
+      );
       return;
     }
 
-    // ✅ Check if topic is required and validate deadline
-    if (_selectedTopicId != null) {
-      // Check deadline
-      final isAccepting = await _dataService.isTopicAcceptingSubmissions(_selectedTopicId!);
-      if (!isAccepting) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(isAr
-                ? 'عذراً، انتهى موعد إرسال الأبحاث لهذا العنوان'
-                : 'Sorry, deadline for this topic has passed'),
+    // Validate deadline
+    final isAccepting = await _ds.isTopicAcceptingSubmissions(_selectedTopicId!);
+    if (!isAccepting) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isAr ? 'عذراً، انتهى موعد إرسال الأبحاث' : 'Deadline has passed'),
             backgroundColor: Colors.red,
-          ));
-        }
-        return;
+          ),
+        );
       }
+      return;
     }
 
     setState(() => _isLoading = true);
     try {
-      await _dataService.uploadResearchToRemote(
+      await _ds.uploadResearchToRemote(
         subject: _selectedSubject!,
         file: _pickedFile!,
-        title: _selectedTopicTitle ?? '', // ✅ Use topic title
-        recipientType: _recipientType,
+        title: _selectedTopicTitle ?? '',
+        recipientType: _selectedRecipientType ?? 'doctor',
       );
 
       if (!mounted) return;
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(isAr ? 'تم إرسال الملف بنجاح' : 'File sent successfully'),
-        backgroundColor: Colors.green,
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isAr ? 'تم إرسال البحث بنجاح ✓' : 'Research sent successfully ✓'),
+          backgroundColor: Colors.green,
+        ),
+      );
       Navigator.pop(context);
     } catch (e) {
-       debugPrint('Upload failed: $e');
       if (!mounted) return;
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(isAr ? 'فشل الإرسال' : 'Upload failed'),
-        backgroundColor: Colors.red,
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isAr ? 'فشل الإرسال' : 'Upload failed'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final isAr = _dataService.isArabic;
-    final isDark = _dataService.isDarkMode;
+    return ListenableBuilder(
+      listenable: _ds,
+      builder: (context, _) {
+        final isAr = _ds.isArabic;
+        final isDark = _ds.isDarkMode;
+        final primaryColor = isDark ? const Color(0xFF03DAC6) : const Color(0xFF673AB7);
 
-    final Color primaryColor = isDark ? const Color(0xFF03DAC6) : const Color(0xFF673AB7);
-    final Color bgColor = isDark ? const Color(0xFF121212) : const Color(0xFFF8F9FA);
-    final Color surfaceColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final Color labelColor = isDark ? Colors.white70 : Colors.black87;
-
-    return Directionality(
-      textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
-      child: Scaffold(
-        backgroundColor: bgColor,
-        appBar: AppBar(
-          title: Text(isAr ? 'إرسال للمراجعة' : 'Submit File'),
-          backgroundColor: isDark ? const Color(0xFF1A1A1A) : primaryColor,
-          foregroundColor: Colors.white,
-          elevation: 0,
-          centerTitle: true,
-          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(bottom: Radius.circular(20))),
-        ),
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(25),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _sectionHeader(isAr ? 'اختيار المادة العلمية' : 'Select Subject', labelColor),
-              const SizedBox(height: 12),
-              Container(
-                decoration: BoxDecoration(
-                  color: surfaceColor,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [BoxShadow(color: Colors.black.withAlpha(isDark ? 50 : 10), blurRadius: 10, offset: const Offset(0, 5))],
-                ),
-                child: DropdownButtonFormField<String>(
-                  dropdownColor: surfaceColor,
-                  style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold),
-                  decoration: InputDecoration(
-                    prefixIcon: Icon(Icons.book_rounded, color: primaryColor),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-                  ),
-                  hint: Text(
-                    isAr ? 'اختر المادة' : 'Choose subject', 
-                    style: TextStyle(color: isDark ? Colors.white38 : Colors.grey)
-                  ),
-                  items: _dataService.allSubjects.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
-                  onChanged: (val) {
-                    setState(() {
-                      _selectedSubject = val;
-                      _loadTopics(); // ✅ Load topics when subject changes
-                    });
-                  },
-                ),
-              ),
-
-              // ✅ NEW: Research Topics Selector (shown after selecting subject)
-              if (_selectedSubject != null) ...[
-                const SizedBox(height: 25),
-                _sectionHeader(isAr ? 'اختيار عنوان البحث' : 'Select Research Topic', labelColor),
-                const SizedBox(height: 12),
-                if (_availableTopics.isEmpty)
-                  Container(
+        return Directionality(
+          textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
+          child: Scaffold(
+            backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF8F9FA),
+            appBar: AppBar(
+              title: Text(isAr ? 'إرسال بحث جديد' : 'Submit Research',
+                  style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+              backgroundColor: isDark ? const Color(0xFF1A1A1A) : primaryColor,
+              foregroundColor: Colors.white,
+              elevation: 0,
+            ),
+            body: _isLoading
+                ? Center(child: CircularProgressIndicator(color: primaryColor))
+                : SingleChildScrollView(
                     padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: surfaceColor,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [BoxShadow(color: Colors.black.withAlpha(isDark ? 50 : 10), blurRadius: 10, offset: const Offset(0, 5))],
+                    child: Column(
+                      children: [
+                        _buildStepIndicator(primaryColor, isDark, isAr),
+                        const SizedBox(height: 30),
+                        if (_currentStep == 0) _buildSubjectSelection(primaryColor, isDark, isAr),
+                        if (_currentStep == 1) _buildRecipientSelection(primaryColor, isDark, isAr),
+                        if (_currentStep == 2) _buildTopicSelection(primaryColor, isDark, isAr),
+                        if (_currentStep == 3) _buildFileUpload(primaryColor, isDark, isAr),
+                      ],
                     ),
-                    child: Center(
-                      child: Text(
-                        isAr ? 'لا توجد عناوين متاحة حالياً' : 'No topics available',
-                        style: TextStyle(color: isDark ? Colors.white70 : Colors.black54),
-                      ),
-                    ),
-                  )
-                else
-                  ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: _availableTopics.length,
-                    itemBuilder: (context, index) {
-                      final topic = _availableTopics[index];
-                      final isExpired = topic['isExpired'] ?? false;
-                      final remainingDays = topic['remainingDays'];
-                      final isSelected = _selectedTopicId == topic['id'];
+                  ),
+          ),
+        );
+      },
+    );
+  }
 
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        decoration: BoxDecoration(
-                          color: isSelected ? primaryColor.withAlpha(30) : surfaceColor,
-                          borderRadius: BorderRadius.circular(15),
-                          border: Border.all(
-                            color: isSelected ? primaryColor : Colors.transparent,
-                            width: 2,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withAlpha(isDark ? 30 : 8),
-                              blurRadius: 8,
-                              offset: const Offset(0, 3),
-                            )
-                          ],
-                        ),
-                        child: ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          leading: Icon(
-                            Icons.assignment,
-                            color: isExpired ? Colors.red : primaryColor,
-                            size: 32,
-                          ),
-                          title: Text(
-                            topic['title'] ?? '',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: isDark ? Colors.white : Colors.black87,
-                            ),
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const SizedBox(height: 4),
-                              Text(
-                                '${isAr ? "الدكتور" : "Doctor"}: ${topic['doctorName'] ?? "Unknown"}',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: isDark ? Colors.white60 : Colors.black54,
-                                ),
-                              ),
-                              if (remainingDays != null)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 4),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.schedule,
-                                        size: 14,
-                                        color: remainingDays <= 3 ? Colors.red : Colors.orange,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        isAr
-                                            ? 'متبقي $remainingDays يوم'
-                                            : '$remainingDays days left',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                          color: remainingDays <= 3 ? Colors.red : Colors.orange,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                            ],
-                          ),
-                          trailing: isExpired
-                              ? Chip(
-                                  label: Text(
-                                    isAr ? 'منتهي' : 'Expired',
-                                    style: const TextStyle(color: Colors.white, fontSize: 10),
-                                  ),
-                                  backgroundColor: Colors.red,
-                                  padding: EdgeInsets.zero,
-                                )
-                              : null,
-                          enabled: !isExpired,
-                          onTap: isExpired
-                              ? null
-                              : () {
-                                  setState(() {
-                                    _selectedTopicId = topic['id'];
-                                    _selectedTopicTitle = topic['title'];
-                                  });
-                                },
-                        ),
-                      );
-                    },
-                  ),
-              ],
+  Widget _buildStepIndicator(Color color, bool isDark, bool isAr) {
+    final steps = [
+      {'icon': Icons.book, 'label': isAr ? 'المادة' : 'Subject'},
+      {'icon': Icons.person, 'label': isAr ? 'المستلم' : 'Recipient'},
+      {'icon': Icons.topic, 'label': isAr ? 'العنوان' : 'Topic'},
+      {'icon': Icons.upload_file, 'label': isAr ? 'الملف' : 'File'},
+    ];
 
-              const SizedBox(height: 25),
-              _sectionHeader(isAr ? 'إرسال إلى' : 'Send To', labelColor),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: ChoiceChip(
-                      label: Center(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          child: Text(
-                            isAr ? 'الدكتور' : 'Doctor',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: _recipientType == 'doctor' ? (isDark ? Colors.black : Colors.white) : labelColor,
-                            ),
-                          ),
-                        ),
-                      ),
-                      selected: _recipientType == 'doctor',
-                      selectedColor: primaryColor,
-                      backgroundColor: surfaceColor,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                      onSelected: (sel) {
-                        if (sel) setState(() => _recipientType = 'doctor');
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 15),
-                  Expanded(
-                    child: ChoiceChip(
-                      label: Center(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          child: Text(
-                            isAr ? 'المعيد' : 'Teaching Assistant',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: _recipientType == 'ta' ? (isDark ? Colors.black : Colors.white) : labelColor,
-                            ),
-                          ),
-                        ),
-                      ),
-                      selected: _recipientType == 'ta',
-                      selectedColor: primaryColor,
-                      backgroundColor: surfaceColor,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                      onSelected: (sel) {
-                        if (sel) setState(() => _recipientType = 'ta');
-                      },
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 25),
-              _sectionHeader(isAr ? 'رفع ملف البحث/الشيت' : 'Pick File', labelColor),
-              const SizedBox(height: 12),
-              GestureDetector(
-                onTap: _pickFile,
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 50, horizontal: 20),
-                  decoration: BoxDecoration(
-                    color: surfaceColor,
-                    border: Border.all(
-                      color: _pickedFile != null ? Colors.green.withAlpha(100) : primaryColor.withAlpha(50), 
-                      width: 2,
-                    ),
-                    borderRadius: BorderRadius.circular(30),
-                    boxShadow: [BoxShadow(color: Colors.black.withAlpha(isDark ? 40 : 10), blurRadius: 15, offset: const Offset(0, 10))],
-                  ),
-                  child: Column(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: (_pickedFile != null ? Colors.green : primaryColor).withAlpha(20),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          _pickedFile != null ? Icons.check_circle_rounded : Icons.cloud_upload_rounded, 
-                          size: 70, 
-                          color: _pickedFile != null ? Colors.green : primaryColor,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Text(
-                        _selectedFileName ?? (isAr ? 'اضغط لاختيار ملف (PDF / DOCX)' : 'Tap to pick (PDF / DOCX)'),
-                        style: TextStyle(
-                          color: isDark ? Colors.white : Colors.black87,
-                          fontSize: 15,
-                          fontWeight: _pickedFile != null ? FontWeight.bold : FontWeight.normal,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      if (_pickedFile != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 10),
-                          child: Text(
-                            "${(_pickedFile!.size / 1024).toStringAsFixed(1)} KB",
-                            style: const TextStyle(color: Colors.grey, fontSize: 12),
-                          ),
-                        ),
-                    ],
-                  ),
+    return Row(
+      children: List.generate(steps.length, (index) {
+        final isActive = index == _currentStep;
+        final isCompleted = index < _currentStep;
+
+        return Expanded(
+          child: Column(
+            children: [
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: isCompleted || isActive ? color : Colors.grey.withAlpha(77),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  isCompleted ? Icons.check : steps[index]['icon'] as IconData,
+                  color: Colors.white,
+                  size: 24,
                 ),
               ),
-              const SizedBox(height: 40),
-              SizedBox(
-                width: double.infinity,
-                height: 65,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _submit,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryColor,
-                    foregroundColor: isDark ? Colors.black : Colors.white,
-                    elevation: 10,
-                    shadowColor: primaryColor.withAlpha(100),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                  ),
-                  child: _isLoading
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              isAr ? 'إرسال الآن' : 'Submit Now', 
-                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)
+              const SizedBox(height: 8),
+              Text(
+                steps[index]['label'] as String,
+                style: GoogleFonts.cairo(
+                  fontSize: 11,
+                  fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                  color: isActive ? color : Colors.grey,
+                ),
+              ),
+            ],
+          ),
+        );
+      }),
+    );
+  }
+
+  Widget _buildSubjectSelection(Color color, bool isDark, bool isAr) {
+    final subjects = _ds.studentSubjects.where((s) => s.isNotEmpty).toList();
+
+    if (subjects.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(40),
+          child: Text(
+            isAr ? 'لا توجد مواد مسجلة' : 'No subjects registered',
+            style: GoogleFonts.cairo(color: Colors.grey),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          isAr ? 'اختر المادة الدراسية' : 'Select Subject',
+          style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 20),
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: subjects.length,
+          itemBuilder: (context, index) {
+            final subject = subjects[index];
+            return Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              elevation: isDark ? 0 : 2,
+              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+                side: isDark ? BorderSide(color: Colors.white.withAlpha(13)) : BorderSide.none,
+              ),
+              child: ListTile(
+                contentPadding: const EdgeInsets.all(16),
+                leading: CircleAvatar(
+                  backgroundColor: color.withAlpha(26),
+                  child: Icon(Icons.book, color: color),
+                ),
+                title: Text(
+                  subject,
+                  style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                trailing: Icon(Icons.arrow_forward_ios, color: color, size: 18),
+                onTap: () {
+                  setState(() {
+                    _selectedSubject = subject;
+                    _currentStep = 1;
+                  });
+                },
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRecipientSelection(Color color, bool isDark, bool isAr) {
+    final studentLevel = _ds.currentStudent?['level'] ?? 'level_1';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => setState(() => _currentStep = 0),
+            ),
+            Expanded(
+              child: Text(
+                isAr ? 'اختر المستلم' : 'Select Recipient',
+                style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        StreamBuilder(
+          stream: _ds.getInstituteCoursesColl(studentLevel).snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+              return Center(
+                child: Text(
+                  isAr ? 'لا توجد مواد' : 'No courses',
+                  style: GoogleFonts.cairo(color: Colors.grey),
+                ),
+              );
+            }
+
+            // Filter courses for selected subject
+            final courses = snapshot.data!.docs.where((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              return (data['name'] ?? '').toString().trim().toLowerCase() ==
+                  _selectedSubject?.trim().toLowerCase();
+            }).toList();
+
+            if (courses.isEmpty) {
+              return Center(
+                child: Text(
+                  isAr ? 'لا توجد معلومات للمادة' : 'No course info',
+                  style: GoogleFonts.cairo(color: Colors.grey),
+                ),
+              );
+            }
+
+            return ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: courses.length,
+              itemBuilder: (context, index) {
+                final courseData = courses[index].data() as Map<String, dynamic>;
+                final doctorId = courseData['doctor_id']?.toString() ?? '';
+                final taId = courseData['ta_id']?.toString() ?? '';
+
+                return Column(
+                  children: [
+                    if (doctorId.isNotEmpty) ...[
+                      StreamBuilder(
+                        stream: _ds.instituteDoctorsColl.doc(doctorId).snapshots(),
+                        builder: (context, docSnapshot) {
+                          if (!docSnapshot.hasData) return const SizedBox();
+                          final docData = docSnapshot.data?.data() as Map<String, dynamic>?;
+                          final docName = docData?['name'] ?? 'دكتور';
+
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            elevation: isDark ? 0 : 2,
+                            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(15),
+                              side: isDark ? BorderSide(color: Colors.white.withAlpha(13)) : BorderSide.none,
                             ),
-                            const SizedBox(width: 10),
-                            const Icon(Icons.send_rounded),
-                          ],
-                        ),
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.all(16),
+                              leading: CircleAvatar(
+                                backgroundColor: Colors.blue.withAlpha(26),
+                                child: const Icon(Icons.school, color: Colors.blue),
+                              ),
+                              title: Text(
+                                docName,
+                                style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
+                              ),
+                              subtitle: Text(
+                                isAr ? 'الدكتور' : 'Doctor',
+                                style: GoogleFonts.cairo(fontSize: 12, color: Colors.grey),
+                              ),
+                              trailing: Icon(Icons.arrow_forward_ios, color: color, size: 18),
+                              onTap: () {
+                                setState(() {
+                                  _selectedRecipientType = 'doctor';
+                                  _selectedRecipientId = doctorId;
+                                  _selectedRecipientName = docName;
+                                  _currentStep = 2;
+                                  _loadTopics();
+                                });
+                              },
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                    if (taId.isNotEmpty) ...[
+                      StreamBuilder(
+                        stream: _ds.instituteTasColl.doc(taId).snapshots(),
+                        builder: (context, taSnapshot) {
+                          if (!taSnapshot.hasData) return const SizedBox();
+                          final taData = taSnapshot.data?.data() as Map<String, dynamic>?;
+                          final taName = taData?['name'] ?? 'معيد';
+
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            elevation: isDark ? 0 : 2,
+                            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(15),
+                              side: isDark ? BorderSide(color: Colors.white.withAlpha(13)) : BorderSide.none,
+                            ),
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.all(16),
+                              leading: CircleAvatar(
+                                backgroundColor: Colors.green.withAlpha(26),
+                                child: const Icon(Icons.person, color: Colors.green),
+                              ),
+                              title: Text(
+                                taName,
+                                style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
+                              ),
+                              subtitle: Text(
+                                isAr ? 'المعيد' : 'TA',
+                                style: GoogleFonts.cairo(fontSize: 12, color: Colors.grey),
+                              ),
+                              trailing: Icon(Icons.arrow_forward_ios, color: color, size: 18),
+                              onTap: () {
+                                setState(() {
+                                  _selectedRecipientType = 'ta';
+                                  _selectedRecipientId = taId;
+                                  _selectedRecipientName = taName;
+                                  _currentStep = 2;
+                                  _loadTopics();
+                                });
+                              },
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ],
+                );
+              },
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTopicSelection(Color color, bool isDark, bool isAr) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => setState(() => _currentStep = 1),
+            ),
+            Expanded(
+              child: Text(
+                isAr ? 'اختر عنوان البحث' : 'Select Topic',
+                style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: color.withAlpha(26),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.info_outline, color: color, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '${isAr ? "المستلم" : "Recipient"}: $_selectedRecipientName',
+                  style: GoogleFonts.cairo(fontSize: 13, fontWeight: FontWeight.bold),
                 ),
               ),
             ],
           ),
         ),
-      ),
+        const SizedBox(height: 20),
+        if (_availableTopics.isEmpty)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.all(40),
+              child: Column(
+                children: [
+                  Icon(Icons.topic_outlined, size: 60, color: Colors.grey.withAlpha(128)),
+                  const SizedBox(height: 15),
+                  Text(
+                    isAr ? 'لا توجد عناوين متاحة حالياً' : 'No topics available',
+                    style: GoogleFonts.cairo(color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+          )
+        else
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _availableTopics.length,
+            itemBuilder: (context, index) {
+              final topic = _availableTopics[index];
+              final title = topic['title'] ?? '';
+              final topicId = topic['id'] ?? '';
+              final deadline = topic['deadline'] != null
+                  ? DateTime.fromMillisecondsSinceEpoch(topic['deadline'])
+                  : null;
+              final remainingDays = topic['remainingDays'];
+
+              return Card(
+                margin: const EdgeInsets.only(bottom: 12),
+                elevation: isDark ? 0 : 2,
+                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15),
+                  side: isDark ? BorderSide(color: Colors.white.withAlpha(13)) : BorderSide.none,
+                ),
+                child: ListTile(
+                  contentPadding: const EdgeInsets.all(16),
+                  leading: CircleAvatar(
+                    backgroundColor: color.withAlpha(26),
+                    child: Icon(Icons.assignment, color: color),
+                  ),
+                  title: Text(
+                    title,
+                    style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (deadline != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          '${isAr ? "آخر موعد" : "Deadline"}: ${deadline.year}/${deadline.month}/${deadline.day}',
+                          style: GoogleFonts.cairo(fontSize: 12, color: Colors.grey),
+                        ),
+                      ],
+                      if (remainingDays != null) ...[
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.schedule,
+                              size: 14,
+                              color: remainingDays <= 3 ? Colors.red : Colors.orange,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              isAr ? 'متبقي $remainingDays يوم' : '$remainingDays days left',
+                              style: GoogleFonts.cairo(
+                                fontSize: 11,
+                                color: remainingDays <= 3 ? Colors.red : Colors.orange,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                  trailing: Icon(Icons.arrow_forward_ios, color: color, size: 18),
+                  onTap: () {
+                    setState(() {
+                      _selectedTopicId = topicId;
+                      _selectedTopicTitle = title;
+                      _currentStep = 3;
+                    });
+                  },
+                ),
+              );
+            },
+          ),
+      ],
     );
   }
 
-  Widget _sectionHeader(String title, Color color) {
-    return Row(
+  Widget _buildFileUpload(Color color, bool isDark, bool isAr) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(width: 4, height: 18, decoration: BoxDecoration(color: const Color(0xFF673AB7), borderRadius: BorderRadius.circular(2))),
-        const SizedBox(width: 10),
-        Text(title, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 17)),
+        Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => setState(() => _currentStep = 2),
+            ),
+            Expanded(
+              child: Text(
+                isAr ? 'رفع الملف' : 'Upload File',
+                style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        Container(
+          padding: const EdgeInsets.all(15),
+          decoration: BoxDecoration(
+            color: color.withAlpha(26),
+            borderRadius: BorderRadius.circular(15),
+            border: Border.all(color: color.withAlpha(51)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.check_circle, color: color, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    isAr ? 'ملخص الإرسال' : 'Summary',
+                    style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              _summaryRow(Icons.book, isAr ? 'المادة' : 'Subject', _selectedSubject ?? '', isAr),
+              _summaryRow(Icons.person, isAr ? 'المستلم' : 'To', _selectedRecipientName ?? '', isAr),
+              _summaryRow(Icons.topic, isAr ? 'العنوان' : 'Topic', _selectedTopicTitle ?? '', isAr),
+            ],
+          ),
+        ),
+        const SizedBox(height: 25),
+        GestureDetector(
+          onTap: _pickFile,
+          child: Container(
+            padding: const EdgeInsets.all(30),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: color, width: 2, style: BorderStyle.solid),
+            ),
+            child: Column(
+              children: [
+                Icon(
+                  _pickedFile == null ? Icons.cloud_upload : Icons.check_circle,
+                  size: 60,
+                  color: _pickedFile == null ? color : Colors.green,
+                ),
+                const SizedBox(height: 15),
+                Text(
+                  _pickedFile == null
+                      ? (isAr ? 'اضغط لاختيار ملف' : 'Tap to select file')
+                      : _selectedFileName ?? '',
+                  style: GoogleFonts.cairo(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: _pickedFile == null ? color : Colors.green,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'PDF, DOCX, DOC',
+                  style: GoogleFonts.cairo(fontSize: 12, color: Colors.grey),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 30),
+        SizedBox(
+          width: double.infinity,
+          height: 55,
+          child: ElevatedButton(
+            onPressed: _pickedFile == null ? null : _submit,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: color,
+              disabledBackgroundColor: Colors.grey,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              elevation: 3,
+            ),
+            child: Text(
+              isAr ? 'إرسال البحث' : 'Submit Research',
+              style: GoogleFonts.cairo(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ),
       ],
+    );
+  }
+
+  Widget _summaryRow(IconData icon, String label, String value, bool isAr) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: Colors.grey),
+          const SizedBox(width: 8),
+          Text(
+            '$label: ',
+            style: GoogleFonts.cairo(fontSize: 13, color: Colors.grey),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: GoogleFonts.cairo(fontSize: 13, fontWeight: FontWeight.bold),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
