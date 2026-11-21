@@ -2180,11 +2180,11 @@ class DataService extends ChangeNotifier {
           .orderBy('createdAt', descending: true);
 
       if (subject != null && subject.isNotEmpty) {
-        query = query.where('subject', isEqualTo: subject) as Query<Map<String, dynamic>>;
+        query = query.where('subject', isEqualTo: subject);
       }
 
       if (onlyActive) {
-        query = query.where('isActive', isEqualTo: true) as Query<Map<String, dynamic>>;
+        query = query.where('isActive', isEqualTo: true);
       }
 
       return query.snapshots().map((snapshot) {
