@@ -129,6 +129,15 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
                 : _selectedSubject == null
                     ? _buildSubjectSelection(primaryColor, isDark)
                     : _buildMainContent(primaryColor, isDark),
+            floatingActionButton: _selectedSubject != null && _ds.currentDoctor != null
+                ? FloatingActionButton.extended(
+                    onPressed: () => _showManageTopicsDialog(primaryColor, isDark),
+                    backgroundColor: primaryColor,
+                    icon: const Icon(Icons.topic_rounded, color: Colors.white),
+                    label: Text(isAr ? 'إدارة العناوين' : 'Manage Topics',
+                        style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold)),
+                  )
+                : null,
           ),
         );
       }
@@ -757,6 +766,475 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showManageTopicsDialog(Color primaryColor, bool isDark) {
+    bool isAr = _ds.isArabic;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.85,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (_, scrollController) => Container(
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: primaryColor.withAlpha(26),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      isAr ? 'إدارة عناوين الأبحاث' : 'Manage Research Topics',
+                      style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.add_circle, color: primaryColor, size: 30),
+                      onPressed: () => _showAddTopicDialog(primaryColor, isDark),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: StreamBuilder<List<Map<String, dynamic>>>(
+                  stream: _ds.getResearchTopics(
+                    subject: _selectedSubject,
+                    onlyActive: false,
+                  ),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.topic_outlined, size: 80, color: Colors.grey.withAlpha(128)),
+                            const SizedBox(height: 20),
+                            Text(
+                              isAr ? 'لا توجد عناوين بعد' : 'No topics yet',
+                              style: GoogleFonts.cairo(fontSize: 16, color: Colors.grey),
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              isAr ? 'اضغط + لإضافة عنوان جديد' : 'Press + to add a topic',
+                              style: GoogleFonts.cairo(fontSize: 14, color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    final topics = snapshot.data!;
+
+                    return ListView.builder(
+                      controller: scrollController,
+                      padding: const EdgeInsets.all(15),
+                      itemCount: topics.length,
+                      itemBuilder: (context, index) {
+                        final data = topics[index];
+                        final topicId = data['id'] ?? '';
+                        final title = data['title'] ?? '';
+                        final isActive = data['isActive'] ?? true;
+                        final deadline = data['deadline'] != null
+                            ? DateTime.fromMillisecondsSinceEpoch(data['deadline'])
+                            : null;
+
+                        final isExpired = deadline != null && DateTime.now().isAfter(deadline);
+                        final remainingDays = deadline?.difference(DateTime.now()).inDays;
+
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          elevation: isDark ? 0 : 2,
+                          color: isDark ? const Color(0xFF2A2A2A) : Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                            side: isDark ? BorderSide(color: Colors.white.withAlpha(13)) : BorderSide.none,
+                          ),
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            leading: CircleAvatar(
+                              backgroundColor: isActive && !isExpired
+                                  ? Colors.green.withAlpha(26)
+                                  : Colors.grey.withAlpha(26),
+                              child: Icon(
+                                isActive && !isExpired ? Icons.check_circle : Icons.cancel,
+                                color: isActive && !isExpired ? Colors.green : Colors.grey,
+                              ),
+                            ),
+                            title: Text(
+                              title,
+                              style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 15),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const SizedBox(height: 4),
+                                if (deadline != null)
+                                  Text(
+                                    isAr
+                                        ? 'آخر موعد: ${deadline.year}/${deadline.month}/${deadline.day}'
+                                        : 'Deadline: ${deadline.year}/${deadline.month}/${deadline.day}',
+                                    style: GoogleFonts.cairo(fontSize: 12, color: isExpired ? Colors.red : Colors.grey),
+                                  ),
+                                if (remainingDays != null && remainingDays > 0)
+                                  Text(
+                                    isAr ? 'متبقي $remainingDays يوم' : '$remainingDays days left',
+                                    style: GoogleFonts.cairo(
+                                      fontSize: 11,
+                                      color: remainingDays < 7 ? Colors.orange : Colors.grey,
+                                    ),
+                                  ),
+                                if (isExpired)
+                                  Text(
+                                    isAr ? 'انتهى الموعد' : 'Expired',
+                                    style: GoogleFonts.cairo(fontSize: 11, color: Colors.red),
+                                  ),
+                              ],
+                            ),
+                            trailing: PopupMenuButton(
+                              icon: const Icon(Icons.more_vert),
+                              itemBuilder: (context) => [
+                                PopupMenuItem(
+                                  value: 'edit',
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.edit, size: 20),
+                                      const SizedBox(width: 10),
+                                      Text(isAr ? 'تعديل' : 'Edit', style: GoogleFonts.cairo()),
+                                    ],
+                                  ),
+                                ),
+                                PopupMenuItem(
+                                  value: 'toggle',
+                                  child: Row(
+                                    children: [
+                                      Icon(isActive ? Icons.visibility_off : Icons.visibility, size: 20),
+                                      const SizedBox(width: 10),
+                                      Text(
+                                        isActive ? (isAr ? 'إخفاء' : 'Hide') : (isAr ? 'إظهار' : 'Show'),
+                                        style: GoogleFonts.cairo(),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                PopupMenuItem(
+                                  value: 'delete',
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.delete, size: 20, color: Colors.red),
+                                      const SizedBox(width: 10),
+                                      Text(isAr ? 'حذف' : 'Delete',
+                                          style: GoogleFonts.cairo(color: Colors.red)),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                              onSelected: (value) {
+                                if (value == 'edit') {
+                                  _showEditTopicDialog(topicId, data, primaryColor, isDark);
+                                } else if (value == 'toggle') {
+                                  _ds.updateResearchTopic(topicId, isActive: !isActive);
+                                } else if (value == 'delete') {
+                                  _confirmDeleteTopic(topicId, title, primaryColor, isDark);
+                                }
+                              },
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showAddTopicDialog(Color primaryColor, bool isDark) {
+    bool isAr = _ds.isArabic;
+    final titleController = TextEditingController();
+    DateTime? selectedDeadline;
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF2A2A2A) : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text(
+            isAr ? 'إضافة عنوان بحث جديد' : 'Add New Research Topic',
+            style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
+          ),
+          content: Form(
+            key: formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: titleController,
+                    style: GoogleFonts.cairo(),
+                    decoration: InputDecoration(
+                      labelText: isAr ? 'عنوان البحث' : 'Topic Title',
+                      labelStyle: GoogleFonts.cairo(),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
+                      prefixIcon: const Icon(Icons.title),
+                    ),
+                    validator: (v) => v == null || v.trim().isEmpty
+                        ? (isAr ? 'مطلوب' : 'Required')
+                        : null,
+                  ),
+                  const SizedBox(height: 15),
+                  ListTile(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15),
+                      side: BorderSide(color: Colors.grey.withAlpha(77)),
+                    ),
+                    leading: const Icon(Icons.calendar_today),
+                    title: Text(
+                      selectedDeadline == null
+                          ? (isAr ? 'اختر آخر موعد (اختياري)' : 'Select Deadline (optional)')
+                          : '${selectedDeadline!.year}/${selectedDeadline!.month}/${selectedDeadline!.day}',
+                      style: GoogleFonts.cairo(),
+                    ),
+                    trailing: selectedDeadline != null
+                        ? IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () => setDialogState(() => selectedDeadline = null),
+                          )
+                        : null,
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: DateTime.now().add(const Duration(days: 7)),
+                        firstDate: DateTime.now(),
+                        lastDate: DateTime.now().add(const Duration(days: 365)),
+                      );
+                      if (picked != null) {
+                        setDialogState(() => selectedDeadline = picked);
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(isAr ? 'إلغاء' : 'Cancel', style: GoogleFonts.cairo()),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryColor,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () async {
+                if (formKey.currentState!.validate()) {
+                  await _ds.createResearchTopic(
+                    title: titleController.text.trim(),
+                    subject: _selectedSubject!,
+                    deadline: selectedDeadline,
+                  );
+
+                  if (mounted) {
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          isAr ? 'تم إضافة العنوان بنجاح ✓' : 'Topic added successfully ✓',
+                          style: GoogleFonts.cairo(),
+                        ),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                }
+              },
+              child: Text(isAr ? 'إضافة' : 'Add', style: GoogleFonts.cairo(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showEditTopicDialog(String topicId, Map<String, dynamic> data, Color primaryColor, bool isDark) {
+    bool isAr = _ds.isArabic;
+    final titleController = TextEditingController(text: data['title']);
+    DateTime? selectedDeadline = data['deadline'] != null
+        ? DateTime.fromMillisecondsSinceEpoch(data['deadline'])
+        : null;
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF2A2A2A) : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text(
+            isAr ? 'تعديل عنوان البحث' : 'Edit Research Topic',
+            style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
+          ),
+          content: Form(
+            key: formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: titleController,
+                    style: GoogleFonts.cairo(),
+                    decoration: InputDecoration(
+                      labelText: isAr ? 'عنوان البحث' : 'Topic Title',
+                      labelStyle: GoogleFonts.cairo(),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
+                      prefixIcon: const Icon(Icons.title),
+                    ),
+                    validator: (v) => v == null || v.trim().isEmpty
+                        ? (isAr ? 'مطلوب' : 'Required')
+                        : null,
+                  ),
+                  const SizedBox(height: 15),
+                  ListTile(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15),
+                      side: BorderSide(color: Colors.grey.withAlpha(77)),
+                    ),
+                    leading: const Icon(Icons.calendar_today),
+                    title: Text(
+                      selectedDeadline == null
+                          ? (isAr ? 'اختر آخر موعد (اختياري)' : 'Select Deadline (optional)')
+                          : '${selectedDeadline!.year}/${selectedDeadline!.month}/${selectedDeadline!.day}',
+                      style: GoogleFonts.cairo(),
+                    ),
+                    trailing: selectedDeadline != null
+                        ? IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () => setDialogState(() => selectedDeadline = null),
+                          )
+                        : null,
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: selectedDeadline ?? DateTime.now().add(const Duration(days: 7)),
+                        firstDate: DateTime.now(),
+                        lastDate: DateTime.now().add(const Duration(days: 365)),
+                      );
+                      if (picked != null) {
+                        setDialogState(() => selectedDeadline = picked);
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(isAr ? 'إلغاء' : 'Cancel', style: GoogleFonts.cairo()),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryColor,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () async {
+                if (formKey.currentState!.validate()) {
+                  await _ds.updateResearchTopic(
+                    topicId,
+                    title: titleController.text.trim(),
+                    deadline: selectedDeadline,
+                  );
+
+                  if (mounted) {
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          isAr ? 'تم التعديل بنجاح ✓' : 'Updated successfully ✓',
+                          style: GoogleFonts.cairo(),
+                        ),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                }
+              },
+              child: Text(isAr ? 'حفظ' : 'Save', style: GoogleFonts.cairo(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _confirmDeleteTopic(String topicId, String title, Color primaryColor, bool isDark) {
+    bool isAr = _ds.isArabic;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF2A2A2A) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          isAr ? 'تأكيد الحذف' : 'Confirm Delete',
+          style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          isAr ? 'هل تريد حذف العنوان "$title"؟' : 'Delete topic "$title"?',
+          style: GoogleFonts.cairo(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(isAr ? 'إلغاء' : 'Cancel', style: GoogleFonts.cairo()),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () async {
+              await _ds.deleteResearchTopic(topicId);
+              if (mounted) {
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      isAr ? 'تم الحذف' : 'Deleted',
+                      style: GoogleFonts.cairo(),
+                    ),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            child: Text(isAr ? 'حذف' : 'Delete', style: GoogleFonts.cairo(color: Colors.white)),
+          ),
+        ],
       ),
     );
   }
