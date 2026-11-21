@@ -430,12 +430,49 @@ class DataService extends ChangeNotifier {
       if (role != null) return role;
     }
 
+    // 🔒 SECURITY: For students, DO NOT search other colleges
+    // Students must login to their registered college only
+    // Doctors/TAs/Managers can work across multiple colleges (checked below)
+
+    // Only search other colleges for staff (doctors, TAs, managers)
+    // Students MUST be in the selected college
+    String cleanCode = uid
+        .replaceAll('doc_', '')
+        .replaceAll('DOC_', '')
+        .replaceAll('ta_', '')
+        .replaceAll('TA_', '')
+        .replaceAll('std_', '')
+        .replaceAll('STD_', '')
+        .replaceAll('.college@smart.com', '')
+        .replaceAll('@smart.edu', '')
+        .replaceAll('@smart.com', '')
+        .trim();
+
+    // Check if this looks like a student ID (numbers only or STD prefix)
+    bool looksLikeStudent = cleanCode.isNotEmpty &&
+        (RegExp(r'^\d+$').hasMatch(cleanCode) || uid.toLowerCase().contains('std'));
+
+    // 🔒 If it looks like a student and not found in selected college, REJECT
+    if (looksLikeStudent && selectedInstituteId != null) {
+      // Student not found in their selected college - login denied
+      return null;
+    }
+
+    // Only for staff: search other colleges
     try {
       var colleges = await _firestore.collection('colleges').get();
       for (var colDoc in colleges.docs) {
         if (colDoc.id == selectedInstituteId) continue;
         role = await _checkUserInCollege(colDoc.id, uid, userEmail: userEmail);
         if (role != null) {
+          // Found in another college - only allow if NOT a student
+          if (role == 'student') {
+            // 🔒 CRITICAL: Student found in wrong college - REJECT
+            currentStudent = null;
+            userRole = null;
+            return null;
+          }
+          // Staff member found - allow and switch college
           await setInstitute(colDoc.id);
           return role;
         }
@@ -2082,6 +2119,173 @@ class DataService extends ChangeNotifier {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (e) {
       debugPrint("WhatsApp launch error: $e");
+    }
+  }
+
+  // ==================== RESEARCH TOPICS MANAGEMENT ====================
+
+  /// Create a new research topic with deadline
+  /// الدكتور يحدد عنوان البحث والموعد
+  Future<String> createResearchTopic({
+    required String title,
+    required String subject,
+    DateTime? deadline,
+    int? maxDays,
+  }) async {
+    if (currentDoctor == null || selectedInstituteId == null) {
+      throw isArabic ? "يرجى تسجيل الدخول أولاً" : "Please login first";
+    }
+
+    try {
+      final docRef = _firestore
+          .collection('colleges')
+          .doc(selectedInstituteId)
+          .collection('research_topics')
+          .doc();
+
+      final topic = {
+        'title': title.trim(),
+        'subject': subject.trim(),
+        'doctorId': currentDoctor!['uid'] ?? currentDoctor!['id']?.toString(),
+        'doctorName': currentDoctor!['name'] ?? 'Unknown',
+        'collegeId': selectedInstituteId,
+        'deadline': deadline?.millisecondsSinceEpoch,
+        'maxDays': maxDays,
+        'isActive': true,
+        'createdAt': DateTime.now().millisecondsSinceEpoch,
+      };
+
+      await docRef.set(topic);
+      return docRef.id;
+    } catch (e) {
+      debugPrint("Create topic error: $e");
+      rethrow;
+    }
+  }
+
+  /// Get all active research topics for a subject
+  /// للدكتور: عرض كل العناوين اللي أنشأها
+  /// للطالب: عرض العناوين المتاحة للإرسال
+  Stream<List<Map<String, dynamic>>> getResearchTopics(
+      {String? subject, bool onlyActive = true}) {
+    if (selectedInstituteId == null) {
+      return Stream.value([]);
+    }
+
+    try {
+      var query = _firestore
+          .collection('colleges')
+          .doc(selectedInstituteId)
+          .collection('research_topics')
+          .orderBy('createdAt', descending: true);
+
+      if (subject != null && subject.isNotEmpty) {
+        query = query.where('subject', isEqualTo: subject) as Query<Map<String, dynamic>>;
+      }
+
+      if (onlyActive) {
+        query = query.where('isActive', isEqualTo: true) as Query<Map<String, dynamic>>;
+      }
+
+      return query.snapshots().map((snapshot) {
+        return snapshot.docs.map((doc) {
+          final data = doc.data();
+          data['id'] = doc.id;
+
+          // Check if deadline passed
+          final deadline = data['deadline'];
+          if (deadline != null) {
+            final deadlineDate = DateTime.fromMillisecondsSinceEpoch(deadline);
+            data['isExpired'] = DateTime.now().isAfter(deadlineDate);
+            data['remainingDays'] =
+                deadlineDate.difference(DateTime.now()).inDays;
+          } else {
+            data['isExpired'] = false;
+            data['remainingDays'] = null;
+          }
+
+          return data;
+        }).toList();
+      });
+    } catch (e) {
+      debugPrint("Get topics error: $e");
+      return Stream.value([]);
+    }
+  }
+
+  /// Update research topic
+  Future<void> updateResearchTopic(
+    String topicId, {
+    String? title,
+    DateTime? deadline,
+    bool? isActive,
+  }) async {
+    if (selectedInstituteId == null) return;
+
+    try {
+      final updates = <String, dynamic>{};
+      if (title != null) updates['title'] = title.trim();
+      if (deadline != null) updates['deadline'] = deadline.millisecondsSinceEpoch;
+      if (isActive != null) updates['isActive'] = isActive;
+
+      await _firestore
+          .collection('colleges')
+          .doc(selectedInstituteId)
+          .collection('research_topics')
+          .doc(topicId)
+          .update(updates);
+    } catch (e) {
+      debugPrint("Update topic error: $e");
+      rethrow;
+    }
+  }
+
+  /// Delete research topic
+  Future<void> deleteResearchTopic(String topicId) async {
+    if (selectedInstituteId == null) return;
+
+    try {
+      await _firestore
+          .collection('colleges')
+          .doc(selectedInstituteId)
+          .collection('research_topics')
+          .doc(topicId)
+          .delete();
+    } catch (e) {
+      debugPrint("Delete topic error: $e");
+      rethrow;
+    }
+  }
+
+  /// Check if a topic is still accepting submissions
+  /// يفحص إذا الموعد انتهى أو لا
+  Future<bool> isTopicAcceptingSubmissions(String topicId) async {
+    if (selectedInstituteId == null) return false;
+
+    try {
+      final doc = await _firestore
+          .collection('colleges')
+          .doc(selectedInstituteId)
+          .collection('research_topics')
+          .doc(topicId)
+          .get();
+
+      if (!doc.exists) return false;
+
+      final data = doc.data();
+      if (data == null) return false;
+
+      final isActive = data['isActive'] ?? true;
+      if (!isActive) return false;
+
+      final deadline = data['deadline'];
+      if (deadline == null) return true;
+
+      final deadlineDate = DateTime.fromMillisecondsSinceEpoch(deadline);
+      return DateTime.now().isBefore(deadlineDate);
+    } catch (e) {
+      debugPrint("Check topic error: $e");
+      return false;
     }
   }
 }

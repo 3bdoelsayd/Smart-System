@@ -12,10 +12,44 @@ class SendResearchScreen extends StatefulWidget {
 class _SendResearchScreenState extends State<SendResearchScreen> {
   final DataService _dataService = DataService();
   String? _selectedSubject;
+  String? _selectedTopicId; // ✅ NEW: Selected research topic
+  String? _selectedTopicTitle; // ✅ NEW: Topic title
   String? _selectedFileName;
   PlatformFile? _pickedFile;
   String _recipientType = 'doctor'; // 'doctor' or 'ta'
   bool _isLoading = false;
+  List<Map<String, dynamic>> _availableTopics = []; // ✅ NEW: Available topics
+
+  /// ✅ Load available research topics when subject changes
+  void _loadTopics() {
+    if (_selectedSubject == null) {
+      setState(() {
+        _availableTopics = [];
+        _selectedTopicId = null;
+        _selectedTopicTitle = null;
+      });
+      return;
+    }
+
+    // Listen to topics stream
+    _dataService
+        .getResearchTopics(subject: _selectedSubject, onlyActive: true)
+        .listen((topics) {
+      // Filter out expired topics
+      final active = topics.where((t) => t['isExpired'] == false).toList();
+      if (mounted) {
+        setState(() {
+          _availableTopics = active;
+          // Reset selection if current topic is expired
+          if (_selectedTopicId != null &&
+              !active.any((t) => t['id'] == _selectedTopicId)) {
+            _selectedTopicId = null;
+            _selectedTopicTitle = null;
+          }
+        });
+      }
+    });
+  }
 
   Future<void> _pickFile() async {
     try {
@@ -42,6 +76,8 @@ class _SendResearchScreenState extends State<SendResearchScreen> {
 
   Future<void> _submit() async {
     final isAr = _dataService.isArabic;
+
+    // ✅ Validate required fields
     if (_selectedSubject == null || _pickedFile == null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(isAr ? 'يرجى اختيار المادة والملف' : 'Please select subject and file'),
@@ -49,12 +85,29 @@ class _SendResearchScreenState extends State<SendResearchScreen> {
       return;
     }
 
+    // ✅ Check if topic is required and validate deadline
+    if (_selectedTopicId != null) {
+      // Check deadline
+      final isAccepting = await _dataService.isTopicAcceptingSubmissions(_selectedTopicId!);
+      if (!isAccepting) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(isAr
+                ? 'عذراً، انتهى موعد إرسال الأبحاث لهذا العنوان'
+                : 'Sorry, deadline for this topic has passed'),
+            backgroundColor: Colors.red,
+          ));
+        }
+        return;
+      }
+    }
+
     setState(() => _isLoading = true);
     try {
       await _dataService.uploadResearchToRemote(
         subject: _selectedSubject!,
         file: _pickedFile!,
-        title: '',
+        title: _selectedTopicTitle ?? '', // ✅ Use topic title
         recipientType: _recipientType,
       );
 
@@ -124,9 +177,139 @@ class _SendResearchScreenState extends State<SendResearchScreen> {
                     style: TextStyle(color: isDark ? Colors.white38 : Colors.grey)
                   ),
                   items: _dataService.allSubjects.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
-                  onChanged: (val) => setState(() => _selectedSubject = val),
+                  onChanged: (val) {
+                    setState(() {
+                      _selectedSubject = val;
+                      _loadTopics(); // ✅ Load topics when subject changes
+                    });
+                  },
                 ),
               ),
+
+              // ✅ NEW: Research Topics Selector (shown after selecting subject)
+              if (_selectedSubject != null) ...[
+                const SizedBox(height: 25),
+                _sectionHeader(isAr ? 'اختيار عنوان البحث' : 'Select Research Topic', labelColor),
+                const SizedBox(height: 12),
+                if (_availableTopics.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: surfaceColor,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [BoxShadow(color: Colors.black.withAlpha(isDark ? 50 : 10), blurRadius: 10, offset: const Offset(0, 5))],
+                    ),
+                    child: Center(
+                      child: Text(
+                        isAr ? 'لا توجد عناوين متاحة حالياً' : 'No topics available',
+                        style: TextStyle(color: isDark ? Colors.white70 : Colors.black54),
+                      ),
+                    ),
+                  )
+                else
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: _availableTopics.length,
+                    itemBuilder: (context, index) {
+                      final topic = _availableTopics[index];
+                      final isExpired = topic['isExpired'] ?? false;
+                      final remainingDays = topic['remainingDays'];
+                      final isSelected = _selectedTopicId == topic['id'];
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: isSelected ? primaryColor.withAlpha(30) : surfaceColor,
+                          borderRadius: BorderRadius.circular(15),
+                          border: Border.all(
+                            color: isSelected ? primaryColor : Colors.transparent,
+                            width: 2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withAlpha(isDark ? 30 : 8),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            )
+                          ],
+                        ),
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          leading: Icon(
+                            Icons.assignment,
+                            color: isExpired ? Colors.red : primaryColor,
+                            size: 32,
+                          ),
+                          title: Text(
+                            topic['title'] ?? '',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.white : Colors.black87,
+                            ),
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 4),
+                              Text(
+                                '${isAr ? "الدكتور" : "Doctor"}: ${topic['doctorName'] ?? "Unknown"}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDark ? Colors.white60 : Colors.black54,
+                                ),
+                              ),
+                              if (remainingDays != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 4),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.schedule,
+                                        size: 14,
+                                        color: remainingDays <= 3 ? Colors.red : Colors.orange,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        isAr
+                                            ? 'متبقي $remainingDays يوم'
+                                            : '$remainingDays days left',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: remainingDays <= 3 ? Colors.red : Colors.orange,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
+                          trailing: isExpired
+                              ? Chip(
+                                  label: Text(
+                                    isAr ? 'منتهي' : 'Expired',
+                                    style: const TextStyle(color: Colors.white, fontSize: 10),
+                                  ),
+                                  backgroundColor: Colors.red,
+                                  padding: EdgeInsets.zero,
+                                )
+                              : null,
+                          enabled: !isExpired,
+                          onTap: isExpired
+                              ? null
+                              : () {
+                                  setState(() {
+                                    _selectedTopicId = topic['id'];
+                                    _selectedTopicTitle = topic['title'];
+                                  });
+                                },
+                        ),
+                      );
+                    },
+                  ),
+              ],
+
               const SizedBox(height: 25),
               _sectionHeader(isAr ? 'إرسال إلى' : 'Send To', labelColor),
               const SizedBox(height: 12),
