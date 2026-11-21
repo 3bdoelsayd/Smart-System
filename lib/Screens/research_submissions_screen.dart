@@ -313,9 +313,112 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
 
               return ListView.builder(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: topics.length,
+                itemCount: topics.length + 1, // +1 for "No Topic" section
                 itemBuilder: (context, index) {
-                  final topic = topics[index];
+                  // First item: "No Topic" (old researches)
+                  if (index == 0) {
+                    return StreamBuilder<QuerySnapshot>(
+                      stream: _ds.instituteRef
+                          .collection('researches')
+                          .where('subject', isEqualTo: _selectedSubject)
+                          .where('researchTopicId', isEqualTo: null)
+                          .snapshots(),
+                      builder: (context, researchSnapshot) {
+                        final researchCount = researchSnapshot.hasData ? researchSnapshot.data!.docs.length : 0;
+
+                        if (researchCount == 0) return const SizedBox.shrink(); // Hide if no old researches
+
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 15),
+                          elevation: isDark ? 0 : 3,
+                          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(18),
+                            side: isDark ? BorderSide(color: Colors.white.withAlpha(13)) : BorderSide.none,
+                          ),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(18),
+                            onTap: () {
+                              setState(() {
+                                _selectedTopicId = 'no_topic';
+                                _selectedTopicTitle = isAr ? 'بدون عنوان' : 'No Topic';
+                              });
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 60,
+                                    height: 60,
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.withAlpha(26),
+                                      borderRadius: BorderRadius.circular(15),
+                                    ),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          '$researchCount',
+                                          style: GoogleFonts.cairo(
+                                            fontSize: 20,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                        Text(
+                                          isAr ? 'بحث' : 'papers',
+                                          style: GoogleFonts.cairo(
+                                            fontSize: 10,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 15),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Icon(Icons.folder_open, size: 20, color: Colors.grey),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                isAr ? 'بدون عنوان' : 'No Topic',
+                                                style: GoogleFonts.cairo(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          isAr ? 'أبحاث قديمة غير مصنفة' : 'Old uncategorized researches',
+                                          style: GoogleFonts.cairo(
+                                            fontSize: 12,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  }
+
+                  // Regular topics (index - 1 because of "No Topic" item)
+                  final topic = topics[index - 1];
                   final topicId = topic['id'] ?? '';
                   final title = topic['title'] ?? '';
                   final isActive = topic['isActive'] ?? true;
@@ -469,6 +572,10 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
 
   Widget _buildMainContent(Color color, bool isDark) {
     bool isAr = _ds.isArabic;
+
+    // Handle "No Topic" section
+    final isNoTopicSection = _selectedTopicId == 'no_topic';
+
     return Column(
       children: [
         Padding(
@@ -559,6 +666,9 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
     final doctorUid = _ds.currentDoctor?['uid'] ?? '';
     final doctorId = _ds.currentDoctor?['id'] ?? '';
 
+    // ✅ Handle "No Topic" section (old researches without topicId)
+    final isNoTopicSection = _selectedTopicId == 'no_topic';
+
     return StreamBuilder<QuerySnapshot>(
       stream: _ds.submissionsColl
           .where('subject', isEqualTo: subject)
@@ -566,11 +676,21 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
         var docs = snapshot.data!.docs;
-        
+
         var filteredSubmissions = docs.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
           final docDocId = data['doctorId']?.toString();
           final recType = data['recipientType']?.toString();
+
+          // ✅ Filter by topic
+          final researchTopicId = data['researchTopicId'];
+          if (isNoTopicSection) {
+            // Show only researches without topic
+            if (researchTopicId != null && researchTopicId.toString().isNotEmpty) return false;
+          } else {
+            // Show only researches matching selected topic
+            if (researchTopicId != _selectedTopicId) return false;
+          }
 
           if (docDocId != null && docDocId.isNotEmpty) {
             if (docDocId == doctorUid || docDocId == doctorId) return true;
