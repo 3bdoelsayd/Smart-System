@@ -240,7 +240,7 @@ class _QuestionEditorScreenState extends State<QuestionEditorScreen> {
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: CircleAvatar(
-          backgroundColor: primaryColor.withOpacity(0.1),
+          backgroundColor: primaryColor.withValues(alpha: 0.1),
           child: Text(
             "${index + 1}",
             style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: primaryColor),
@@ -251,7 +251,7 @@ class _QuestionEditorScreenState extends State<QuestionEditorScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: typeColor.withOpacity(0.15),
+                color: typeColor.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
@@ -263,7 +263,7 @@ class _QuestionEditorScreenState extends State<QuestionEditorScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: Colors.teal.withOpacity(0.15),
+                color: Colors.teal.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
@@ -577,7 +577,7 @@ class _QuestionDialogContentState extends State<_QuestionDialogContent> {
                                 hintStyle: GoogleFonts.cairo(color: isDark ? Colors.white38 : Colors.grey),
                                 filled: true,
                                 fillColor: isSelected
-                                    ? Colors.green.withOpacity(isDark ? 0.2 : 0.1)
+                                    ? Colors.green.withValues(alpha: isDark ? 0.2 : 0.1)
                                     : (isDark ? Colors.black26 : Colors.grey.shade100),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
@@ -613,7 +613,7 @@ class _QuestionDialogContentState extends State<_QuestionDialogContent> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           decoration: BoxDecoration(
-                            color: _tfCorrectAnswer ? Colors.green.withOpacity(0.2) : (isDark ? Colors.black26 : Colors.grey.shade100),
+                            color: _tfCorrectAnswer ? Colors.green.withValues(alpha: 0.2) : (isDark ? Colors.black26 : Colors.grey.shade100),
                             border: Border.all(color: _tfCorrectAnswer ? Colors.green : Colors.transparent, width: 2),
                             borderRadius: BorderRadius.circular(14),
                           ),
@@ -634,7 +634,7 @@ class _QuestionDialogContentState extends State<_QuestionDialogContent> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           decoration: BoxDecoration(
-                            color: !_tfCorrectAnswer ? Colors.red.withOpacity(0.2) : (isDark ? Colors.black26 : Colors.grey.shade100),
+                            color: !_tfCorrectAnswer ? Colors.red.withValues(alpha: 0.2) : (isDark ? Colors.black26 : Colors.grey.shade100),
                             border: Border.all(color: !_tfCorrectAnswer ? Colors.red : Colors.transparent, width: 2),
                             borderRadius: BorderRadius.circular(14),
                           ),
@@ -653,7 +653,7 @@ class _QuestionDialogContentState extends State<_QuestionDialogContent> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.1),
+                    color: Colors.orange.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(

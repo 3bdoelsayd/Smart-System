@@ -67,7 +67,7 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
                       borderRadius: BorderRadius.circular(25),
                       boxShadow: [
                         BoxShadow(
-                          color: primaryColor.withOpacity(isDark ? 0.2 : 0.3),
+                          color: primaryColor.withValues(alpha: isDark ? 0.2 : 0.3),
                           blurRadius: 15,
                           offset: const Offset(0, 8),
                         )
@@ -101,7 +101,7 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
+                                  color: Colors.white.withValues(alpha: 0.2),
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 child: Text(
@@ -214,14 +214,14 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
         color: surfaceColor,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(isDark ? 0.1 : 0.05), blurRadius: 10, offset: const Offset(0, 4)),
+          BoxShadow(color: Colors.black.withValues(alpha: isDark ? 0.1 : 0.05), blurRadius: 10, offset: const Offset(0, 4)),
         ],
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+            decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
             child: Icon(icon, color: color),
           ),
           const SizedBox(width: 15),

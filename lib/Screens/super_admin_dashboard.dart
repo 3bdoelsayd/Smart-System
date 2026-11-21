@@ -213,7 +213,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   ),
                   borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(45), bottomRight: Radius.circular(45)),
                   boxShadow: [
-                    BoxShadow(color: (isDark ? Colors.black : const Color(0xFF673AB7)).withOpacity(0.3), blurRadius: 25, offset: const Offset(0, 10))
+                    BoxShadow(color: (isDark ? Colors.black : const Color(0xFF673AB7)).withValues(alpha: 0.3), blurRadius: 25, offset: const Offset(0, 10))
                   ],
                 ),
                 child: Column(
@@ -223,13 +223,13 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Builder(builder: (context) => Container(
-                          decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), borderRadius: BorderRadius.circular(15)),
+                          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(15)),
                           child: IconButton(icon: const Icon(Icons.menu_rounded, color: Colors.white, size: 28), onPressed: () => Scaffold.of(context).openDrawer()),
                         )),
                         Text(isAr ? 'نظام الإدارة' : 'Admin System', style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
                         Container(
                           padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), shape: BoxShape.circle),
+                          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.1), shape: BoxShape.circle),
                           child: const Icon(Icons.shield_rounded, color: Colors.white, size: 22),
                         )
                       ],
@@ -242,7 +242,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(_ds.translate('welcome'), style: GoogleFonts.cairo(color: Colors.white.withOpacity(0.7), fontSize: 14)),
+                              Text(_ds.translate('welcome'), style: GoogleFonts.cairo(color: Colors.white.withValues(alpha: 0.7), fontSize: 14)),
                               Text(adminName, style: GoogleFonts.cairo(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w900, height: 1.2)),
                             ],
                           ),
@@ -307,14 +307,14 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   Widget _buildQuickStat(String label, String value, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(color: Colors.white.withOpacity(0.12), borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.white10)),
+      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.white10)),
       child: Column(
         children: [
           Text(label, style: GoogleFonts.cairo(color: Colors.white60, fontSize: 10)),
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle, boxShadow: [BoxShadow(color: color.withOpacity(0.5), blurRadius: 5)])),
+              Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle, boxShadow: [BoxShadow(color: color.withValues(alpha: 0.5), blurRadius: 5)])),
               const SizedBox(width: 6),
               Text(value, style: GoogleFonts.cairo(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
             ],
@@ -331,19 +331,19 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: isDark ? Colors.black.withOpacity(0.4) : color.withOpacity(0.08),
+            color: isDark ? Colors.black.withValues(alpha: 0.4) : color.withValues(alpha: 0.08),
             blurRadius: 15,
             offset: const Offset(0, 8),
           ),
         ],
-        border: Border.all(color: isDark ? Colors.white.withOpacity(0.03) : Colors.grey.shade100, width: 1),
+        border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.03) : Colors.grey.shade100, width: 1),
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(28),
-          splashColor: color.withOpacity(0.1),
+          splashColor: color.withValues(alpha: 0.1),
           child: Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -351,7 +351,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
               children: [
                 Container(
                   padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(15)),
+                  decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(15)),
                   child: Icon(icon, color: color, size: 24),
                 ),
                 const Spacer(),
@@ -450,12 +450,12 @@ Widget _buildListItem({required bool isDarkMode, required String title, required
       borderRadius: BorderRadius.circular(25),
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.05),
+          color: Colors.black.withValues(alpha: isDarkMode ? 0.3 : 0.05),
           blurRadius: 15,
           offset: const Offset(0, 8),
         )
       ],
-      border: Border.all(color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey.shade100),
+      border: Border.all(color: isDarkMode ? Colors.white.withValues(alpha: 0.05) : Colors.grey.shade100),
     ),
     child: Column(
       children: [
@@ -473,7 +473,7 @@ Widget _buildListItem({required bool isDarkMode, required String title, required
               },
               child: CircleAvatar(
                 radius: 24,
-                backgroundColor: color.withOpacity(0.12),
+                backgroundColor: color.withValues(alpha: 0.12),
                 backgroundImage: photoUrl != null && photoUrl.isNotEmpty ? DataService().getAvatarImageProvider(photoUrl) : null,
                 child: (photoUrl ?? '').isEmpty
                     ? Text(
@@ -507,9 +507,9 @@ Widget _buildListItem({required bool isDarkMode, required String title, required
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
-                        color: Colors.orange.withOpacity(0.12),
+                        color: Colors.orange.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.orange.withOpacity(0.2)),
+                        border: Border.all(color: Colors.orange.withValues(alpha: 0.2)),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -548,7 +548,7 @@ Widget _buildActionCircle(IconData icon, Color color, VoidCallback onTap) {
       child: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(icon, color: color, size: 18),

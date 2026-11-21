@@ -21,7 +21,7 @@ class ModernButton extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 14),
           child: Row(
             children: [
-              CircleAvatar(backgroundColor: c.withOpacity(0.12), child: Icon(icon, color: c)),
+              CircleAvatar(backgroundColor: c.withValues(alpha: 0.12), child: Icon(icon, color: c)),
               const SizedBox(width: 14),
               Expanded(child: Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700))),
               const Icon(Icons.chevron_right, color: Colors.grey),

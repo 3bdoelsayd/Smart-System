@@ -40,7 +40,7 @@ class SubjectsGroupsScreen extends StatelessWidget {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                     child: ListTile(
                       leading: CircleAvatar(
-                        backgroundColor: primaryColor.withOpacity(0.1),
+                        backgroundColor: primaryColor.withValues(alpha: 0.1),
                         child: Icon(Icons.menu_book_rounded, color: primaryColor),
                       ),
                       title: Text(

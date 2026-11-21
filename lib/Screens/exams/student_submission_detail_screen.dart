@@ -226,7 +226,7 @@ class _StudentSubmissionDetailScreenState extends State<StudentSubmissionDetailS
                       children: [
                         CircleAvatar(
                           radius: 28,
-                          backgroundColor: primaryColor.withOpacity(0.15),
+                          backgroundColor: primaryColor.withValues(alpha: 0.15),
                           child: Icon(Icons.person_rounded, size: 30, color: primaryColor),
                         ),
                         const SizedBox(width: 14),
@@ -248,7 +248,7 @@ class _StudentSubmissionDetailScreenState extends State<StudentSubmissionDetailS
                         ElevatedButton.icon(
                           onPressed: _openChatWithStudent,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue.withOpacity(0.15),
+                            backgroundColor: Colors.blue.withValues(alpha: 0.15),
                             foregroundColor: Colors.blue,
                             elevation: 0,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -330,7 +330,7 @@ class _StudentSubmissionDetailScreenState extends State<StudentSubmissionDetailS
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: Colors.orange.withOpacity(0.5), width: 1.5),
+          border: Border.all(color: Colors.orange.withValues(alpha: 0.5), width: 1.5),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -341,7 +341,7 @@ class _StudentSubmissionDetailScreenState extends State<StudentSubmissionDetailS
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.15),
+                    color: Colors.orange.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
@@ -437,7 +437,7 @@ class _StudentSubmissionDetailScreenState extends State<StudentSubmissionDetailS
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: statusColor.withOpacity(0.3), width: 1.5),
+          border: Border.all(color: statusColor.withValues(alpha: 0.3), width: 1.5),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

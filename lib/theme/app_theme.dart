@@ -81,7 +81,7 @@ class AppTheme {
     scaffoldBackgroundColor: darkBackground,
     canvasColor: darkBackground,
     textTheme: GoogleFonts.cairoTextTheme(ThemeData.dark().textTheme).apply(
-      bodyColor: Colors.white.withOpacity(0.9),
+      bodyColor: Colors.white.withValues(alpha: 0.9),
       displayColor: Colors.white,
     ),
     appBarTheme: AppBarTheme(
@@ -100,7 +100,7 @@ class AppTheme {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.white.withOpacity(0.05), width: 1),
+        side: BorderSide(color: Colors.white.withValues(alpha: 0.05), width: 1),
       ),
       margin: const EdgeInsets.all(8),
     ),
@@ -109,7 +109,7 @@ class AppTheme {
         backgroundColor: primaryDark,
         foregroundColor: Colors.white,
         elevation: 4,
-        shadowColor: primaryDark.withOpacity(0.3),
+        shadowColor: primaryDark.withValues(alpha: 0.3),
         textStyle: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
@@ -118,7 +118,7 @@ class AppTheme {
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: primaryDark,
-        side: BorderSide(color: primaryDark.withOpacity(0.5), width: 1.5),
+        side: BorderSide(color: primaryDark.withValues(alpha: 0.5), width: 1.5),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         textStyle: GoogleFonts.cairo(fontWeight: FontWeight.bold),
       ),
@@ -132,11 +132,11 @@ class AppTheme {
     inputDecorationTheme: InputDecorationTheme(
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12), 
-        borderSide: BorderSide(color: Colors.white.withOpacity(0.1))
+        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1))
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12), 
-        borderSide: BorderSide(color: Colors.white.withOpacity(0.1))
+        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1))
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12), 
@@ -149,7 +149,7 @@ class AppTheme {
       contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
     ),
     dividerTheme: DividerThemeData(
-      color: Colors.white.withOpacity(0.1),
+      color: Colors.white.withValues(alpha: 0.1),
       thickness: 1,
     ),
     colorScheme: ColorScheme.fromSeed(

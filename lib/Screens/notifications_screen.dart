@@ -94,11 +94,11 @@ class NotificationsScreen extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                     borderRadius: BorderRadius.circular(15),
-                    boxShadow: [BoxShadow(color: isDark ? Colors.black54 : Colors.black.withOpacity(0.05), blurRadius: 10)],
+                    boxShadow: [BoxShadow(color: isDark ? Colors.black54 : Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
                   ),
                   child: ListTile(
                     leading: CircleAvatar(
-                      backgroundColor: primaryColor.withOpacity(0.1),
+                      backgroundColor: primaryColor.withValues(alpha: 0.1),
                       child: Icon(Icons.notifications_active_rounded, color: primaryColor, size: 20),
                     ),
                     title: Text(

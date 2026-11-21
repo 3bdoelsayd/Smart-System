@@ -329,7 +329,7 @@ class _ExamResultsDoctorScreenState extends State<ExamResultsDoctorScreen> with 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -423,7 +423,7 @@ class _ExamResultsDoctorScreenState extends State<ExamResultsDoctorScreen> with 
         },
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: CircleAvatar(
-          backgroundColor: scoreColor.withOpacity(0.15),
+          backgroundColor: scoreColor.withValues(alpha: 0.15),
           child: Text(
             "${pct.toStringAsFixed(0)}%",
             style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold, color: scoreColor),
@@ -460,7 +460,7 @@ class _ExamResultsDoctorScreenState extends State<ExamResultsDoctorScreen> with 
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                   decoration: BoxDecoration(
-                    color: sub.isGraded ? Colors.green.withOpacity(0.15) : Colors.orange.withOpacity(0.15),
+                    color: sub.isGraded ? Colors.green.withValues(alpha: 0.15) : Colors.orange.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -538,7 +538,7 @@ class _ExamResultsDoctorScreenState extends State<ExamResultsDoctorScreen> with 
           child: ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             leading: CircleAvatar(
-              backgroundColor: Colors.red.withOpacity(0.15),
+              backgroundColor: Colors.red.withValues(alpha: 0.15),
               child: const Icon(Icons.person_off_rounded, color: Colors.red, size: 20),
             ),
             title: Text(

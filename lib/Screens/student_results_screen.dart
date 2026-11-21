@@ -143,7 +143,7 @@ class _StudentResultsScreenState extends State<StudentResultsScreen> {
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                 borderRadius: BorderRadius.circular(20),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
               ),
               child: Column(
                 children: [
@@ -154,7 +154,7 @@ class _StudentResultsScreenState extends State<StudentResultsScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: total >= 50 ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+                          color: total >= 50 ? Colors.green.withValues(alpha: 0.1) : Colors.red.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
@@ -189,12 +189,12 @@ class _StudentResultsScreenState extends State<StudentResultsScreen> {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
       ),
       child: Row(
         children: [
           CircleAvatar(
-            backgroundColor: primaryColor.withOpacity(0.1),
+            backgroundColor: primaryColor.withValues(alpha: 0.1),
             child: Icon(Icons.bookmark_added_rounded, color: primaryColor),
           ),
           const SizedBox(width: 15),
@@ -240,7 +240,7 @@ class _StudentResultsScreenState extends State<StudentResultsScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.hourglass_empty_rounded, size: 60, color: Colors.grey.withOpacity(0.3)),
+          Icon(Icons.hourglass_empty_rounded, size: 60, color: Colors.grey.withValues(alpha: 0.3)),
           const SizedBox(height: 15),
           Text(
             isFinal 

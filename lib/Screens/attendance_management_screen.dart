@@ -436,7 +436,7 @@ class _AttendanceManagementScreenState extends State<AttendanceManagementScreen>
                   borderRadius: BorderRadius.circular(30),
                   boxShadow: [
                     BoxShadow(
-                      color: isDark ? Colors.black.withOpacity(0.3) : color.withAlpha(60),
+                      color: isDark ? Colors.black.withValues(alpha: 0.3) : color.withAlpha(60),
                       blurRadius: 20,
                       offset: const Offset(0, 10)
                     )

@@ -106,14 +106,14 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
                   gradient: LinearGradient(
                     colors: isDark 
                       ? [const Color(0xFF2E1A47), const Color(0xFF121212)] 
-                      : [theme.primaryColor, theme.primaryColor.withOpacity(0.8)],
+                      : [theme.primaryColor, theme.primaryColor.withValues(alpha: 0.8)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(40), bottomRight: Radius.circular(40)),
                   boxShadow: [
                     BoxShadow(
-                      color: theme.primaryColor.withOpacity(isDark ? 0.2 : 0.3),
+                      color: theme.primaryColor.withValues(alpha: isDark ? 0.2 : 0.3),
                       blurRadius: 20,
                       offset: const Offset(0, 10),
                     )
@@ -198,7 +198,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
   Widget _buildLevelSelector() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 15),
-      decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), borderRadius: BorderRadius.circular(15)),
+      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(15)),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: _selectedLevel,
@@ -279,7 +279,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.withOpacity(0.3), borderRadius: BorderRadius.circular(10))),
+              Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(10))),
               const SizedBox(height: 20),
               Row(
                 children: [
@@ -900,7 +900,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
               var d = courses[i].data() as Map<String, dynamic>;
               return Card(
                 child: ListTile(
-                  leading: CircleAvatar(backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1), child: Icon(Icons.menu_book, color: Theme.of(context).primaryColor)),
+                  leading: CircleAvatar(backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1), child: Icon(Icons.menu_book, color: Theme.of(context).primaryColor)),
                   title: Text(d['name'] ?? '', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
                   subtitle: Text('الشعبة: ${d['division']}'),
                   trailing: const Icon(Icons.arrow_forward_ios, size: 16),
@@ -936,7 +936,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
                   decoration: BoxDecoration(
                     color: _ds.isDarkMode ? const Color(0xFF252530) : Colors.white, 
                     borderRadius: BorderRadius.circular(15), 
-                    border: Border.all(color: Theme.of(context).primaryColor.withOpacity(0.1)),
+                    border: Border.all(color: Theme.of(context).primaryColor.withValues(alpha: 0.1)),
                   ),
                   child: Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Text('${i + 1}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)), Text(_ds.isArabic ? 'محاضرة' : 'Lecture', style: GoogleFonts.cairo(fontSize: 12, color: Colors.grey))])),
                 ),
@@ -1007,7 +1007,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
             bool isActive = d['isActive'] ?? false;
             return Card(
               child: ListTile(
-                leading: CircleAvatar(backgroundColor: (isActive ? Colors.green : Colors.grey).withOpacity(0.1), child: Icon(Icons.calendar_today, color: isActive ? Colors.green : Colors.grey)),
+                leading: CircleAvatar(backgroundColor: (isActive ? Colors.green : Colors.grey).withValues(alpha: 0.1), child: Icon(Icons.calendar_today, color: isActive ? Colors.green : Colors.grey)),
                 title: Text(d['name'] ?? '', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
                 subtitle: Text('الترتيب: ${d['order']}'),
                 trailing: Switch(value: isActive, onChanged: (v) => _ds.toggleSemesterStatus(docs[i].id, v)),
@@ -1101,12 +1101,12 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
         borderRadius: BorderRadius.circular(25),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
+            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05),
             blurRadius: 15,
             offset: const Offset(0, 8),
           )
         ],
-        border: Border.all(color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade100),
+        border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey.shade100),
       ),
       child: Column(
         children: [
@@ -1122,7 +1122,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
               : Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
+                    color: color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(15),
                   ),
                   child: Icon(icon, color: color, size: 24),
@@ -1144,9 +1144,9 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                         decoration: BoxDecoration(
-                          color: Colors.blue.withOpacity(0.1),
+                          color: Colors.blue.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.blue.withOpacity(0.2)),
+                          border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -1171,9 +1171,9 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
-                          color: Colors.orange.withOpacity(0.1),
+                          color: Colors.orange.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.orange.withOpacity(0.2)),
+                          border: Border.all(color: Colors.orange.withValues(alpha: 0.2)),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -1208,7 +1208,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
         child: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(icon, color: color, size: 18),
@@ -1222,7 +1222,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 80, color: Colors.grey.withOpacity(0.2)),
+          Icon(icon, size: 80, color: Colors.grey.withValues(alpha: 0.2)),
           const SizedBox(height: 15),
           Text(message, style: GoogleFonts.cairo(color: Colors.grey, fontSize: 16)),
         ],

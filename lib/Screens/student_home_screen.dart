@@ -586,7 +586,7 @@ class _StudentResearchsPage extends StatelessWidget {
                                       Container(
                                         padding: const EdgeInsets.all(12),
                                         decoration: BoxDecoration(
-                                          color: isDark ? Colors.white.withOpacity(0.03) : Colors.grey.shade50,
+                                          color: isDark ? Colors.white.withValues(alpha: 0.03) : Colors.grey.shade50,
                                           borderRadius: BorderRadius.circular(15),
                                           border: Border.all(color: isDark ? Colors.white10 : Colors.grey.shade200),
                                         ),
@@ -599,7 +599,7 @@ class _StudentResearchsPage extends StatelessWidget {
                                                   Container(
                                                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                                                     decoration: BoxDecoration(
-                                                      color: Colors.green.withOpacity(0.15),
+                                                      color: Colors.green.withValues(alpha: 0.15),
                                                       borderRadius: BorderRadius.circular(10),
                                                     ),
                                                     child: Row(

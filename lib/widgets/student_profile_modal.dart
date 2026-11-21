@@ -53,7 +53,7 @@ void showRichStudentProfileModal({
           q = await FirebaseFirestore.instance.collectionGroup('students').where('id', isEqualTo: int.tryParse(cleanId)).get();
         }
         for (var doc in q.docs) {
-          mergedData.addAll(doc.data() as Map<String, dynamic>);
+          mergedData.addAll(doc.data());
         }
       } catch (_) {}
 
@@ -61,7 +61,7 @@ void showRichStudentProfileModal({
         try {
           var q = await FirebaseFirestore.instance.collectionGroup('students').where('name', isEqualTo: studentName.trim()).get();
           for (var doc in q.docs) {
-            mergedData.addAll(doc.data() as Map<String, dynamic>);
+            mergedData.addAll(doc.data());
           }
         } catch (_) {}
       }

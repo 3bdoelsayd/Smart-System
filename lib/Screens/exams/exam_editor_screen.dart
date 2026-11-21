@@ -248,7 +248,7 @@ class _ExamEditorScreenState extends State<ExamEditorScreen> {
                           ? Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: Colors.orange.withOpacity(0.1),
+                                color: Colors.orange.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Text(
@@ -474,7 +474,7 @@ class _ExamEditorScreenState extends State<ExamEditorScreen> {
         child: Row(
           children: [
             CircleAvatar(
-              backgroundColor: color.withOpacity(0.1),
+              backgroundColor: color.withValues(alpha: 0.1),
               child: Icon(icon, color: color, size: 22),
             ),
             const SizedBox(width: 14),

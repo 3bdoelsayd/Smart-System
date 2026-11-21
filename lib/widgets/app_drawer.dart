@@ -40,8 +40,8 @@ class AppDrawer extends StatelessWidget {
           Color primaryColor = Theme.of(context).primaryColor;
           
           final bgColor = isDark ? const Color(0xFF1C1C23) : Colors.white;
-          final textColor = isDark ? Colors.white.withOpacity(0.9) : Colors.black87;
-          final iconColor = isDark ? primaryColor : primaryColor.withOpacity(0.8);
+          final textColor = isDark ? Colors.white.withValues(alpha: 0.9) : Colors.black87;
+          final iconColor = isDark ? primaryColor : primaryColor.withValues(alpha: 0.8);
 
           return Drawer(
             backgroundColor: bgColor,
@@ -50,14 +50,14 @@ class AppDrawer extends StatelessWidget {
               children: [
                 UserAccountsDrawerHeader(
                   accountName: Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                  accountEmail: Text(role, style: TextStyle(color: Colors.white.withOpacity(0.8))),
+                  accountEmail: Text(role, style: TextStyle(color: Colors.white.withValues(alpha: 0.8))),
                   currentAccountPicture: Container(
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white.withOpacity(0.2), width: 2),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.2), width: 2),
                     ),
                     child: CircleAvatar(
-                      backgroundColor: Colors.white.withOpacity(0.2),
+                      backgroundColor: Colors.white.withValues(alpha: 0.2),
                       backgroundImage: ds.getAvatarImageProvider(profilePhoto),
                       child: (profilePhoto ?? '').toString().isEmpty
                           ? Text(
@@ -241,7 +241,7 @@ class AppDrawer extends StatelessWidget {
                 _buildDrawerItem(
                   icon: Icons.exit_to_app_rounded,
                   title: isAr ? 'تسجيل الخروج' : 'Logout',
-                  textColor: textColor, iconColor: Colors.redAccent.withOpacity(0.8),
+                  textColor: textColor, iconColor: Colors.redAccent.withValues(alpha: 0.8),
                   onTap: () async { await ds.clearSession(); Navigator.pushNamedAndRemoveUntil(context, '/start', (route) => false); },
                   isLogout: true,
                 ),

@@ -396,7 +396,7 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: _remainingSeconds < 180 ? Colors.red.withOpacity(0.2) : Colors.white24,
+                    color: _remainingSeconds < 180 ? Colors.red.withValues(alpha: 0.2) : Colors.white24,
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(
@@ -455,7 +455,7 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: Colors.teal.withOpacity(0.15),
+                                  color: Colors.teal.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Text(
@@ -579,7 +579,7 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: isDark ? Colors.black54 : Colors.black.withOpacity(0.06),
+              color: isDark ? Colors.black54 : Colors.black.withValues(alpha: 0.06),
               blurRadius: 15,
               offset: const Offset(0, 5),
             ),
@@ -622,7 +622,7 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                           decoration: BoxDecoration(
                             color: isSelected
-                                ? primaryColor.withOpacity(0.15)
+                                ? primaryColor.withValues(alpha: 0.15)
                                 : (isDark ? Colors.black26 : Colors.grey.shade50),
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
@@ -682,7 +682,7 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                         padding: const EdgeInsets.symmetric(vertical: 20),
                         decoration: BoxDecoration(
                           color: currentAnswer == true
-                              ? Colors.green.withOpacity(0.2)
+                              ? Colors.green.withValues(alpha: 0.2)
                               : (isDark ? Colors.black26 : Colors.grey.shade100),
                           borderRadius: BorderRadius.circular(18),
                           border: Border.all(
@@ -721,7 +721,7 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                         padding: const EdgeInsets.symmetric(vertical: 20),
                         decoration: BoxDecoration(
                           color: currentAnswer == false
-                              ? Colors.red.withOpacity(0.2)
+                              ? Colors.red.withValues(alpha: 0.2)
                               : (isDark ? Colors.black26 : Colors.grey.shade100),
                           borderRadius: BorderRadius.circular(18),
                           border: Border.all(

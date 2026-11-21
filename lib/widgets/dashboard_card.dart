@@ -29,13 +29,13 @@ class DashboardCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(25),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.25 : 0.08),
+            color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.08),
             blurRadius: 18,
             offset: const Offset(0, 8),
           ),
         ],
         border: Border.all(
-          color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade100,
+          color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey.shade100,
           width: 1.5,
         ),
       ),
@@ -45,7 +45,7 @@ class DashboardCard extends StatelessWidget {
           color: Colors.transparent,
           child: InkWell(
             onTap: onTap,
-            splashColor: color.withOpacity(0.1),
+            splashColor: color.withValues(alpha: 0.1),
             child: Stack(
               children: [
                 // Glow Effect
@@ -57,7 +57,7 @@ class DashboardCard extends StatelessWidget {
                     height: 90,
                     decoration: BoxDecoration(
                       gradient: RadialGradient(
-                        colors: [color.withOpacity(0.12), color.withOpacity(0)],
+                        colors: [color.withValues(alpha: 0.12), color.withValues(alpha: 0)],
                       ),
                       shape: BoxShape.circle,
                     ),
@@ -73,12 +73,12 @@ class DashboardCard extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: color.withOpacity(0.12),
+                          color: color.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(15),
                         ),
                         child: Icon(
                           icon,
-                          color: isDark ? Colors.white.withOpacity(0.95) : color,
+                          color: isDark ? Colors.white.withValues(alpha: 0.95) : color,
                           size: 28,
                         ),
                       ),
@@ -131,7 +131,7 @@ class DashboardCard extends StatelessWidget {
                   child: Icon(
                     icon,
                     size: 14,
-                    color: color.withOpacity(0.25),
+                    color: color.withValues(alpha: 0.25),
                   ),
                 ),
               ],

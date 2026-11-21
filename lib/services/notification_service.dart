@@ -1,5 +1,3 @@
-import 'package:flutter/foundation.dart';
-
 class NotificationService {
   static Future<void> init() async {
     // Disabled permission requests and notification reminders completely
