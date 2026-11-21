@@ -1424,19 +1424,48 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
               ),
               onPressed: () async {
                 if (formKey.currentState!.validate()) {
-                  await _ds.createResearchTopic(
-                    title: titleController.text.trim(),
-                    subject: _selectedSubject!,
-                    deadline: selectedDeadline,
-                  );
+                  try {
+                    // ✅ Add debugging
+                    debugPrint('Creating topic: ${titleController.text.trim()}');
+                    debugPrint('Subject: $_selectedSubject');
+                    debugPrint('College ID: ${_ds.selectedInstituteId}');
+                    debugPrint('Doctor: ${_ds.currentDoctor?['name']}');
 
-                  if (mounted) {
-                    Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          isAr ? 'تم إضافة العنوان بنجاح ✓' : 'Topic added successfully ✓',
-                          style: GoogleFonts.cairo(),
+                    await _ds.createResearchTopic(
+                      title: titleController.text.trim(),
+                      subject: _selectedSubject!,
+                      deadline: selectedDeadline,
+                    );
+
+                    if (mounted) {
+                      Navigator.pop(ctx);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            isAr ? 'تم إضافة العنوان بنجاح ✓' : 'Topic added successfully ✓',
+                            style: GoogleFonts.cairo(),
+                          ),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    debugPrint('❌ Error creating topic: $e');
+                    if (mounted) {
+                      Navigator.pop(ctx);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            '${isAr ? "خطأ" : "Error"}: $e',
+                            style: GoogleFonts.cairo(),
+                          ),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  }
+                }
+              },
                         ),
                         backgroundColor: Colors.green,
                       ),
