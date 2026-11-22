@@ -965,6 +965,42 @@ class DataService extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> resetAllStudentsDevices({String? levelId}) async {
+    if (selectedInstituteId == null) return;
+    try {
+      var batch = _firestore.batch();
+      int count = 0;
+
+      if (levelId != null && levelId.isNotEmpty) {
+        String lvlNum = levelId.replaceAll('level_', '');
+        var snap = await studentsColl.where('level', isEqualTo: lvlNum).get();
+        for (var doc in snap.docs) {
+          batch.update(doc.reference, {'deviceId': FieldValue.delete()});
+          count++;
+          if (count % 400 == 0) {
+            await batch.commit();
+            batch = _firestore.batch();
+          }
+        }
+      } else {
+        var snap = await studentsColl.get();
+        for (var doc in snap.docs) {
+          batch.update(doc.reference, {'deviceId': FieldValue.delete()});
+          count++;
+          if (count % 400 == 0) {
+            await batch.commit();
+            batch = _firestore.batch();
+          }
+        }
+      }
+      await batch.commit();
+      notifyListeners();
+    } catch (e) {
+      debugPrint("Reset all devices error: $e");
+      rethrow;
+    }
+  }
+
   Future<void> deleteAllStudents() async {
     try {
       var groupSnap = await _firestore.collectionGroup('students').get();
@@ -1791,10 +1827,11 @@ class DataService extends ChangeNotifier {
     isArabic = prefs.getBool('persist_v3_arabic') ?? true;
     isDarkMode = prefs.getBool('persist_v3_dark') ?? false;
 
-    // Auto-purge dummy college from Firestore if it exists
-    try {
-      _deleteCommerceCollegePermanently();
-    } catch (_) {}
+    // ⚠️ DISABLED: This code deleted production data!
+    // Auto-purge was running on every app start and deleting 'commerce' college from Firestore
+    // try {
+    //   _deleteCommerceCollegePermanently();
+    // } catch (_) {}
 
     notifyListeners();
   }

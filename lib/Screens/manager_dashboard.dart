@@ -542,7 +542,25 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
   Widget _buildStudentsTab() {
     return Column(
       children: [
-        _buildSearchField(),
+        Row(
+          children: [
+            Expanded(child: _buildSearchField()),
+            Padding(
+              padding: const EdgeInsets.only(top: 15, left: 15, right: 15),
+              child: ElevatedButton.icon(
+                onPressed: () => _confirmResetAllDevices(context),
+                icon: const Icon(Icons.phonelink_erase_rounded, size: 16),
+                label: Text('تصفير أجهزة الكل', style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                ),
+              ),
+            ),
+          ],
+        ),
         StreamBuilder<QuerySnapshot>(
           stream: _ds.getInstituteSectionsColl(_selectedLevel!).snapshots(),
           builder: (ctx, secSnap) {
@@ -696,6 +714,64 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
                     }
                   },
                   child: Text('تأكيد', style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          )
+        ],
+      ),
+    );
+  }
+
+  void _confirmResetAllDevices(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+        title: Column(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 50),
+            const SizedBox(height: 10),
+            Text("إعادة ضبط أجهزة جميع الطلاب", style: GoogleFonts.cairo(fontWeight: FontWeight.w900, color: Colors.orange.shade900)),
+          ],
+        ),
+        content: Text(
+          "هل أنت متأكد من رغبتك في فك ربط أجهزة جميع طلاب هذه الفرقة دفعة واحدة؟",
+          textAlign: TextAlign.center,
+          style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 14),
+        ),
+        actions: [
+          Row(
+            children: [
+              Expanded(
+                child: TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text('إلغاء', style: GoogleFonts.cairo(color: Colors.grey, fontWeight: FontWeight.bold)),
+                ),
+              ),
+              Expanded(
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                    elevation: 0,
+                  ),
+                  onPressed: () async {
+                    Navigator.pop(ctx);
+                    showDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (_) => const Center(child: CircularProgressIndicator()),
+                    );
+                    await _ds.resetAllStudentsDevices(levelId: _selectedLevel);
+                    if (context.mounted) {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('تمت إعادة ضبط أجهزة جميع الطلاب بنجاح'), backgroundColor: Colors.orangeAccent),
+                      );
+                    }
+                  },
+                  child: Text('تأكيد الكل', style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold)),
                 ),
               ),
             ],
