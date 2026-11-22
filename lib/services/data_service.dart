@@ -2175,22 +2175,13 @@ class DataService extends ChangeNotifier {
     }
 
     try {
-      var query = _firestore
+      final query = _firestore
           .collection('colleges')
           .doc(selectedInstituteId)
-          .collection('research_topics')
-          .orderBy('createdAt', descending: true);
-
-      if (subject != null && subject.isNotEmpty) {
-        query = query.where('subject', isEqualTo: subject);
-      }
-
-      if (onlyActive) {
-        query = query.where('isActive', isEqualTo: true);
-      }
+          .collection('research_topics');
 
       return query.snapshots().map((snapshot) {
-        return snapshot.docs.map((doc) {
+        final topics = snapshot.docs.map((doc) {
           final data = doc.data();
           data['id'] = doc.id;
 
@@ -2207,7 +2198,22 @@ class DataService extends ChangeNotifier {
           }
 
           return data;
+        }).where((topic) {
+          if (onlyActive && topic['isActive'] == false) return false;
+          if (subject != null && subject.trim().isNotEmpty) {
+            final topicSubject = (topic['subject'] ?? '').toString().trim();
+            if (topicSubject != subject.trim()) return false;
+          }
+          return true;
         }).toList();
+
+        // Sort in Dart instead of Firestore query to avoid composite index requirement
+        topics.sort((a, b) {
+          final aCreated = (a['createdAt'] as int? ?? 0);
+          final bCreated = (b['createdAt'] as int? ?? 0);
+          return bCreated.compareTo(aCreated);
+        });
+        return topics;
       });
     } catch (e) {
       debugPrint("Get topics error: $e");

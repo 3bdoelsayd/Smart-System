@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/data_service.dart';
 
 class SendResearchScreen extends StatefulWidget {
@@ -311,141 +312,231 @@ class _SendResearchScreenState extends State<SendResearchScreen> {
             ),
           ],
         ),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: color.withAlpha(20),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.book, color: color, size: 18),
+              const SizedBox(width: 8),
+              Text(
+                '${isAr ? "المادة المختارة:" : "Selected Subject:"} ${_selectedSubject ?? ""}',
+                style: GoogleFonts.cairo(fontSize: 13, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+        ),
         const SizedBox(height: 20),
-        StreamBuilder(
-          stream: _ds.getInstituteCoursesColl(studentLevel).snapshots(),
+        FutureBuilder<List<dynamic>>(
+          future: Future.wait([
+            _ds.getInstituteCoursesColl(studentLevel).get(),
+            _ds.getInstituteCoursesColl('level_1').get(),
+            _ds.getInstituteCoursesColl('level_2').get(),
+            _ds.getInstituteCoursesColl('level_3').get(),
+            _ds.getInstituteCoursesColl('level_4').get(),
+          ]),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
             }
 
-            if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-              return Center(
-                child: Text(
-                  isAr ? 'لا توجد مواد' : 'No courses',
-                  style: GoogleFonts.cairo(color: Colors.grey),
-                ),
-              );
-            }
+            final allCourseDocs = (snapshot.data as List?)?.expand((qs) => (qs as QuerySnapshot).docs).toList() ?? [];
 
-            // Filter courses for selected subject
-            final courses = snapshot.data!.docs.where((doc) {
+            final matchingCourses = allCourseDocs.where((doc) {
               final data = doc.data() as Map<String, dynamic>;
-              return (data['name'] ?? '').toString().trim().toLowerCase() ==
-                  _selectedSubject?.trim().toLowerCase();
+              final courseName = (data['name'] ?? '').toString().trim().toLowerCase();
+              final selSubject = (_selectedSubject ?? '').trim().toLowerCase();
+              return courseName == selSubject;
             }).toList();
 
-            if (courses.isEmpty) {
-              return Center(
-                child: Text(
-                  isAr ? 'لا توجد معلومات للمادة' : 'No course info',
-                  style: GoogleFonts.cairo(color: Colors.grey),
-                ),
-              );
+            Set<String> doctorIds = {};
+            Set<String> taIds = {};
+
+            for (var cDoc in matchingCourses) {
+              final cData = cDoc.data() as Map<String, dynamic>;
+              if (cData['doctor_id'] != null && cData['doctor_id'].toString().isNotEmpty) {
+                doctorIds.add(cData['doctor_id'].toString());
+              }
+              if (cData['ta_id'] != null && cData['ta_id'].toString().isNotEmpty) {
+                taIds.add(cData['ta_id'].toString());
+              }
+              if (cData['ta_ids'] is List) {
+                for (var id in cData['ta_ids']) {
+                  if (id != null && id.toString().isNotEmpty) taIds.add(id.toString());
+                }
+              }
             }
 
-            return ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: courses.length,
-              itemBuilder: (context, index) {
-                final courseData = courses[index].data() as Map<String, dynamic>;
-                final doctorId = courseData['doctor_id']?.toString() ?? '';
-                final taId = courseData['ta_id']?.toString() ?? '';
+            return StreamBuilder<QuerySnapshot>(
+              stream: _ds.instituteDoctorsColl.snapshots(),
+              builder: (context, docSnap) {
+                return StreamBuilder<QuerySnapshot>(
+                  stream: _ds.instituteTasColl.snapshots(),
+                  builder: (context, taSnap) {
+                    final allDoctors = docSnap.data?.docs ?? [];
+                    final allTas = taSnap.data?.docs ?? [];
 
-                return Column(
-                  children: [
-                    if (doctorId.isNotEmpty) ...[
-                      StreamBuilder(
-                        stream: _ds.instituteDoctorsColl.doc(doctorId).snapshots(),
-                        builder: (context, docSnapshot) {
-                          if (!docSnapshot.hasData) return const SizedBox();
-                          final docData = docSnapshot.data?.data() as Map<String, dynamic>?;
-                          final docName = docData?['name'] ?? 'دكتور';
+                    final recipientDoctors = allDoctors.where((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      final docUid = data['uid'] ?? doc.id;
+                      final docId = data['id']?.toString() ?? '';
+                      final subjects = List<String>.from(data['subjects'] ?? []);
+                      
+                      bool isAssignedInCourse = doctorIds.contains(docUid) || doctorIds.contains(docId) || doctorIds.contains(doc.id);
+                      bool teachesSubject = subjects.any((s) => s.trim().toLowerCase() == _selectedSubject?.trim().toLowerCase());
 
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            elevation: isDark ? 0 : 2,
-                            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(15),
-                              side: isDark ? BorderSide(color: Colors.white.withAlpha(13)) : BorderSide.none,
-                            ),
-                            child: ListTile(
-                              contentPadding: const EdgeInsets.all(16),
-                              leading: CircleAvatar(
-                                backgroundColor: Colors.blue.withAlpha(26),
-                                child: const Icon(Icons.school, color: Colors.blue),
-                              ),
-                              title: Text(
-                                docName,
-                                style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
-                              ),
-                              subtitle: Text(
-                                isAr ? 'الدكتور' : 'Doctor',
-                                style: GoogleFonts.cairo(fontSize: 12, color: Colors.grey),
-                              ),
-                              trailing: Icon(Icons.arrow_forward_ios, color: color, size: 18),
-                              onTap: () {
-                                setState(() {
-                                  _selectedRecipientType = 'doctor';
-                                  _selectedRecipientId = doctorId;
-                                  _selectedRecipientName = docName;
-                                  _currentStep = 2;
-                                  _loadTopics();
-                                });
-                              },
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                    if (taId.isNotEmpty) ...[
-                      StreamBuilder(
-                        stream: _ds.instituteTasColl.doc(taId).snapshots(),
-                        builder: (context, taSnapshot) {
-                          if (!taSnapshot.hasData) return const SizedBox();
-                          final taData = taSnapshot.data?.data() as Map<String, dynamic>?;
-                          final taName = taData?['name'] ?? 'معيد';
+                      return isAssignedInCourse || (doctorIds.isEmpty && teachesSubject);
+                    }).toList();
 
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            elevation: isDark ? 0 : 2,
-                            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(15),
-                              side: isDark ? BorderSide(color: Colors.white.withAlpha(13)) : BorderSide.none,
+                    final recipientTas = allTas.where((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      final taUid = data['uid'] ?? doc.id;
+                      final taId = data['id']?.toString() ?? '';
+                      final subjects = List<String>.from(data['subjects'] ?? []);
+                      
+                      bool isAssignedInCourse = taIds.contains(taUid) || taIds.contains(taId) || taIds.contains(doc.id);
+                      bool teachesSubject = subjects.any((s) => s.trim().toLowerCase() == _selectedSubject?.trim().toLowerCase());
+
+                      return isAssignedInCourse || (taIds.isEmpty && teachesSubject);
+                    }).toList();
+
+                    // Sort alphabetically
+                    recipientDoctors.sort((a, b) => ((a.data() as Map<String, dynamic>)['name'] ?? '').toString().compareTo(((b.data() as Map<String, dynamic>)['name'] ?? '').toString()));
+                    recipientTas.sort((a, b) => ((a.data() as Map<String, dynamic>)['name'] ?? '').toString().compareTo(((b.data() as Map<String, dynamic>)['name'] ?? '').toString()));
+
+                    if (recipientDoctors.isEmpty && recipientTas.isEmpty) {
+                      return Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(30),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.person_off_rounded, size: 60, color: Colors.grey.withAlpha(128)),
+                              const SizedBox(height: 15),
+                              Text(
+                                isAr ? 'لم يتم تحديد دكتور أو معيد لهذه المادة بعد' : 'No doctor or TA assigned to this subject yet',
+                                style: GoogleFonts.cairo(color: Colors.grey, fontSize: 14),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (recipientDoctors.isNotEmpty) ...[
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 10, top: 5),
+                            child: Text(
+                              isAr ? 'أعضاء هيئة التدريس (الدكتور):' : 'Doctors:',
+                              style: GoogleFonts.cairo(fontSize: 14, fontWeight: FontWeight.bold, color: color),
                             ),
-                            child: ListTile(
-                              contentPadding: const EdgeInsets.all(16),
-                              leading: CircleAvatar(
-                                backgroundColor: Colors.green.withAlpha(26),
-                                child: const Icon(Icons.person, color: Colors.green),
+                          ),
+                          ...recipientDoctors.map((doc) {
+                            final data = doc.data() as Map<String, dynamic>;
+                            final docName = data['name'] ?? 'دكتور المادة';
+                            final docUid = data['uid'] ?? doc.id;
+
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              elevation: isDark ? 0 : 2,
+                              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                side: isDark ? BorderSide(color: Colors.white.withAlpha(13)) : BorderSide.none,
                               ),
-                              title: Text(
-                                taName,
-                                style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
+                              child: ListTile(
+                                contentPadding: const EdgeInsets.all(16),
+                                leading: CircleAvatar(
+                                  radius: 25,
+                                  backgroundColor: Colors.blue.withAlpha(30),
+                                  child: const Icon(Icons.school_rounded, color: Colors.blue, size: 26),
+                                ),
+                                title: Text(
+                                  '${isAr ? "دكتور:" : "Doctor:"} $docName',
+                                  style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 16),
+                                ),
+                                subtitle: Text(
+                                  isAr ? 'أستاذ المادة المسئول' : 'Course Professor',
+                                  style: GoogleFonts.cairo(fontSize: 12, color: Colors.grey),
+                                ),
+                                trailing: Icon(Icons.arrow_forward_ios_rounded, color: color, size: 18),
+                                onTap: () {
+                                  setState(() {
+                                    _selectedRecipientType = 'doctor';
+                                    _selectedRecipientId = docUid;
+                                    _selectedRecipientName = docName;
+                                    _currentStep = 2;
+                                    _loadTopics();
+                                  });
+                                },
                               ),
-                              subtitle: Text(
-                                isAr ? 'المعيد' : 'TA',
-                                style: GoogleFonts.cairo(fontSize: 12, color: Colors.grey),
-                              ),
-                              trailing: Icon(Icons.arrow_forward_ios, color: color, size: 18),
-                              onTap: () {
-                                setState(() {
-                                  _selectedRecipientType = 'ta';
-                                  _selectedRecipientId = taId;
-                                  _selectedRecipientName = taName;
-                                  _currentStep = 2;
-                                  _loadTopics();
-                                });
-                              },
+                            );
+                          }),
+                        ],
+
+                        const SizedBox(height: 10),
+
+                        if (recipientTas.isNotEmpty) ...[
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 10, top: 5),
+                            child: Text(
+                              isAr ? 'الهيئة المعاونة (المعيد):' : 'Teaching Assistants (TAs):',
+                              style: GoogleFonts.cairo(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.teal),
                             ),
-                          );
-                        },
-                      ),
-                    ],
-                  ],
+                          ),
+                          ...recipientTas.map((doc) {
+                            final data = doc.data() as Map<String, dynamic>;
+                            final taName = data['name'] ?? 'معيد المادة';
+                            final taUid = data['uid'] ?? doc.id;
+
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              elevation: isDark ? 0 : 2,
+                              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                side: isDark ? BorderSide(color: Colors.white.withAlpha(13)) : BorderSide.none,
+                              ),
+                              child: ListTile(
+                                contentPadding: const EdgeInsets.all(16),
+                                leading: CircleAvatar(
+                                  radius: 25,
+                                  backgroundColor: Colors.teal.withAlpha(30),
+                                  child: const Icon(Icons.badge_rounded, color: Colors.teal, size: 26),
+                                ),
+                                title: Text(
+                                  '${isAr ? "معيد:" : "TA:"} $taName',
+                                  style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 16),
+                                ),
+                                subtitle: Text(
+                                  isAr ? 'معيد المادة المسئول' : 'Teaching Assistant',
+                                  style: GoogleFonts.cairo(fontSize: 12, color: Colors.grey),
+                                ),
+                                trailing: Icon(Icons.arrow_forward_ios_rounded, color: Colors.teal, size: 18),
+                                onTap: () {
+                                  setState(() {
+                                    _selectedRecipientType = 'ta';
+                                    _selectedRecipientId = taUid;
+                                    _selectedRecipientName = taName;
+                                    _currentStep = 2;
+                                    _loadTopics();
+                                  });
+                                },
+                              ),
+                            );
+                          }),
+                        ],
+                      ],
+                    );
+                  },
                 );
               },
             );

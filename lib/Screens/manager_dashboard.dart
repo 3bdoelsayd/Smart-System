@@ -597,9 +597,11 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
               var docs = snap.data!.docs.where((d) {
                 final data = d.data() as Map<String, dynamic>;
                 String sName = (data['name'] ?? '').toString().toLowerCase();
+                String sCode = (data['id'] ?? data['code'] ?? data['academicCode'] ?? data['nationalId'] ?? d.id).toString().toLowerCase();
                 String sDiv = (data['division'] ?? '').toString();
 
-                bool matchesSearch = sName.contains(_searchQuery.toLowerCase());
+                final q = _searchQuery.trim().toLowerCase();
+                bool matchesSearch = q.isEmpty || sName.contains(q) || sCode.contains(q);
                 
                 bool matchesDiv = _selectedStudentDivisionFilter == 'all' || 
                                   _ds.normalizeDivision(sDiv) == _ds.normalizeDivision(_selectedStudentDivisionFilter) ||
@@ -609,7 +611,14 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
                 return matchesSearch && matchesDiv;
               }).toList();
 
-              if (docs.isEmpty) return _buildEmptyState(Icons.group_off, 'لا يوجد طلاب لهذه الشعبة');
+              // Sort alphabetically by student name (أبجدي)
+              docs.sort((a, b) {
+                String nA = ((a.data() as Map<String, dynamic>)['name'] ?? '').toString();
+                String nB = ((b.data() as Map<String, dynamic>)['name'] ?? '').toString();
+                return nA.compareTo(nB);
+              });
+
+              if (docs.isEmpty) return _buildEmptyState(Icons.group_off, 'لا يوجد طلاب مطابقين للبحث');
 
               return ListView.builder(
                 padding: const EdgeInsets.all(15), 
@@ -721,62 +730,102 @@ class _ManagerDashboardState extends State<ManagerDashboard> with SingleTickerPr
   }
 
   Widget _buildDoctorsTab() {
-    return StreamBuilder<QuerySnapshot>(
-      stream: _ds.instituteDoctorsColl.snapshots(),
-      builder: (ctx, snap) {
-        if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-        var docs = snap.data!.docs;
-        docs.sort((a, b) => (a.data() as Map<String, dynamic>)['name'].toString().compareTo((b.data() as Map<String, dynamic>)['name'].toString()));
-        if (docs.isEmpty) return _buildEmptyState(Icons.person_off_outlined, 'لا يوجد دكاترة');
-        return ListView.builder(padding: const EdgeInsets.all(15), itemCount: docs.length, itemBuilder: (ctx, i) {
-          var d = docs[i].data() as Map<String, dynamic>;
-          return _buildListItem(
-            title: d['name'] ?? '', 
-            subtitle: d['email'] ?? '', 
-            icon: Icons.person, 
-            color: Colors.pink, 
-            photoUrl: d['photoUrl'],
-            onTap: () => showRichDoctorProfileModal(
-              context: context,
-              doctorUidOrEmail: docs[i].id,
-              doctorName: d['name'],
-              initialDoctorData: d,
-            ),
-            onEdit: () => _showEditDoctorBS(docs[i]),
-            onDelete: () => _ds.deleteDoctor(docs[i].id)
-          );
-        });
-      },
+    return Column(
+      children: [
+        _buildSearchField(),
+        Expanded(
+          child: StreamBuilder<QuerySnapshot>(
+            stream: _ds.instituteDoctorsColl.snapshots(),
+            builder: (ctx, snap) {
+              if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+              final q = _searchQuery.trim().toLowerCase();
+              var docs = snap.data!.docs.where((d) {
+                final data = d.data() as Map<String, dynamic>;
+                String dName = (data['name'] ?? '').toString().toLowerCase();
+                String dCode = (data['id'] ?? data['code'] ?? data['email'] ?? d.id).toString().toLowerCase();
+                return q.isEmpty || dName.contains(q) || dCode.contains(q);
+              }).toList();
+
+              docs.sort((a, b) => ((a.data() as Map<String, dynamic>)['name'] ?? '').toString().compareTo(((b.data() as Map<String, dynamic>)['name'] ?? '').toString()));
+
+              if (docs.isEmpty) return _buildEmptyState(Icons.person_off_outlined, 'لا يوجد دكاترة مطابقين للبحث');
+              return ListView.builder(
+                padding: const EdgeInsets.all(15), 
+                itemCount: docs.length, 
+                itemBuilder: (ctx, i) {
+                  var d = docs[i].data() as Map<String, dynamic>;
+                  String codeStr = d['id'] ?? d['code'] ?? '';
+                  return _buildListItem(
+                    title: d['name'] ?? '', 
+                    subtitle: codeStr.isNotEmpty ? 'كود: $codeStr | ${d['email'] ?? ''}' : (d['email'] ?? ''), 
+                    icon: Icons.person, 
+                    color: Colors.pink, 
+                    photoUrl: d['photoUrl'],
+                    onTap: () => showRichDoctorProfileModal(
+                      context: context,
+                      doctorUidOrEmail: docs[i].id,
+                      doctorName: d['name'],
+                      initialDoctorData: d,
+                    ),
+                    onEdit: () => _showEditDoctorBS(docs[i]),
+                    onDelete: () => _ds.deleteDoctor(docs[i].id)
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
   Widget _buildTAsTab() {
-    return StreamBuilder<QuerySnapshot>(
-      stream: _ds.instituteTasColl.snapshots(),
-      builder: (ctx, snap) {
-        if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-        var docs = snap.data!.docs;
-        docs.sort((a, b) => (a.data() as Map<String, dynamic>)['name'].toString().compareTo((b.data() as Map<String, dynamic>)['name'].toString()));
-        if (docs.isEmpty) return _buildEmptyState(Icons.person_off_outlined, 'لا يوجد معيدين مسجلين');
-        return ListView.builder(padding: const EdgeInsets.all(15), itemCount: docs.length, itemBuilder: (ctx, i) {
-          var d = docs[i].data() as Map<String, dynamic>;
-          return _buildListItem(
-            title: d['name'] ?? '', 
-            subtitle: 'كود: ${d['id'] ?? ''} | ${d['email'] ?? ''}', 
-            icon: Icons.person_outline_rounded, 
-            color: Colors.teal, 
-            photoUrl: d['photoUrl'],
-            onTap: () => showRichDoctorProfileModal(
-              context: context,
-              doctorUidOrEmail: docs[i].id,
-              doctorName: d['name'],
-              initialDoctorData: d,
-            ),
-            onEdit: () => _showEditTABS(docs[i]),
-            onDelete: () => _ds.deleteTA(docs[i].id)
-          );
-        });
-      },
+    return Column(
+      children: [
+        _buildSearchField(),
+        Expanded(
+          child: StreamBuilder<QuerySnapshot>(
+            stream: _ds.instituteTasColl.snapshots(),
+            builder: (ctx, snap) {
+              if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+              final q = _searchQuery.trim().toLowerCase();
+              var docs = snap.data!.docs.where((d) {
+                final data = d.data() as Map<String, dynamic>;
+                String tName = (data['name'] ?? '').toString().toLowerCase();
+                String tCode = (data['id'] ?? data['code'] ?? data['email'] ?? d.id).toString().toLowerCase();
+                return q.isEmpty || tName.contains(q) || tCode.contains(q);
+              }).toList();
+
+              docs.sort((a, b) => ((a.data() as Map<String, dynamic>)['name'] ?? '').toString().compareTo(((b.data() as Map<String, dynamic>)['name'] ?? '').toString()));
+
+              if (docs.isEmpty) return _buildEmptyState(Icons.person_off_outlined, 'لا يوجد معيدين مطابقين للبحث');
+              return ListView.builder(
+                padding: const EdgeInsets.all(15), 
+                itemCount: docs.length, 
+                itemBuilder: (ctx, i) {
+                  var d = docs[i].data() as Map<String, dynamic>;
+                  String codeStr = d['id'] ?? d['code'] ?? '';
+                  return _buildListItem(
+                    title: d['name'] ?? '', 
+                    subtitle: codeStr.isNotEmpty ? 'كود: $codeStr | ${d['email'] ?? ''}' : (d['email'] ?? ''), 
+                    icon: Icons.person_outline_rounded, 
+                    color: Colors.teal, 
+                    photoUrl: d['photoUrl'],
+                    onTap: () => showRichDoctorProfileModal(
+                      context: context,
+                      doctorUidOrEmail: docs[i].id,
+                      doctorName: d['name'],
+                      initialDoctorData: d,
+                    ),
+                    onEdit: () => _showEditTABS(docs[i]),
+                    onDelete: () => _ds.deleteTA(docs[i].id)
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 

@@ -25,7 +25,7 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
   int _selectedCategoryIndex = 0;
 
   // ✅ NEW: For moving researches between topics
-  Set<String> _selectedResearchIds = {};
+  final Set<String> _selectedResearchIds = {};
   bool _isSelectionMode = false;
 
   @override
@@ -69,7 +69,7 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
 
   Future<void> _launchURL(String url) async {
     if (url.trim().isEmpty) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("رابط الملف غير متاح")));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text("رابط الملف غير متاح")));
       return;
     }
 
@@ -86,7 +86,7 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
       }
 
       if (!launched && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تعذر فتح ملف البحث")));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text("تعذر فتح ملف البحث")));
       }
     } catch (e) {
       debugPrint("Launch Error: $e");
@@ -115,7 +115,7 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
             appBar: AppBar(
               elevation: 0,
               centerTitle: true,
-              title: Text(_selectedSubject ?? _ds.translate('research_review'), 
+              title: Text(_selectedTopicTitle ?? _selectedSubject ?? _ds.translate('research_review'), 
                   style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 18)),
               backgroundColor: isDark ? const Color(0xFF1A1A1A) : const Color(0xFF673AB7),
               foregroundColor: Colors.white,
@@ -293,40 +293,28 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
                 return const Center(child: CircularProgressIndicator());
               }
 
-              if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.topic_outlined, size: 80, color: Colors.grey.withAlpha(128)),
-                      const SizedBox(height: 20),
-                      Text(
-                        isAr ? 'لا توجد عناوين بعد' : 'No topics yet',
-                        style: GoogleFonts.cairo(fontSize: 16, color: Colors.grey),
-                      ),
-                    ],
-                  ),
-                );
-              }
-
-              final topics = snapshot.data!;
+              final topics = snapshot.data ?? [];
 
               return ListView.builder(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: topics.length + 1, // +1 for "No Topic" section
+                itemCount: topics.isEmpty ? 2 : topics.length + 1,
                 itemBuilder: (context, index) {
-                  // First item: "No Topic" (old researches)
+                  // First item: "No Topic" (old / uncategorized researches)
                   if (index == 0) {
                     return StreamBuilder<QuerySnapshot>(
-                      stream: _ds.instituteRef
-                          .collection('researches')
-                          .where('subject', isEqualTo: _selectedSubject)
-                          .where('researchTopicId', isEqualTo: null)
-                          .snapshots(),
+                      stream: _ds.submissionsColl.snapshots(),
                       builder: (context, researchSnapshot) {
-                        final researchCount = researchSnapshot.hasData ? researchSnapshot.data!.docs.length : 0;
-
-                        if (researchCount == 0) return const SizedBox.shrink(); // Hide if no old researches
+                        int researchCount = 0;
+                        if (researchSnapshot.hasData) {
+                          researchCount = researchSnapshot.data!.docs.where((doc) {
+                            final d = doc.data() as Map<String, dynamic>;
+                            final sub = (d['subject'] ?? '').toString().trim();
+                            final selSub = (_selectedSubject ?? '').trim();
+                            if (sub != selSub) return false;
+                            final tid = d['researchTopicId'];
+                            return tid == null || tid.toString().isEmpty || tid == 'no_topic';
+                          }).length;
+                        }
 
                         return Card(
                           margin: const EdgeInsets.only(bottom: 15),
@@ -341,7 +329,7 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
                             onTap: () {
                               setState(() {
                                 _selectedTopicId = 'no_topic';
-                                _selectedTopicTitle = isAr ? 'بدون عنوان' : 'No Topic';
+                                _selectedTopicTitle = isAr ? 'أبحاث بدون عنوان' : 'Uncategorized Researches';
                               });
                             },
                             child: Padding(
@@ -383,11 +371,11 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
                                       children: [
                                         Row(
                                           children: [
-                                            Icon(Icons.folder_open, size: 20, color: Colors.grey),
+                                            const Icon(Icons.folder_open, size: 20, color: Colors.grey),
                                             const SizedBox(width: 8),
                                             Expanded(
                                               child: Text(
-                                                isAr ? 'بدون عنوان' : 'No Topic',
+                                                isAr ? 'أبحاث بدون عنوان (السابقة)' : 'Uncategorized Researches',
                                                 style: GoogleFonts.cairo(
                                                   fontSize: 16,
                                                   fontWeight: FontWeight.bold,
@@ -398,7 +386,7 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
                                         ),
                                         const SizedBox(height: 6),
                                         Text(
-                                          isAr ? 'أبحاث قديمة غير مصنفة' : 'Old uncategorized researches',
+                                          isAr ? 'الأبحاث القديمة أو المرسلة بدون اختيار عنوان' : 'Old researches submitted without a topic',
                                           style: GoogleFonts.cairo(
                                             fontSize: 12,
                                             color: Colors.grey,
@@ -407,13 +395,52 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
                                       ],
                                     ),
                                   ),
-                                  Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+                                  const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
                                 ],
                               ),
                             ),
                           ),
                         );
                       },
+                    );
+                  }
+
+                  if (topics.isEmpty && index == 1) {
+                    return Container(
+                      margin: const EdgeInsets.only(top: 10, bottom: 20),
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: isDark ? Colors.white12 : Colors.grey.shade200),
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(Icons.topic_outlined, size: 50, color: Colors.grey.withAlpha(128)),
+                          const SizedBox(height: 12),
+                          Text(
+                            isAr ? 'لا توجد عناوين أبحاث لهذه المادة حتى الآن' : 'No research topics added for this subject yet',
+                            style: GoogleFonts.cairo(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.bold),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            isAr ? 'قم بإنشاء عنوان جديد ليتكمّن الطلاب من رفع أبحاثهم تحته' : 'Create a new topic so students can submit papers under it',
+                            style: GoogleFonts.cairo(fontSize: 12, color: Colors.grey),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton.icon(
+                            onPressed: () => _showAddTopicDialog(color, isDark),
+                            icon: const Icon(Icons.add, color: Colors.white),
+                            label: Text(isAr ? 'إضافة عنوان جديد' : 'Add New Topic', style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: color,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
+                        ],
+                      ),
                     );
                   }
 
@@ -430,13 +457,15 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
 
                   // Count researches for this topic
                   return StreamBuilder<QuerySnapshot>(
-                    stream: _ds.instituteRef
-                        .collection('researches')
-                        .where('subject', isEqualTo: _selectedSubject)
-                        .where('researchTopicId', isEqualTo: topicId)
-                        .snapshots(),
+                    stream: _ds.submissionsColl.snapshots(),
                     builder: (context, researchSnapshot) {
-                      final researchCount = researchSnapshot.hasData ? researchSnapshot.data!.docs.length : 0;
+                      int researchCount = 0;
+                      if (researchSnapshot.hasData) {
+                        researchCount = researchSnapshot.data!.docs.where((doc) {
+                          final d = doc.data() as Map<String, dynamic>;
+                          return d['researchTopicId'] == topicId;
+                        }).length;
+                      }
 
                       return Card(
                         margin: const EdgeInsets.only(bottom: 15),
@@ -534,7 +563,7 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
                                               ),
                                             ),
                                             if (remainingDays != null && remainingDays > 0) ...[
-                                              Text(
+                                              const Text(
                                                 ' • ',
                                                 style: TextStyle(color: Colors.grey),
                                               ),
@@ -572,9 +601,6 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
 
   Widget _buildMainContent(Color color, bool isDark) {
     bool isAr = _ds.isArabic;
-
-    // Handle "No Topic" section
-    final isNoTopicSection = _selectedTopicId == 'no_topic';
 
     return Column(
       children: [
@@ -1433,7 +1459,7 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
 
                     await _ds.createResearchTopic(
                       title: titleController.text.trim(),
-                      subject: _selectedSubject!,
+                      subject: _selectedSubject!.trim(),
                       deadline: selectedDeadline,
                     );
 
@@ -1463,13 +1489,6 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
                         ),
                       );
                     }
-                  }
-                }
-              },
-                        ),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
                   }
                 }
               },
@@ -1724,6 +1743,7 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
         });
       }
 
+      final count = _selectedResearchIds.length;
       await batch.commit();
 
       if (mounted) {
@@ -1736,8 +1756,8 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
           SnackBar(
             content: Text(
               isAr
-                  ? 'تم نقل ${_selectedResearchIds.length} بحث بنجاح'
-                  : '${_selectedResearchIds.length} research(es) moved successfully',
+                  ? 'تم نقل $count بحث بنجاح'
+                  : '$count research(es) moved successfully',
               style: GoogleFonts.cairo(),
             ),
             backgroundColor: Colors.green,

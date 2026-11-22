@@ -12,7 +12,7 @@ import 'Screens/unified_login_screen.dart';
 import 'Screens/student_home_screen.dart';
 import 'Screens/doctor_home_screen.dart';
 import 'Screens/admin_home_screen.dart';
-import 'Screens/research_upload_screen.dart';
+import 'Screens/send_research_screen.dart';
 import 'Screens/research_list_screen.dart';
 import 'Screens/student_results_screen.dart';
 import 'Screens/attendance_scan_screen.dart';
@@ -131,7 +131,7 @@ class UniversityApp extends StatelessWidget {
             '/manager/dashboard': (context) => const ManagerDashboard(),
             '/admin/password-management': (context) => const PasswordManagementScreen(),
             '/admin/bulk-upload': (context) => const BulkUploadResultsScreen(),
-            '/student/research-upload': (context) => const ResearchUploadScreen(),
+            '/student/research-upload': (context) => const SendResearchScreen(),
             '/student/research-list': (context) => const ResearchListScreen(),
             '/student/results': (context) => const StudentResultsScreen(),
             '/student/attendance-scan': (context) => const AttendanceScanScreen(),
