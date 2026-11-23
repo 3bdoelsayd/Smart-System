@@ -12,6 +12,10 @@ class DoctorHomeScreen extends StatelessWidget {
 
   void _showSubjectPicker(BuildContext context, String doctorId, List<String> teachingLevels, DataService ds) {
     bool isDark = ds.isDarkMode;
+    final doctorUid = ds.currentDoctor?['uid']?.toString() ?? '';
+    final doctorIdStr = ds.currentDoctor?['id']?.toString() ?? '';
+    final doctorCode = doctorIdStr.replaceAll('doc_', '').replaceAll('DOC_', '').trim();
+    final doctorSubjects = List<String>.from(ds.currentDoctor?['subjects'] ?? []).map((s) => s.trim().toLowerCase()).toList();
 
     showModalBottomSheet(
       context: context,
@@ -31,12 +35,37 @@ class DoctorHomeScreen extends StatelessWidget {
             Text(ds.translate('select_subject_forum'), style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 20),
             StreamBuilder<List<QuerySnapshot>>(
-              stream: Stream.fromFuture(Future.wait(
-                teachingLevels.map((lvlId) => ds.getInstituteCoursesColl(lvlId).where(ds.userRole == 'ta' ? 'ta_id' : 'doctor_id', isEqualTo: doctorId).get())
-              )),
+              stream: Stream.fromFuture(Future.wait([
+                ds.getInstituteCoursesColl('level_1').get(),
+                ds.getInstituteCoursesColl('level_2').get(),
+                ds.getInstituteCoursesColl('level_3').get(),
+                ds.getInstituteCoursesColl('level_4').get(),
+              ])),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-                final allDocs = snapshot.data?.expand((qs) => qs.docs).toList() ?? [];
+                
+                final allDocs = snapshot.data?.expand((qs) => qs.docs).where((doc) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  final docDoctorId = data['doctor_id']?.toString() ?? '';
+                  final docTaId = data['ta_id']?.toString() ?? '';
+                  final taIds = List<String>.from(data['ta_ids'] ?? []);
+                  final courseName = (data['name'] ?? '').toString().trim().toLowerCase();
+
+                  bool isMyDoc = docDoctorId.isNotEmpty && (
+                    docDoctorId == doctorUid || 
+                    docDoctorId == doctorIdStr || 
+                    docDoctorId == doctorCode ||
+                    docDoctorId == doctorId
+                  );
+
+                  bool isMyTa = (docTaId.isNotEmpty && (docTaId == doctorUid || docTaId == doctorIdStr || docTaId == doctorCode || docTaId == doctorId)) ||
+                                taIds.any((id) => id == doctorUid || id == doctorIdStr || id == doctorCode || id == doctorId);
+
+                  bool isMySubject = doctorSubjects.contains(courseName);
+
+                  return isMyDoc || isMyTa || isMySubject;
+                }).toList() ?? [];
+
                 if (allDocs.isEmpty) return Padding(padding: const EdgeInsets.all(20), child: Text(ds.translate('no_subjects_assigned')));
 
                 return Flexible(
@@ -180,15 +209,43 @@ class DoctorHomeScreen extends StatelessWidget {
                     child: Text(ds.translate('my_courses'), style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87)),
                   ),
                 ),
-                teachingLevels.isEmpty 
-                ? SliverToBoxAdapter(child: Center(child: Padding(padding: const EdgeInsets.all(40), child: Text(isAr ? "لم يتم إسناد فرق دراسية لك بعد" : "No levels assigned"))))
-                : StreamBuilder<List<QuerySnapshot>>(
-                  stream: Stream.fromFuture(Future.wait(
-                    teachingLevels.map((lvlId) => ds.getInstituteCoursesColl(lvlId).where(ds.userRole == 'ta' ? 'ta_id' : 'doctor_id', isEqualTo: doctorId).get())
-                  )),
+                StreamBuilder<List<QuerySnapshot>>(
+                  stream: Stream.fromFuture(Future.wait([
+                    ds.getInstituteCoursesColl('level_1').get(),
+                    ds.getInstituteCoursesColl('level_2').get(),
+                    ds.getInstituteCoursesColl('level_3').get(),
+                    ds.getInstituteCoursesColl('level_4').get(),
+                  ])),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) return const SliverToBoxAdapter(child: Center(child: CircularProgressIndicator()));
-                    final allDocs = snapshot.data?.expand((qs) => qs.docs).toList() ?? [];
+                    
+                    final doctorUid = ds.currentDoctor?['uid']?.toString() ?? '';
+                    final doctorIdStr = ds.currentDoctor?['id']?.toString() ?? '';
+                    final doctorCode = doctorIdStr.replaceAll('doc_', '').replaceAll('DOC_', '').trim();
+                    final doctorSubjects = List<String>.from(ds.currentDoctor?['subjects'] ?? []).map((s) => s.trim().toLowerCase()).toList();
+
+                    final allDocs = snapshot.data?.expand((qs) => qs.docs).where((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      final docDoctorIds = List<String>.from(data['doctor_ids'] ?? (data['doctor_id'] != null ? [data['doctor_id']] : []));
+                      final docTaId = data['ta_id']?.toString() ?? '';
+                      final taIds = List<String>.from(data['ta_ids'] ?? []);
+                      final courseName = (data['name'] ?? '').toString().trim().toLowerCase();
+
+                      bool isMyDoc = docDoctorIds.any((id) => id.toString().isNotEmpty && (
+                        id == doctorUid || 
+                        id == doctorIdStr || 
+                        id == doctorCode ||
+                        id == doctorId
+                      ));
+
+                      bool isMyTa = (docTaId.isNotEmpty && (docTaId == doctorUid || docTaId == doctorIdStr || docTaId == doctorCode || docTaId == doctorId)) ||
+                                    taIds.any((id) => id == doctorUid || id == doctorIdStr || id == doctorCode || id == doctorId);
+
+                      bool isMySubject = doctorSubjects.contains(courseName);
+
+                      return isMyDoc || isMyTa || isMySubject;
+                    }).toList() ?? [];
+
                     if (allDocs.isEmpty) return SliverToBoxAdapter(child: Center(child: Padding(padding: const EdgeInsets.all(40), child: Text(ds.translate('no_subjects_assigned')))));
 
                     return SliverList(
@@ -197,18 +254,18 @@ class DoctorHomeScreen extends StatelessWidget {
                           final doc = allDocs[index];
                           final data = doc.data() as Map<String, dynamic>;
                           final name = data['name']?.toString() ?? 'Unknown';
-                          final levelId = data['level_id']?.toString() ?? 'level_1';
+                          final levelId = data['level_id'] ?? doc.reference.parent.parent?.id ?? 'level_1';
                           return Container(
                             margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                             decoration: BoxDecoration(color: isDark ? const Color(0xFF1E1E1E) : Colors.white, borderRadius: BorderRadius.circular(15), boxShadow: [BoxShadow(color: Colors.black.withAlpha(5), blurRadius: 10)]),
                             child: ListTile(
                               leading: CircleAvatar(backgroundColor: const Color(0xFF673AB7).withAlpha(26), child: const Icon(Icons.book_rounded, color: Color(0xFF673AB7))),
                               title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                              subtitle: Text("${ds.translate('level')}: ${levelId.replaceAll('level_', '')}"),
+                              subtitle: Text("${ds.translate('level')}: ${levelId.toString().replaceAll('level_', '')}"),
                               trailing: IconButton(
                                 icon: const Icon(Icons.forum_rounded, color: Colors.cyan),
                                 onPressed: () {
-                                  Navigator.push(context, MaterialPageRoute(builder: (ctx) => DiscussionForumScreen(levelId: levelId, courseId: doc.id, courseName: name)));
+                                  Navigator.push(context, MaterialPageRoute(builder: (ctx) => DiscussionForumScreen(levelId: levelId.toString(), courseId: doc.id, courseName: name)));
                                 },
                               ),
                             ),

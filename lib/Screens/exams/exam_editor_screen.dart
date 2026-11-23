@@ -67,23 +67,35 @@ class _ExamEditorScreenState extends State<ExamEditorScreen> {
 
   Future<void> _loadDoctorCourses() async {
     setState(() => _isLoading = true);
-    final doctorId = _ds.currentDoctor?['uid'] ?? _ds.currentDoctor?['id'] ?? '';
-    final List<String> teachingLevels = List<String>.from(_ds.currentDoctor?['teachingLevels'] ?? ['level_1']);
+    final doctorUid = _ds.currentDoctor?['uid']?.toString() ?? '';
+    final doctorId = _ds.currentDoctor?['id']?.toString() ?? '';
+    final doctorCode = doctorId.replaceAll('doc_', '').replaceAll('DOC_', '').trim();
+    final doctorSubjects = List<String>.from(_ds.currentDoctor?['subjects'] ?? []).map((s) => s.trim().toLowerCase()).toList();
 
     final List<Map<String, dynamic>> courses = [];
 
-    for (var lvlId in teachingLevels) {
-      final snap = await _ds.getInstituteCoursesColl(lvlId)
-          .where(_ds.userRole == 'ta' ? 'ta_id' : 'doctor_id', isEqualTo: doctorId)
-          .get();
+    for (var lvlId in ['level_1', 'level_2', 'level_3', 'level_4']) {
+      final snap = await _ds.getInstituteCoursesColl(lvlId).get();
 
       for (var doc in snap.docs) {
         final data = doc.data() as Map<String, dynamic>;
-        courses.add({
-          'id': doc.id,
-          'name': data['name'] ?? 'Unknown',
-          'level_id': data['level_id'] ?? lvlId,
-        });
+        final docDoctorId = data['doctor_id']?.toString() ?? '';
+        final docTaId = data['ta_id']?.toString() ?? '';
+        final taIds = List<String>.from(data['ta_ids'] ?? []);
+        final courseName = (data['name'] ?? '').toString().trim().toLowerCase();
+
+        bool isMyDoc = docDoctorId.isNotEmpty && (docDoctorId == doctorUid || docDoctorId == doctorId || docDoctorId == doctorCode);
+        bool isMyTa = (docTaId.isNotEmpty && (docTaId == doctorUid || docTaId == doctorId || docTaId == doctorCode)) ||
+                      taIds.any((id) => id == doctorUid || id == doctorId || id == doctorCode);
+        bool isMySubject = doctorSubjects.contains(courseName);
+
+        if (isMyDoc || isMyTa || isMySubject) {
+          courses.add({
+            'id': doc.id,
+            'name': data['name'] ?? 'Unknown',
+            'level_id': data['level_id'] ?? lvlId,
+          });
+        }
       }
     }
 

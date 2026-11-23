@@ -238,11 +238,49 @@ class _AttendanceManagementScreenState extends State<AttendanceManagementScreen>
     );
   }
 
+  Widget _buildLevelsListView(List<QueryDocumentSnapshot> docs, Color color, bool isDark, bool isAr) {
+    return ListView.builder(
+      padding: const EdgeInsets.all(15),
+      itemCount: docs.length,
+      itemBuilder: (ctx, i) {
+        final data = docs[i].data() as Map<String, dynamic>;
+        final name = data['name'] ?? (isAr ? "الفرقة ${docs[i].id.replaceAll('level_', '')}" : "Level ${docs[i].id.replaceAll('level_', '')}");
+        final levelId = docs[i].id.replaceAll('level_', '');
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 15),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            borderRadius: BorderRadius.circular(25),
+            boxShadow: [BoxShadow(color: Colors.black.withAlpha(10), blurRadius: 15, offset: const Offset(0, 8))],
+          ),
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            leading: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: color.withAlpha(20), shape: BoxShape.circle),
+              child: Icon(Icons.school_rounded, color: color, size: 28),
+            ),
+            title: Text(name, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17, color: isDark ? Colors.white : Colors.black87)),
+            trailing: Icon(Icons.arrow_forward_ios_rounded, size: 18, color: color),
+            onTap: () => setState(() {
+              _selectedLevel = levelId;
+            }),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildLevelsList() {
     final isAr = _ds.isArabic;
     final isDark = _ds.isDarkMode;
     final color = isDark ? const Color(0xFF03DAC6) : const Color(0xFF673AB7);
-    final doctorLevels = List<String>.from(_ds.currentDoctor?['teachingLevels'] ?? []);
+    final doctorUid = _ds.currentDoctor?['uid']?.toString() ?? '';
+    final doctorId = _ds.currentDoctor?['id']?.toString() ?? '';
+    final doctorCode = doctorId.replaceAll('doc_', '').replaceAll('DOC_', '').trim();
+    final doctorSubjects = List<String>.from(_ds.currentDoctor?['subjects'] ?? []).map((s) => s.trim().toLowerCase()).toList();
+    final doctorLevels = List<String>.from(_ds.currentDoctor?['teachingLevels'] ?? []).map((l) => l.startsWith('level_') ? l : 'level_$l').toList();
     final bool isStaff = _ds.userRole == 'doctor' || _ds.userRole == 'ta';
 
     return StreamBuilder<QuerySnapshot>(
@@ -250,46 +288,70 @@ class _AttendanceManagementScreenState extends State<AttendanceManagementScreen>
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
         
-        var docs = snapshot.data?.docs ?? [];
-        if (isStaff) {
-          docs = docs.where((doc) => doctorLevels.contains(doc.id)).toList();
+        final allLevelDocs = snapshot.data?.docs ?? [];
+
+        if (!isStaff) {
+          allLevelDocs.sort((a, b) => a.id.compareTo(b.id));
+          return _buildLevelsListView(allLevelDocs, color, isDark, isAr);
         }
 
-        if (docs.isEmpty) {
-          return Center(child: Padding(padding: const EdgeInsets.all(40), child: Text(isAr ? "لا توجد فرق دراسية متاحة" : "No levels available")));
-        }
+        return StreamBuilder<List<QuerySnapshot>>(
+          stream: Stream.fromFuture(Future.wait([
+            _ds.getInstituteCoursesColl('level_1').get(),
+            _ds.getInstituteCoursesColl('level_2').get(),
+            _ds.getInstituteCoursesColl('level_3').get(),
+            _ds.getInstituteCoursesColl('level_4').get(),
+          ])),
+          builder: (context, courseSnapshot) {
+            if (courseSnapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-        docs.sort((a, b) => a.id.compareTo(b.id));
+            final Set<String> matchedLevelIds = {};
 
-        return ListView.builder(
-          padding: const EdgeInsets.all(15),
-          itemCount: docs.length,
-          itemBuilder: (ctx, i) {
-            final data = docs[i].data() as Map<String, dynamic>;
-            final name = data['name'] ?? (isAr ? "الفرقة ${docs[i].id.replaceAll('level_', '')}" : "Level ${docs[i].id.replaceAll('level_', '')}");
-            final levelId = docs[i].id.replaceAll('level_', '');
+            if (courseSnapshot.hasData) {
+              for (var qs in courseSnapshot.data!) {
+                for (var cDoc in qs.docs) {
+                  final data = cDoc.data() as Map<String, dynamic>;
+                  final docDoctorIds = List<String>.from(data['doctor_ids'] ?? (data['doctor_id'] != null ? [data['doctor_id']] : []));
+                  final docTaId = data['ta_id']?.toString() ?? '';
+                  final taIds = List<String>.from(data['ta_ids'] ?? []);
+                  final courseName = (data['name'] ?? '').toString().trim().toLowerCase();
+                  final levelId = (data['level_id'] ?? cDoc.reference.parent.parent?.id ?? '').toString();
 
-            return Container(
-              margin: const EdgeInsets.only(bottom: 15),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                borderRadius: BorderRadius.circular(25),
-                boxShadow: [BoxShadow(color: Colors.black.withAlpha(10), blurRadius: 15, offset: const Offset(0, 8))],
-              ),
-              child: ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                leading: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(color: color.withAlpha(20), shape: BoxShape.circle),
-                  child: Icon(Icons.school_rounded, color: color, size: 28),
-                ),
-                title: Text(name, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17, color: isDark ? Colors.white : Colors.black87)),
-                trailing: Icon(Icons.arrow_forward_ios_rounded, size: 18, color: color),
-                onTap: () => setState(() {
-                  _selectedLevel = levelId;
-                }),
-              ),
-            );
+                  bool isMyDoc = docDoctorIds.any((id) => id.toString().isNotEmpty && (
+                    id == doctorUid || 
+                    id == doctorId || 
+                    id == doctorCode
+                  ));
+
+                  bool isMyTa = (docTaId.isNotEmpty && (docTaId == doctorUid || docTaId == doctorId || docTaId == doctorCode)) ||
+                                taIds.any((id) => id == doctorUid || id == doctorId || id == doctorCode);
+
+                  bool isMySubject = doctorSubjects.contains(courseName);
+
+                  if (isMyDoc || isMyTa || isMySubject) {
+                    if (levelId.isNotEmpty) {
+                      matchedLevelIds.add(levelId.startsWith('level_') ? levelId : 'level_$levelId');
+                    }
+                  }
+                }
+              }
+            }
+
+            final filteredDocs = allLevelDocs.where((doc) {
+              bool inTeachingLevels = doctorLevels.contains(doc.id) || doctorLevels.contains(doc.id.replaceAll('level_', ''));
+              bool inMatchedCourses = matchedLevelIds.contains(doc.id);
+              return inTeachingLevels || inMatchedCourses || (doctorLevels.isEmpty && matchedLevelIds.isEmpty);
+            }).toList();
+
+            filteredDocs.sort((a, b) => a.id.compareTo(b.id));
+
+            if (filteredDocs.isEmpty) {
+              return Center(child: Padding(padding: const EdgeInsets.all(40), child: Text(isAr ? "لا توجد فرق دراسية متاحة" : "No levels available")));
+            }
+
+            return _buildLevelsListView(filteredDocs, color, isDark, isAr);
           },
         );
       },
@@ -300,23 +362,38 @@ class _AttendanceManagementScreenState extends State<AttendanceManagementScreen>
     final isAr = _ds.isArabic;
     final isDark = _ds.isDarkMode;
     final color = isDark ? const Color(0xFF03DAC6) : const Color(0xFF673AB7);
-    final doctorId = _ds.currentDoctor?['uid'] ?? '';
+    final doctorUid = _ds.currentDoctor?['uid']?.toString() ?? '';
+    final doctorId = _ds.currentDoctor?['id']?.toString() ?? '';
+    final doctorCode = doctorId.replaceAll('doc_', '').replaceAll('DOC_', '').trim();
+    final doctorSubjects = List<String>.from(_ds.currentDoctor?['subjects'] ?? []).map((s) => s.trim().toLowerCase()).toList();
     
     final levelDocId = 'level_$_selectedLevel';
 
-    Query query = _ds.getInstituteCoursesColl(levelDocId);
-    if (_ds.userRole == 'ta') {
-      query = query.where('ta_id', isEqualTo: doctorId);
-    } else if (_ds.userRole == 'doctor') {
-      query = query.where('doctor_id', isEqualTo: doctorId);
-    }
-
     return StreamBuilder<QuerySnapshot>(
-      stream: query.snapshots(),
+      stream: _ds.getInstituteCoursesColl(levelDocId).snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
         
-        final allDocs = snapshot.data?.docs ?? [];
+        final allDocs = (snapshot.data?.docs ?? []).where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          final docDoctorId = data['doctor_id']?.toString() ?? '';
+          final docTaId = data['ta_id']?.toString() ?? '';
+          final taIds = List<String>.from(data['ta_ids'] ?? []);
+          final courseName = (data['name'] ?? '').toString().trim().toLowerCase();
+
+          bool isMyDoc = docDoctorId.isNotEmpty && (
+            docDoctorId == doctorUid || 
+            docDoctorId == doctorId || 
+            docDoctorId == doctorCode
+          );
+
+          bool isMyTa = (docTaId.isNotEmpty && (docTaId == doctorUid || docTaId == doctorId || docTaId == doctorCode)) ||
+                        taIds.any((id) => id == doctorUid || id == doctorId || id == doctorCode);
+
+          bool isMySubject = doctorSubjects.contains(courseName);
+
+          return isMyDoc || isMyTa || isMySubject;
+        }).toList();
         
         if (allDocs.isEmpty) {
           return Center(child: Padding(padding: const EdgeInsets.all(40), child: Text(_ds.translate('no_subjects_assigned'))));

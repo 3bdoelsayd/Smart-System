@@ -736,43 +736,6 @@ void _showExcelOptions(BuildContext context, bool isDark, String type, VoidCallb
                   _autoUploadFourthYearGeneralStudents(context, ds);
                 },
               ),
-              const Divider(),
-              ListTile(
-                leading: const CircleAvatar(backgroundColor: Colors.red, child: Icon(Icons.delete_sweep_rounded, color: Colors.white)),
-                title: Text('حذف جميع الطلاب نهائياً 🗑️', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: Colors.red)),
-                subtitle: Text('مسح كل بيانات الطلاب من قاعدة البيانات لإضافة بيانات حقيقية', style: GoogleFonts.cairo(fontSize: 11)),
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  bool? confirm = await showDialog<bool>(
-                    context: context,
-                    builder: (dialogCtx) => AlertDialog(
-                      title: Text('تحذير خطير', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: Colors.red)),
-                      content: Text('هل أنت متأكد من حذف جميع الطلاب من قاعدة البيانات؟ لا يمكن التراجع عن هذا الإجراء.', style: GoogleFonts.cairo()),
-                      actions: [
-                        TextButton(onPressed: () => Navigator.pop(dialogCtx, false), child: Text('إلغاء')),
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                          onPressed: () => Navigator.pop(dialogCtx, true),
-                          child: Text('تأكيد الحذف', style: TextStyle(color: Colors.white)),
-                        ),
-                      ],
-                    ),
-                  );
-
-                  if (confirm == true) {
-                    try {
-                      await ds.deleteAllStudents();
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حذف جميع الطلاب نهائياً من فايربيس بنجاح 🗑️'), backgroundColor: Colors.green));
-                      }
-                    } catch (e) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل الحذف: $e'), backgroundColor: Colors.red));
-                      }
-                    }
-                  }
-                },
-              ),
             ],
             const SizedBox(height: 30),
           ],

@@ -17,7 +17,6 @@ import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:io' as io;
-import 'firestore_constants.dart';
 
 class DataService extends ChangeNotifier {
   static final DataService _instance = DataService._internal();
@@ -937,7 +936,18 @@ class DataService extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool get _isAuthorizedManagerOrAdmin {
+    return userRole == 'manager' || userRole == 'super_admin' || userRole == 'super_admin_plus' || userRole == 'admin';
+  }
+
   Future<void> deleteStudent(String uid, String level) async {
+    if (selectedInstituteId == null || selectedInstituteId!.isEmpty) {
+      throw isArabic ? "يجب اختيار الكلية أولاً" : "College must be selected first";
+    }
+    if (!_isAuthorizedManagerOrAdmin) {
+      throw isArabic ? "غير مصرح لك بحذف الطلاب" : "Unauthorized to delete students";
+    }
+
     try {
       final studentDoc = await studentsColl.doc(uid).get();
       final data = studentDoc.data() as Map<String, dynamic>?;
@@ -947,16 +957,17 @@ class DataService extends ChangeNotifier {
       await getInstituteStudentsColl('level_$level').doc(uid).delete();
 
       if (studentId != null) {
-        final attDocs = await attendanceColl.where('studentId', isEqualTo: studentId).get();
+        final attDocs = await attendanceColl.where('studentId', isEqualTo: studentId).where('instituteId', isEqualTo: selectedInstituteId).get();
         for (var d in attDocs.docs) { await d.reference.delete(); }
-        final subDocs = await submissionsColl.where('studentId', isEqualTo: studentId).get();
+        final subDocs = await submissionsColl.where('studentId', isEqualTo: studentId).where('instituteId', isEqualTo: selectedInstituteId).get();
         for (var d in subDocs.docs) { await d.reference.delete(); }
-        final resDocs = await examResultsColl.where('studentId', isEqualTo: studentId).get();
+        final resDocs = await examResultsColl.where('studentId', isEqualTo: studentId).where('instituteId', isEqualTo: selectedInstituteId).get();
         for (var d in resDocs.docs) { await d.reference.delete(); }
       }
       notifyListeners();
     } catch (e) {
       debugPrint("Comprehensive delete error: $e");
+      rethrow;
     }
   }
 
@@ -1001,50 +1012,23 @@ class DataService extends ChangeNotifier {
     }
   }
 
-  Future<void> deleteAllStudents() async {
-    try {
-      var groupSnap = await _firestore.collectionGroup('students').get();
-      var batch = _firestore.batch();
-      int count = 0;
-      for (var doc in groupSnap.docs) {
-        batch.delete(doc.reference);
-        count++;
-        if (count % 400 == 0) {
-          await batch.commit();
-          batch = _firestore.batch();
-        }
-      }
-      await batch.commit();
-
-      var colleges = await _firestore.collection('colleges').get();
-      for (var colDoc in colleges.docs) {
-        var rootSnap = await colDoc.reference.collection('students').get();
-        var b2 = _firestore.batch();
-        for (var rd in rootSnap.docs) {
-          b2.delete(rd.reference);
-        }
-        await b2.commit();
-
-        var levels = await colDoc.reference.collection('levels').get();
-        for (var lvl in levels.docs) {
-          var lvlSnap = await lvl.reference.collection('students').get();
-          var b3 = _firestore.batch();
-          for (var ld in lvlSnap.docs) {
-            b3.delete(ld.reference);
-          }
-          await b3.commit();
-        }
-      }
-      notifyListeners();
-    } catch (e) {
-      debugPrint("Delete all students error: $e");
-      rethrow;
-    }
+  Future<void> deleteDoctor(String uid) async {
+    if (selectedInstituteId == null || selectedInstituteId!.isEmpty) throw "College not selected";
+    await instituteDoctorsColl.doc(uid).delete();
+    notifyListeners();
   }
 
-  Future<void> deleteDoctor(String uid) async { await instituteDoctorsColl.doc(uid).delete(); notifyListeners(); }
-  Future<void> deleteTA(String uid) async { await instituteTasColl.doc(uid).delete(); notifyListeners(); }
-  Future<void> deleteManager(String uid) async { await instituteManagersColl.doc(uid).delete(); notifyListeners(); }
+  Future<void> deleteTA(String uid) async {
+    if (selectedInstituteId == null || selectedInstituteId!.isEmpty) throw "College not selected";
+    await instituteTasColl.doc(uid).delete();
+    notifyListeners();
+  }
+
+  Future<void> deleteManager(String uid) async {
+    if (selectedInstituteId == null || selectedInstituteId!.isEmpty) throw "College not selected";
+    await instituteManagersColl.doc(uid).delete();
+    notifyListeners();
+  }
 
   Future<void> updateDoctorByAdmin(String docId, {required String name, String? email}) async {
     Map<String, dynamic> data = {'name': name};
@@ -1061,9 +1045,24 @@ class DataService extends ChangeNotifier {
   }
 
   Future<void> clearAllNotifications(String type) async {
-    var snap = await notificationsColl.where('targetType', isEqualTo: type).get();
-    for (var d in snap.docs) { await d.reference.delete(); }
-    notifyListeners();
+    if (selectedInstituteId == null || selectedInstituteId!.isEmpty) {
+      throw isArabic ? "يجب اختيار الكلية أولاً" : "College must be selected first";
+    }
+    if (!_isAuthorizedManagerOrAdmin) {
+      throw isArabic ? "غير مصرح لك بمسح الإشعارات" : "Unauthorized";
+    }
+
+    try {
+      var snap = await notificationsColl
+          .where('targetType', isEqualTo: type)
+          .where('instituteId', isEqualTo: selectedInstituteId)
+          .get();
+      for (var d in snap.docs) { await d.reference.delete(); }
+      notifyListeners();
+    } catch (e) {
+      debugPrint("Clear notifications error: $e");
+      rethrow;
+    }
   }
 
   Future<void> addSemester(String id, String name, int order) async { await instituteSemestersColl.doc(id).set({'id': id, 'name': name, 'order': order, 'isActive': false, 'createdAt': FieldValue.serverTimestamp()}); notifyListeners(); }
@@ -1826,52 +1825,9 @@ class DataService extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     isArabic = prefs.getBool('persist_v3_arabic') ?? true;
     isDarkMode = prefs.getBool('persist_v3_dark') ?? false;
-
-    // ⚠️ DISABLED: This code deleted production data!
-    // Auto-purge was running on every app start and deleting 'commerce' college from Firestore
-    // try {
-    //   _deleteCommerceCollegePermanently();
-    // } catch (_) {}
-
     notifyListeners();
   }
 
-  Future<void> _deleteCommerceCollegePermanently() async {
-    try {
-      var collegeRef = _firestore.collection(FirestoreConstants.collegesCollection)
-          .doc(FirestoreConstants.dummyCommerceId);
-      var docSnap = await collegeRef.get();
-      if (!docSnap.exists) return;
-
-      var subcollections = ['levels', 'students', 'doctors', 'tas', 'super_admins', 'managers', 'courses', 'exams', 'notifications', 'private_chats', 'reports'];
-      for (var sub in subcollections) {
-        try {
-          var snap = await collegeRef.collection(sub).get();
-          for (var doc in snap.docs) {
-            if (sub == 'levels') {
-              try {
-                var levelsStudents = await doc.reference.collection('students').get();
-                for (var sDoc in levelsStudents.docs) {
-                  await sDoc.reference.delete();
-                }
-              } catch (_) {}
-              try {
-                var coursesSnap = await doc.reference.collection('courses').get();
-                for (var cDoc in coursesSnap.docs) {
-                  await cDoc.reference.delete();
-                }
-              } catch (_) {}
-            }
-            await doc.reference.delete();
-          }
-        } catch (_) {}
-      }
-      await collegeRef.delete();
-      debugPrint("🔥 Successfully purged and deleted dummy college from Firestore.");
-    } catch (e) {
-      debugPrint("Purge commerce error: $e");
-    }
-  }
   Future<void> toggleLanguage(bool v) async { isArabic = v; final prefs = await SharedPreferences.getInstance(); await prefs.setBool('persist_v3_arabic', v); notifyListeners(); }
 
   Future<void> toggleDarkMode(bool v) async {

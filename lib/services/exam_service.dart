@@ -106,11 +106,19 @@ class ExamService {
 
   // Stream of exams for Doctor / TA
   Stream<List<ExamModel>> getExamsStreamForDoctor(String doctorUid) {
-    return _examsColl
-        .where('createdByUid', isEqualTo: doctorUid)
-        .snapshots()
-        .map((snap) {
-      final exams = snap.docs.map((doc) => ExamModel.fromFirestore(doc)).toList();
+    final String doctorId = _ds.currentDoctor?['id']?.toString() ?? '';
+    final String doctorCode = doctorId.replaceAll('doc_', '').replaceAll('DOC_', '').trim();
+
+    return _examsColl.snapshots().map((snap) {
+      final exams = snap.docs
+          .map((doc) => ExamModel.fromFirestore(doc))
+          .where((exam) => 
+            exam.createdByUid == doctorUid || 
+            exam.createdByUid == doctorId ||
+            exam.createdByUid == doctorCode ||
+            (doctorUid.isNotEmpty && exam.createdByUid.contains(doctorUid))
+          )
+          .toList();
       exams.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       return exams;
     });

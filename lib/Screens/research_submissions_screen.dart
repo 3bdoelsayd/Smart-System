@@ -196,21 +196,18 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
   }
 
   Widget _buildSubjectSelection(Color color, bool isDark) {
-    final doctorUid = _ds.currentDoctor?['uid'] ?? '';
-    final doctorId = _ds.currentDoctor?['id'] ?? '';
-    final doctorSubjects = List<String>.from(_ds.currentDoctor?['subjects'] ?? []);
-    final teachingLevels = List<String>.from(_ds.currentDoctor?['teachingLevels'] ?? ['level_1', 'level_2', 'level_3', 'level_4']);
-
-    if (teachingLevels.isEmpty) {
-      return Center(child: Padding(padding: const EdgeInsets.all(40), child: Text(_ds.isArabic ? "لم يتم إسناد فرق دراسية لك بعد" : "No levels assigned", style: GoogleFonts.cairo())));
-    }
+    final doctorUid = _ds.currentDoctor?['uid']?.toString() ?? '';
+    final doctorId = _ds.currentDoctor?['id']?.toString() ?? '';
+    final doctorCode = doctorId.replaceAll('doc_', '').replaceAll('DOC_', '').trim();
+    final doctorSubjects = List<String>.from(_ds.currentDoctor?['subjects'] ?? []).map((s) => s.trim().toLowerCase()).toList();
 
     return StreamBuilder<List<QuerySnapshot>>(
-      stream: Stream.fromFuture(Future.wait(
-        teachingLevels.map((lvlId) => 
-          _ds.getInstituteCoursesColl(lvlId.startsWith('level_') ? lvlId : 'level_$lvlId').get()
-        )
-      )),
+      stream: Stream.fromFuture(Future.wait([
+        _ds.getInstituteCoursesColl('level_1').get(),
+        _ds.getInstituteCoursesColl('level_2').get(),
+        _ds.getInstituteCoursesColl('level_3').get(),
+        _ds.getInstituteCoursesColl('level_4').get(),
+      ])),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
         
@@ -218,11 +215,19 @@ class _ResearchSubmissionsScreenState extends State<ResearchSubmissionsScreen> {
           final d = doc.data() as Map<String, dynamic>;
           final docDoctorId = d['doctor_id']?.toString() ?? '';
           final docTaId = d['ta_id']?.toString() ?? '';
-          final docName = d['name']?.toString().trim() ?? '';
+          final taIds = List<String>.from(d['ta_ids'] ?? []);
+          final docName = (d['name'] ?? '').toString().trim().toLowerCase();
           
-          bool isMyDoctorId = (docDoctorId.isNotEmpty && (docDoctorId == doctorUid || docDoctorId == doctorId));
-          bool isMyTaId = (docTaId.isNotEmpty && (docTaId == doctorUid || docTaId == doctorId));
-          bool isMySubject = doctorSubjects.any((s) => s.trim().toLowerCase() == docName.toLowerCase());
+          bool isMyDoctorId = docDoctorId.isNotEmpty && (
+            docDoctorId == doctorUid || 
+            docDoctorId == doctorId || 
+            docDoctorId == doctorCode
+          );
+
+          bool isMyTaId = (docTaId.isNotEmpty && (docTaId == doctorUid || docTaId == doctorId || docTaId == doctorCode)) ||
+                          taIds.any((id) => id == doctorUid || id == doctorId || id == doctorCode);
+
+          bool isMySubject = doctorSubjects.contains(docName);
           
           return isMyDoctorId || isMyTaId || isMySubject;
         }).toList() ?? [];
